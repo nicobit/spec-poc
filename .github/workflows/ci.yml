@@ -14,6 +14,8 @@ on:
 permissions:
   contents: read
   packages: write
+  pages: write
+  id-token: write
 
 jobs:
   lint:
@@ -74,10 +76,11 @@ jobs:
         run: pip install -r backend/requirements.txt
       - name: Install test tools
         run: pip install pytest pytest-cov junit-xml
-      - name: Run backend tests (pytest -> JUnit + coverage)
+      - name: Run backend tests (pytest -> JUnit + coverage + HTML)
         run: |
           mkdir -p reports
-          pytest tests/backend --junitxml=reports/junit.xml --cov=backend --cov-report=xml:reports/coverage.xml
+          pytest tests/backend --junitxml=reports/junit.xml --cov=backend \
+            --cov-report=xml:reports/coverage.xml --cov-report=html:reports/coverage-html
       - name: Upload backend reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -102,11 +105,12 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Install frontend dependencies
         run: npm ci
-      - name: Run frontend tests (Vitest -> JUnit + coverage)
+      - name: Run frontend tests and generate coverage (c8 -> lcov + json + html)
         run: |
           mkdir -p reports
-          # write junit.xml to reports/ via vitest-junit (installed by npm ci)
-          npm run test:ci
+          npm ci
+          # run tests under c8 to produce lcov, json and HTML coverage
+          npm run coverage:ci
       - name: Build frontend
         run: npm run build
       - name: Upload frontend reports
@@ -114,7 +118,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: frontend-reports
-          path: reports/**, coverage/**
+          path: reports/**, coverage/**, coverage/lcov.info, coverage/index.html
       # NOTE: PR summary step removed due to reporter input error; re-add with a compatible reporter or a github-script summary
 
   backend-asgi-image:
@@ -166,3 +170,36 @@ jobs:
         uses: codecov/codecov-action@v4
         with:
           files: backend-reports/reports/coverage.xml, frontend-reports/coverage/lcov.info
+
+  publish-coverage-pages:
+    runs-on: ubuntu-latest
+    needs: [report]
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - name: Download backend reports
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-reports
+        continue-on-error: true
+      - name: Download frontend reports
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-reports
+        continue-on-error: true
+      - name: Prepare coverage site
+        run: |
+          rm -rf coverage-site || true
+          mkdir -p coverage-site
+          if [ -d "reports/coverage-html" ]; then mkdir -p coverage-site/backend && cp -r reports/coverage-html/* coverage-site/backend/ || true; fi
+          if [ -d "coverage" ]; then mkdir -p coverage-site/frontend && cp -r coverage/* coverage-site/frontend/ || true; fi
+          # also copy vitest reports if present
+          if [ -d "reports" ]; then cp -r reports coverage-site/reports || true; fi
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: coverage-site
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v1
