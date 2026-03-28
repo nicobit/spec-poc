@@ -12,6 +12,13 @@ backend/.python_packages/
 .pytest_cache/
 __blobstorage__/
 __queuestorage__/
+__azurite_db_blob__
+__azurite_db_blob__~
+__azurite_db_blob_extent__
+__azurite_db_blob_extent__~
+__azurite_db_queue__
+__azurite_db_queue_extent__
+__azurite_db_table__
 .coverage
 coverage/
 .DS_Store
