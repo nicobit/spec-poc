@@ -29,3 +29,10 @@ backend/local.settings.*.json
 !.github/
 !.claude/
 !.codex/
+
+# Playwright / test artifacts
+playwright-report/
+test-results/
+.playwright/
+tmp-screenshots/
+frontend/tmp-screenshots/
