@@ -6,7 +6,7 @@
         "dev": "vite",
         "lint": "eslint src --ext .ts,.tsx",
         "test": "vitest run",
-            "test:ci": "mkdir -p reports && vitest run --coverage --reporter=json > reports/vitest-report.json",
+            "test:ci": "mkdir -p reports && vitest run --reporter=json > reports/vitest-report.json",
         "test:watch": "vitest",
         "typecheck": "tsc --noEmit",
         "build": "vite build",
