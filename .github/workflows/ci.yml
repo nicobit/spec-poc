@@ -98,10 +98,9 @@ jobs:
         run: npm ci
       - name: Run frontend tests (Vitest -> JUnit + coverage)
         run: |
-          mkdir -p frontend/reports
-          npx vitest run --reporter=dot --coverage --coverageProvider=v8 || npx vitest run --coverage
-          # attempt to produce a junit.xml if vitest junit reporter is configured
-          # many repos use vitest-junit or similar; if present it will write to frontend/reports/
+          mkdir -p reports
+          # write junit.xml to reports/ via vitest-junit (installed by npm ci)
+          VITEST_JUNIT_OUTPUT=reports/junit.xml npm run test:ci
       - name: Build frontend
         run: npm run build
       - name: Upload frontend reports
@@ -109,7 +108,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: frontend-reports
-          path: frontend/reports/**, frontend/coverage/**
+          path: reports/**, coverage/**
       # NOTE: PR summary step removed due to reporter input error; re-add with a compatible reporter or a github-script summary
 
   backend-asgi-image:
@@ -156,4 +155,4 @@ jobs:
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: reports/coverage.xml, frontend/coverage/lcov.info
+          files: backend-reports/reports/coverage.xml, frontend-reports/coverage/lcov.info
