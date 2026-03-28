@@ -1,12 +1,14 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { EnvironmentStage } from '../api';
-import { themeClasses } from '@/theme/themeClasses';
+import React from 'react';
+import { GripVertical, Layers, Plus, Trash2 } from 'lucide-react';
 import { enqueueSnackbar } from 'notistack';
-import { useLocation, useNavigate } from 'react-router-dom';
+
+import { themeClasses } from '@/theme/themeClasses';
+
+import type { EnvironmentStage } from '../api';
 
 type Props = {
   stages: EnvironmentStage[];
-  onChange: (s: EnvironmentStage[]) => void;
+  onChange: (stages: EnvironmentStage[]) => void;
 };
 
 function newStage(): EnvironmentStage {
@@ -20,227 +22,146 @@ function newStage(): EnvironmentStage {
   } as EnvironmentStage;
 }
 
-export default function StageEditor({ stages, onChange }: Props) {
-  const [active, setActive] = React.useState(0);
-  const [editIndex, setEditIndex] = useState<number | null>(null);
-  const [editName, setEditName] = useState('');
-  const nameRef = useRef<HTMLInputElement | null>(null);
-  const tabsRef = useRef<HTMLDivElement | null>(null);
-  const navigate = useNavigate();
-  const location = useLocation();
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return <label className="block text-sm font-medium text-[var(--text-primary)]">{children}</label>;
+}
 
-  const updateStage = (idx: number, patch: Partial<EnvironmentStage>) => {
-    const next = stages.map((s, i) => (i === idx ? { ...s, ...patch } : s));
-    onChange(next);
+function StageSummary({ stage }: { stage: EnvironmentStage }) {
+  const resourceCount = stage.resourceActions?.length || 0;
+
+  return (
+    <div className="mt-3 flex flex-wrap gap-2">
+      <span className="rounded-full bg-[var(--surface-panel-muted)] px-2.5 py-1 text-xs text-[var(--text-secondary)]">
+        {resourceCount} resource action{resourceCount === 1 ? '' : 's'}
+      </span>
+      <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+        {stage.status}
+      </span>
+    </div>
+  );
+}
+
+export default function StageEditor({ stages, onChange }: Props) {
+  const updateStage = (index: number, patch: Partial<EnvironmentStage>) => {
+    onChange(stages.map((stage, stageIndex) => (stageIndex === index ? { ...stage, ...patch } : stage)));
   };
 
   const addStage = () => {
-    const next = [...stages, newStage()];
-    onChange(next);
-    const idx = next.length - 1;
-    setActive(idx);
-    // focus will occur after render via effect
-    // update URL
-    try { const params = new URLSearchParams(location.search); params.set('stage', next[idx].id); navigate({ search: params.toString() }, { replace: true }); } catch (e) {}
+    onChange([...stages, newStage()]);
   };
 
-  const removeStage = (idx: number) => {
-    const removed = stages[idx];
-    const next = stages.filter((_, i) => i !== idx);
+  const removeStage = (index: number) => {
+    const removed = stages[index];
+    const next = stages.filter((_, stageIndex) => stageIndex !== index);
     onChange(next);
-    if (active >= next.length) setActive(Math.max(0, next.length - 1));
-    // show undo snackbar
+
     enqueueSnackbar('Stage removed', {
       variant: 'info',
-      action: (key) => (
-        // @ts-ignore - notistack action signature
-        <button className="ui-button-secondary px-2 py-1 text-sm" onClick={() => {
-          // restore
-          const restored = [...next.slice(0, idx), removed, ...next.slice(idx)];
-          onChange(restored);
-          setActive(idx);
-          // close snackbar
-        }}>Undo</button>
+      action: () => (
+        <button
+          className="ui-button-secondary rounded px-2 py-1 text-sm"
+          onClick={() => {
+            const restored = [...next.slice(0, index), removed, ...next.slice(index)];
+            onChange(restored);
+          }}
+        >
+          Undo
+        </button>
       ),
       autoHideDuration: 6000,
     });
   };
 
-  // drag-and-drop reordering using native HTML5 API
-  const onDragStart = (e: React.DragEvent, idx: number) => {
-    try {
-      e.dataTransfer.setData('text/plain', String(idx));
-      e.dataTransfer.effectAllowed = 'move';
-    } catch (err) {}
-  };
-
-  const onDropTab = (e: React.DragEvent, toIdx: number) => {
-    e.preventDefault();
-    try {
-      const from = Number(e.dataTransfer.getData('text/plain'));
-      if (isNaN(from)) return;
-      if (from === toIdx) return;
-      const copy = [...stages];
-      const [item] = copy.splice(from, 1);
-      copy.splice(toIdx, 0, item);
-      onChange(copy);
-      setActive(toIdx);
-    } catch (err) {}
-  };
-
-  // key/value editor helpers
-  const toEntries = (obj: Record<string, any> | undefined) => {
-    if (!obj) return [] as { k: string; v: string }[];
-    return Object.entries(obj).map(([k, v]) => ({ k, v: typeof v === 'string' ? v : JSON.stringify(v) }));
-  };
-
-  const fromEntries = (entries: { k: string; v: string }[]) => {
-    const out: Record<string, any> = {};
-    for (const e of entries) {
-      const key = (e.k || '').trim();
-      if (!key) continue;
-      const val = e.v || '';
-      // try to parse JSON values, otherwise use string
-      try {
-        out[key] = JSON.parse(val);
-      } catch (_err) {
-        out[key] = val;
-      }
-    }
-    return out;
-  };
-
-  const onAzureConfigChange = (idx: number, entries: { k: string; v: string }[]) => {
-    const parsed = fromEntries(entries);
-    updateStage(idx, { azureConfig: parsed });
-  };
-
-  // sync active stage from URL if provided
-  useEffect(() => {
-    try {
-      const params = new URLSearchParams(location.search);
-      const sid = params.get('stage');
-      if (sid) {
-        const idx = stages.findIndex((s) => s.id === sid);
-        if (idx >= 0) setActive(idx);
-      }
-    } catch (e) {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    // update URL when active changes
-    try {
-      const params = new URLSearchParams(location.search);
-      const sid = stages[active]?.id;
-      if (sid) params.set('stage', sid); else params.delete('stage');
-      navigate({ search: params.toString() }, { replace: true });
-    } catch (e) {}
-    // focus input when active changes
-    setTimeout(() => {
-      nameRef.current?.focus();
-      nameRef.current?.select();
-      // ensure tab visible
-      const tabBtn = tabsRef.current?.querySelectorAll('button')[active] as HTMLElement | undefined;
-      tabBtn?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-    }, 50);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active]);
-
-  const activeStage = stages[active];
-
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-medium">Stages</h3>
-        <div className="flex items-center gap-2">
-          <button className={`${themeClasses.buttonSecondary} text-sm px-2 py-1`} onClick={addStage}>Add stage</button>
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="text-xs uppercase tracking-[0.18em] ui-text-muted">Stages</div>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
+            Define one or more stages, then add the Azure resources needed for each stage workflow.
+          </p>
         </div>
+        <button
+          className={`${themeClasses.buttonPrimary} inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm`}
+          onClick={addStage}
+        >
+          <Plus className="h-4 w-4" />
+          Add stage
+        </button>
       </div>
 
-      <div>
-        <div>
-          <div role="tablist" aria-label="Stages" className="hidden sm:flex flex-wrap gap-2 mb-3" ref={tabsRef}>
-            {stages.map((s, idx) => {
-              const hasError = !(s.name && s.name.trim());
-              return (
-                <button
-                  key={s.id}
-                  role="tab"
-                  draggable
-                  aria-selected={active === idx}
-                  tabIndex={active === idx ? 0 : -1}
-                  onClick={() => { setActive(idx); setEditIndex(null); }}
-                  onDoubleClick={() => { setEditIndex(idx); setEditName(s.name || ''); }}
-                  onDragStart={(e) => onDragStart(e, idx)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => onDropTab(e, idx)}
-                  className={`${active === idx ? 'bg-[var(--surface-panel)] text-[var(--text-primary)] border border-[var(--accent)] shadow-sm ring-1 ring-[var(--accent)]' : 'bg-transparent text-[var(--text-muted)] hover:bg-[var(--surface-hover)]'} px-3 py-1 rounded text-sm flex items-center gap-2 cursor-grab`}
-                >
-                  {editIndex === idx ? (
-                    <input
-                      ref={nameRef}
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      onBlur={() => { if (editIndex !== null) { updateStage(editIndex, { name: editName }); setEditIndex(null); } }}
-                      onKeyDown={(e) => { if (e.key === 'Enter' && editIndex !== null) { updateStage(editIndex, { name: editName }); setEditIndex(null); } }}
-                      className={`${themeClasses.field} text-sm px-2 py-0.5`}
-                    />
-                  ) : (
-                    <span>{s.name || 'New stage'}</span>
-                  )}
-                  {hasError ? <span className="text-xs text-red-400">•</span> : null}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* small screen: use select */}
-          <div className="sm:hidden mb-3">
-            <label className="sr-only">Select stage</label>
-            <select value={stages[active]?.id || ''} className={`${themeClasses.select} w-full`} onChange={(e) => {
-              const idx = stages.findIndex((s) => s.id === e.target.value);
-              if (idx >= 0) setActive(idx);
-            }}>
-              {stages.map((s) => <option key={s.id} value={s.id}>{s.name || 'New stage'}</option>)}
-            </select>
-          </div>
+      {stages.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] px-5 py-10 text-center">
+          <div className="text-base font-medium text-[var(--text-primary)]">No stages yet</div>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
+            Add a stage to start defining the resources and actions for this environment.
+          </p>
         </div>
+      ) : (
+        <div className="space-y-4">
+          {stages.map((stage, index) => (
+            <article key={stage.id} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] ui-text-muted">
+                    <GripVertical className="h-4 w-4" />
+                    Stage {index + 1}
+                  </div>
+                  <StageSummary stage={stage} />
+                </div>
+                <button
+                  aria-label="Remove stage"
+                  className={`${themeClasses.buttonSecondary} inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm`}
+                  onClick={() => removeStage(index)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Remove
+                </button>
+              </div>
 
-        {activeStage ? (
-          <div className="ui-panel p-3 rounded">
-                <div className="flex items-start gap-3">
-              <div className="flex-1">
-                <label className="block text-sm font-medium">Stage name</label>
-                <input ref={nameRef} aria-label="Stage name" className={`${themeClasses.field} mt-1 w-full`} value={activeStage.name} onChange={(e) => updateStage(active, { name: e.target.value })} />
-                <label className="block text-sm font-medium mt-3">Resources</label>
+              <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)]">
+                <div>
+                  <FieldLabel>Stage name</FieldLabel>
+                  <input
+                    aria-label="Stage name"
+                    className={`${themeClasses.field} mt-1 w-full rounded-lg px-3 py-2 text-sm`}
+                    value={stage.name}
+                    onChange={(event) => updateStage(index, { name: event.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-5">
+                <div className="mb-3 flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-[var(--text-secondary)]" />
+                  <div className="text-sm font-medium text-[var(--text-primary)]">Resources</div>
+                </div>
                 <ResourceActionsEditor
-                  envIndex={active}
-                  actions={activeStage.resourceActions || []}
-                  onChangeActions={(actions) => updateStage(active, { resourceActions: actions })}
+                  actions={stage.resourceActions || []}
+                  onChangeActions={(actions) => updateStage(index, { resourceActions: actions })}
                 />
               </div>
-              <div className="shrink-0 flex flex-col gap-2">
-                <button aria-label="Remove stage" className={`${themeClasses.buttonSecondary} px-2 py-1 text-sm`} onClick={() => removeStage(active)}>Remove</button>
-                <div className="text-xs ui-text-muted mt-1">Drag tabs to reorder</div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="rounded-lg border border-dashed border-[var(--border-subtle)] px-4 py-8 text-sm ui-text-muted">No stages defined.</div>
-        )}
-      </div>
+            </article>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function ResourceActionsEditor({ envIndex, actions, onChangeActions }: { envIndex: number; actions: any[]; onChangeActions: (a: any[]) => void }) {
-  const [local, setLocal] = useState(actions && actions.length ? actions : [] as any[]);
+function ResourceActionsEditor({
+  actions,
+  onChangeActions,
+}: {
+  actions: any[];
+  onChangeActions: (actions: any[]) => void;
+}) {
+  const [local, setLocal] = React.useState(actions && actions.length ? actions : []);
 
-  useEffect(() => setLocal(actions && actions.length ? actions : []), [actions]);
+  React.useEffect(() => setLocal(actions && actions.length ? actions : []), [actions]);
 
-  const update = (i: number, patch: Partial<any>) => {
-    const next = local.map((it, idx) => (idx === i ? { ...it, ...patch } : it));
+  const update = (index: number, patch: Partial<any>) => {
+    const next = local.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item));
     setLocal(next);
     onChangeActions(next);
   };
@@ -251,54 +172,142 @@ function ResourceActionsEditor({ envIndex, actions, onChangeActions }: { envInde
     onChangeActions(next);
   };
 
-  const remove = (i: number) => {
-    const next = local.filter((_, idx) => idx !== i);
+  const remove = (index: number) => {
+    const next = local.filter((_, itemIndex) => itemIndex !== index);
     setLocal(next);
     onChangeActions(next);
   };
 
   return (
-    <div className="space-y-2">
-      {local.map((it, i) => (
-        <div key={`${it.type}-${i}`} className="ui-panel p-2 rounded">
-          <div className="flex gap-2 items-start">
-            <div className="flex-1">
-              <label className="block text-sm font-medium">Resource type</label>
-              <select aria-label="Resource type" className={`${themeClasses.field} mt-1 w-full`} value={it.type} onChange={(e) => update(i, { type: e.target.value })}>
+    <div className="space-y-3">
+      {local.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] px-4 py-6 text-sm text-[var(--text-secondary)]">
+          No resources yet. Add the Azure resource actions required for this stage.
+        </div>
+      ) : null}
+
+      {local.map((item, index) => (
+        <section key={`${item.type}-${index}`} className="ui-panel-muted rounded-2xl p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="text-xs uppercase tracking-[0.18em] ui-text-muted">Resource {index + 1}</div>
+              <div className="mt-1 text-sm text-[var(--text-secondary)]">Choose the resource type and complete the fields required for that integration.</div>
+            </div>
+            <button
+              aria-label="Remove resource"
+              className={`${themeClasses.buttonSecondary} rounded-lg px-3 py-1.5 text-sm`}
+              onClick={() => remove(index)}
+            >
+              Remove
+            </button>
+          </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <div className="lg:col-span-2">
+              <FieldLabel>Resource type</FieldLabel>
+              <select
+                aria-label="Resource type"
+                className={`${themeClasses.field} mt-1 w-full rounded-lg px-3 py-2 text-sm`}
+                value={item.type}
+                onChange={(event) => update(index, { type: event.target.value })}
+              >
                 <option value="sql-vm">SQL VM</option>
                 <option value="sql-managed-instance">SQL Managed Instance</option>
                 <option value="synapse-sql-pool">Synapse SQL Pool</option>
-                <option value="service-bus-message">Service Bus (queue/topic)</option>
+                <option value="service-bus-message">Service Bus message</option>
               </select>
+            </div>
 
-              {it.type === 'service-bus-message' ? (
-                <>
-                  <label className="block text-sm font-medium mt-2">Service Bus namespace</label>
-                  <input aria-label="Service Bus namespace" className={`${themeClasses.field} mt-1 w-full`} value={it.namespace || ''} onChange={(e) => update(i, { namespace: e.target.value })} />
-                  <label className="block text-sm font-medium mt-2">Entity type</label>
-                  <select aria-label="Service Bus entity type" className={`${themeClasses.field} mt-1 w-full`} value={it.queueOrTopic === 'topic' ? 'topic' : 'queue'} onChange={(e) => update(i, { queueOrTopic: e.target.value })}>
-                    <option value="queue">Queue</option>
-                    <option value="topic">Topic</option>
-                  </select>
-                  <label className="block text-sm font-medium mt-2">Entity name</label>
-                  <input aria-label="Service Bus entity name" className={`${themeClasses.field} mt-1 w-full`} value={it.queueOrTopicName || it.queueName || it.topicName || ''} onChange={(e) => update(i, { queueOrTopicName: e.target.value })} />
-                </>
-              ) : (
-                <>
-                  <label className="block text-sm font-medium mt-2">Resource id</label>
-                  <input aria-label="Resource id" className={`${themeClasses.field} mt-1 w-full font-mono`} value={it.id || ''} onChange={(e) => update(i, { id: e.target.value })} />
-                </>
-              )}
-            </div>
-            <div className="shrink-0 flex flex-col gap-2">
-              <button aria-label="Remove resource" className={`${themeClasses.buttonSecondary} px-2 py-1 text-sm`} onClick={() => remove(i)}>Remove</button>
-            </div>
+            {item.type === 'sql-vm' ? (
+              <>
+                <FormField label="Subscription ID" value={item.subscriptionId || ''} onChange={(value) => update(index, { subscriptionId: value })} />
+                <FormField label="Resource group" value={item.resourceGroup || ''} onChange={(value) => update(index, { resourceGroup: value })} />
+                <div className="lg:col-span-2">
+                  <FormField label="Server name" value={item.serverName || ''} onChange={(value) => update(index, { serverName: value })} />
+                </div>
+              </>
+            ) : null}
+
+            {item.type === 'sql-managed-instance' ? (
+              <>
+                <FormField label="Subscription ID" value={item.subscriptionId || ''} onChange={(value) => update(index, { subscriptionId: value })} />
+                <FormField label="Resource group" value={item.resourceGroup || ''} onChange={(value) => update(index, { resourceGroup: value })} />
+                <div className="lg:col-span-2">
+                  <FormField label="Instance name" value={item.instanceName || ''} onChange={(value) => update(index, { instanceName: value })} />
+                </div>
+              </>
+            ) : null}
+
+            {item.type === 'synapse-sql-pool' ? (
+              <>
+                <FormField label="Subscription ID" value={item.subscriptionId || ''} onChange={(value) => update(index, { subscriptionId: value })} />
+                <FormField label="Workspace name" value={item.workspaceName || ''} onChange={(value) => update(index, { workspaceName: value })} />
+                <div className="lg:col-span-2">
+                  <FormField label="SQL pool name" value={item.sqlPoolName || ''} onChange={(value) => update(index, { sqlPoolName: value })} />
+                </div>
+              </>
+            ) : null}
+
+            {item.type === 'service-bus-message' ? (
+              <>
+                <FormField
+                  label="Service Bus namespace"
+                  ariaLabel="Service Bus namespace"
+                  value={item.namespace || ''}
+                  onChange={(value) => update(index, { namespace: value })}
+                />
+                <FormField
+                  label="Message type"
+                  value={item.messageType || ''}
+                  onChange={(value) => update(index, { messageType: value })}
+                />
+                <div className="lg:col-span-2">
+                  <FormField
+                    label="Service Bus entity name"
+                    ariaLabel="Service Bus entity name"
+                    value={item.queueOrTopic || ''}
+                    onChange={(value) => update(index, { queueOrTopic: value })}
+                  />
+                </div>
+              </>
+            ) : null}
           </div>
-        </div>
+        </section>
       ))}
-      <div>
-        <button aria-label="Add resource" type="button" className={`${themeClasses.buttonSecondary} px-2 py-1 text-sm`} onClick={add}>Add resource</button>
-      </div>
+
+      <button
+        aria-label="Add resource"
+        type="button"
+        className={`${themeClasses.buttonSecondary} inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm`}
+        onClick={add}
+      >
+        <Plus className="h-4 w-4" />
+        Add resource
+      </button>
+    </div>
+  );
+}
+
+function FormField({
+  label,
+  value,
+  onChange,
+  ariaLabel,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  ariaLabel?: string;
+}) {
+  return (
+    <div>
+      <FieldLabel>{label}</FieldLabel>
+      <input
+        aria-label={ariaLabel || label}
+        className={`${themeClasses.field} mt-1 w-full rounded-lg px-3 py-2 text-sm`}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
     </div>
   );
 }

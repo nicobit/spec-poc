@@ -21,6 +21,7 @@ from shared.environment_store import (
     set_stage_status,
     update_stage_configuration,
     create_environment as create_environment_inmemory,
+    delete_environment as delete_environment_inmemory,
 )
 from shared.environment_repository import get_environment_store
 from shared.environment_store import create_environment
@@ -679,6 +680,49 @@ async def postpone_schedule(req: Request, schedule_id: str, body: PostponeIn):
         }
     )
     return {"updated": updated}
+
+
+@fast_app.delete("/api/environments/{env_id}")
+async def delete_environment(env_id: str, req: Request):
+    user = await _resolve_user(req)
+
+    existing = None
+    if env_store:
+        try:
+            existing = env_store.get_environment(env_id)
+        except Exception:
+            existing = None
+    if not existing:
+        existing = get_environment_item(env_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Environment not found")
+
+    client_val = existing.get("client")
+    if not (has_any_role(user, ["admin", "environment-manager"]) or (client_val and has_client_admin_for(user, client_val))):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    if env_store:
+        try:
+            deleted = env_store.delete_environment(env_id)
+        except Exception:
+            deleted = delete_environment_inmemory(env_id)
+    else:
+        deleted = delete_environment_inmemory(env_id)
+
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Environment not found")
+
+    append_audit(
+        {
+            "environment": env_id,
+            "client": client_val,
+            "action": "delete",
+            "status": "success",
+            "eventType": "environment-deleted",
+            "requestedBy": user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid"),
+        }
+    )
+    return {"deleted": env_id}
 
 
 @fast_app.get("/api/environments/{env_id}")

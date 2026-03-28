@@ -160,11 +160,18 @@ The UI shall allow authorized users to:
   - schedule management
   - activity history
   - notification/postponement context
+- The environment inventory page shall use a single page title and shall not repeat the page title inside nested panels
+- When an environment detail, create, or edit route is open, the related `Environments > Manage` navigation group in the left sidebar shall remain expanded and visually associated with the current page
+- The create and edit forms shall present environment details, stage configuration, and derived configuration summary as clearly separated sections, and shall avoid showing derived fields as editable inputs
+- The details page shall present environment overview, stage status, resource action summaries, schedules, and recent activity in structured sections rather than raw configuration dumps as the default view
 - Users shall be able to:
   - trigger start/stop for a stage
   - inspect configured Azure resource actions
   - manage notification recipients
   - postpone eligible scheduled actions
+- The environment inventory rows shall expose details, edit, and delete actions through a compact interaction that expands on hover and keyboard focus while remaining accessible on non-hover devices
+- Stage resource editors shall show type-specific input fields for the selected Azure resource action instead of a single generic identifier field
+- The details page shall support stage start and stop actions from within each stage section while keeping those actions visually secondary to the status and configuration overview
 - Loading, empty, error, and unauthorized states must be explicit
 
 ## Data and Domain Concepts
@@ -243,6 +250,18 @@ The feature package includes updated API, test, and validation artifacts coverin
 ### AC-ENV-010
 
 Authorization documentation is updated when role or permission behavior changes.
+
+### AC-ENV-011
+
+The environment inventory page presents a single clear title, professional filter/action controls, and compact row actions that reveal details, edit, and delete affordances without duplicating headers or overcrowding the list.
+
+### AC-ENV-012
+
+The environment create and edit forms use a guided layout with separate environment details, stage workspace, and configuration summary sections, while resource editors display labels specific to the selected action type.
+
+### AC-ENV-013
+
+The environment details page uses a scan-friendly layout with overview cards, structured stage sections, readable schedule and activity summaries, and avoids presenting raw JSON as the primary content.
 
 ## Risks and Open Questions
 

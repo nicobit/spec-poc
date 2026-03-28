@@ -16,12 +16,16 @@ The existing environments capability is too narrow for real operational use. Env
 - Schedules are tied to environment stages and can notify configured recipient groups
 - Authorized notified users can postpone scheduled actions
 - Activity history must show lifecycle actions, notifications, postponements, and execution outcomes
+- The manage list view should present a single page title, keep page-level actions in the header area, and use a compact row-action pattern that expands on hover or focus without cluttering the list
+- The create and edit forms should separate environment details from stage configuration, reduce redundant derived-field noise, and use resource-type-specific inputs so operators understand what to enter
+- The details page should emphasize environment overview, stage summaries, schedules, and recent activity without exposing raw JSON as the primary presentation
 
 ## Assumptions
 
 - Existing RBAC roles `admin` and `environment-manager` remain the primary management roles
 - Notification recipients may not be administrators, but must still be validated as authorized postponement actors for the related environment
 - A stage is the operational unit for orchestration, even if the UI still presents environment-level grouping
+- Environment deletion remains an authorized management action and should be available from the manage list when the backend route is present
 
 ## Open Questions
 
@@ -43,8 +47,12 @@ The existing environments capability is too narrow for real operational use. Env
 - Keep environment/stage configuration as app-managed metadata
 - Expose a clear API contract for:
   - stage configuration
+  - environment deletion
   - immediate control actions
   - schedule management
   - postponement
   - activity retrieval
 - Treat notifications and postponements as first-class activity events, not side effects hidden in logs
+- Use a professional inventory layout with explicit empty/error states and a progressive disclosure action rail for per-row actions
+- Use guided create/edit forms with a compact environment details section, a clear stage workspace, and a lightweight configuration summary instead of a single dense panel
+- Use a structured details view with summary cards and readable stage/resource groupings so operators can scan status quickly before taking lifecycle actions

@@ -50,8 +50,8 @@ async function run() {
     const BASE = await BASE_PROMISE;
     console.log('Opening', `${BASE}/environment/manage`);
     await page.goto(`${BASE}/environment/manage`, { waitUntil: 'networkidle' });
-    // wait for list to load (look for a known element that appears once loaded)
-    await page.waitForSelector('h3:has-text("Manage Environments")', { timeout: 15000 });
+    // wait for list to load (look for the page title or an environment row)
+    await page.waitForSelector('h1:has-text("Manage Environments")', { timeout: 15000 });
 
     // take a screenshot of the list for debugging if needed
     await page.screenshot({ path: 'demos/list.png' });

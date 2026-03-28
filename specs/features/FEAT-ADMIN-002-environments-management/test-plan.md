@@ -36,6 +36,7 @@ Validate the expanded Environments Management capability covering stage configur
 
 - `GET /api/environments`
 - `GET /api/environments/{environmentId}`
+- `DELETE /api/environments/{environmentId}`
 - `PUT /api/environments/{environmentId}/stages/{stageId}/configuration`
 - `POST /api/environments/{environmentId}/stages/{stageId}/start`
 - `POST /api/environments/{environmentId}/stages/{stageId}/stop`
@@ -53,6 +54,10 @@ Validate the expanded Environments Management capability covering stage configur
 - Authorized users can create/update schedules with notification recipients
 - Activity view includes notification/postponement events
 - Postponement actions are shown only to eligible users
+- Manage inventory page renders a single title, compact row actions, and delete confirmation for authorized users
+- Sidebar keeps `Environments > Manage` expanded while environment create, detail, and edit pages are open
+- Create and edit forms render separate environment-details and stage-configuration sections with a derived summary and resource-type-specific fields
+- Details page renders overview cards, structured stage sections, readable schedules/activity summaries, and stage lifecycle controls
 - Error and unauthorized states are shown correctly
 
 ## Core Scenarios
@@ -67,6 +72,7 @@ Validate the expanded Environments Management capability covering stage configur
 8. Authorized notified user postpones a scheduled action successfully
 9. Unauthorized user attempts postponement and receives correct denial
 10. Activity view displays configuration, notification, postponement, and execution events
+11. Authorized user deletes an environment from the manage list and the list refreshes without repeating the page title
 
 ## Authorization Validation
 

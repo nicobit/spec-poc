@@ -9,7 +9,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import AdminPortalLogo from "@/shared/ui/AdminPortalLogo";
 import { themeClasses } from "@/theme/themeClasses";
 
-import { getMenuItems, type MenuItem } from "../navigation/sidebar-menu";
+import { getMenuItems, matchesMenuItemPath, type MenuItem } from "../navigation/sidebar-menu";
 
 export default function Sidebar() {
   const { sidebarOpen, toggleSidebar } = useSidebar();
@@ -22,10 +22,10 @@ export default function Sidebar() {
   const isCyber = themeId === "cyber";
   const isCommerce = themeId === "commerce";
 
-  const isActivePath = (path?: string) => !!path && pathname === path;
+  const isActivePath = (item?: MenuItem) => !!item && matchesMenuItemPath(item, pathname);
   const hasActiveDescendant = (item: MenuItem): boolean =>
     (item.children ?? []).some(
-      (child) => isActivePath(child.path) || (child.children ? hasActiveDescendant(child) : false),
+      (child) => isActivePath(child) || (child.children ? hasActiveDescendant(child) : false),
     );
 
   useEffect(() => {
@@ -51,7 +51,7 @@ export default function Sidebar() {
     items.find((item) => item.children?.length && openGroups[item.name]) ??
     items.find((item) => item.children?.length && hasActiveDescendant(item));
   const activeCyberItem =
-    items.find((item) => isActivePath(item.path) || hasActiveDescendant(item)) ??
+    items.find((item) => isActivePath(item) || hasActiveDescendant(item)) ??
     activeCyberGroup ??
     items[0];
   const cyberSubItems = activeCyberGroup?.children ?? [];
@@ -69,7 +69,7 @@ export default function Sidebar() {
 
           <nav className="flex flex-1 flex-col items-center gap-3">
             {cyberSubItems.map((child) => {
-              const childActive = isActivePath(child.path) || (child.children ? hasActiveDescendant(child) : false);
+              const childActive = isActivePath(child) || (child.children ? hasActiveDescendant(child) : false);
               const ChildIcon = child.icon;
               return (
                 <Link
@@ -264,7 +264,7 @@ function getRailGlyph(name: string) {
 type ItemProps = {
   item: MenuItem;
   sidebarOpen: boolean;
-  isActivePath: (path?: string) => boolean;
+  isActivePath: (item?: MenuItem) => boolean;
   hasActiveDescendant: (item: MenuItem) => boolean;
   openGroups: Record<string, boolean>;
   onToggleGroup: (name: string) => void;
@@ -283,7 +283,7 @@ function SidebarItem({
   const { themeId } = useTheme();
   const Icon = item.icon;
   const isLeaf = !item.children || item.children.length === 0;
-  const activeLeaf = isLeaf && isActivePath(item.path);
+  const activeLeaf = isLeaf && isActivePath(item);
   const activeGroup = !isLeaf && hasActiveDescendant(item);
   const isCyber = themeId === "cyber";
   const isCommerce = themeId === "commerce";
@@ -409,7 +409,7 @@ function SidebarItem({
           ].join(" ")}
         >
           {(item.children ?? []).map((child) => {
-            const childActive = isActivePath(child.path) || hasActiveDescendant(child);
+            const childActive = isActivePath(child) || hasActiveDescendant(child);
             return (
               <li key={child.name}>
                 <Link
@@ -435,7 +435,7 @@ function SidebarItem({
         <div className="pointer-events-none absolute left-full top-0 z-20 ml-2 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100">
           <div className="ui-panel min-w-[12rem] rounded-2xl py-2">
             {(item.children ?? []).map((child) => {
-              const childActive = isActivePath(child.path) || hasActiveDescendant(child);
+              const childActive = isActivePath(child) || hasActiveDescendant(child);
               return (
                 <Link
                   key={child.name}

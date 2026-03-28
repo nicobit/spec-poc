@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useMsal } from '@azure/msal-react';
 import { getEnvironment, updateEnvironment } from '../api';
-import { themeClasses } from '@/theme/themeClasses';
-import StageEditor from '../components/StageEditor';
+import EnvironmentEditorForm from '../components/EnvironmentEditorForm';
 import EnvironmentPageLayout from '../components/EnvironmentPageLayout';
 import type { EnvironmentStage } from '../api';
 
@@ -67,41 +66,20 @@ export default function EnvironmentEditPage() {
 
   return (
     <EnvironmentPageLayout title="Edit Environment" description="Update details and save.">
-      <div className="ui-panel rounded-2xl p-6 w-full max-w-none">
-        {error ? <div className="mb-3 text-sm text-red-600">{error}</div> : null}
-        {validationErrors.length > 0 ? (
-          <div className="mb-3 text-sm text-red-600">
-            <ul className="list-disc list-inside">
-              {validationErrors.map((ve) => (
-                <li key={ve}>{ve}</li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-
-          <div className="space-y-3">
-          <div>
-            <label className="block text-sm font-medium"><svg className="inline -mt-0.5 mr-2" width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5"/><path d="M8 12h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>Name</label>
-            <input className={`${themeClasses.field} mt-1 w-full`} value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium"><svg className="inline -mt-0.5 mr-2" width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="6" width="18" height="12" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M8 12h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>Client</label>
-            <input className={`${themeClasses.field} mt-1 w-full`} value={client} onChange={(e) => setClient(e.target.value)} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium">Type</label>
-            <div className="mt-1 text-sm ui-text-muted">Derived from stage resource types.</div>
-          </div>
-          <div>
-            <StageEditor stages={stages} onChange={setStages} />
-          </div>
-        </div>
-
-        <div className="mt-6 flex justify-end gap-2">
-          <button className={`${themeClasses.buttonSecondary} rounded px-3 py-1.5 text-sm`} onClick={() => navigate(-1)} disabled={saving}>Cancel</button>
-          <button className={`${themeClasses.buttonPrimary} rounded px-3 py-1.5 text-sm`} onClick={onSave} disabled={saving}>Save</button>
-        </div>
-      </div>
+      <EnvironmentEditorForm
+        mode="edit"
+        name={name}
+        client={client}
+        stages={stages}
+        saving={saving}
+        error={error}
+        validationErrors={validationErrors}
+        onNameChange={setName}
+        onClientChange={setClient}
+        onStagesChange={setStages}
+        onCancel={() => navigate(-1)}
+        onSubmit={onSave}
+      />
     </EnvironmentPageLayout>
   );
 }

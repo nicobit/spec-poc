@@ -121,6 +121,11 @@ export async function updateEnvironment(msalInstance: IPublicClientApplication, 
   return body.updated;
 }
 
+export async function deleteEnvironment(msalInstance: IPublicClientApplication, id: string): Promise<void> {
+  const res = await authFetch(msalInstance, apiUrl(`/environments/${encodeURIComponent(id)}`), { method: 'DELETE' });
+  await ensureOk(res);
+}
+
 export async function startEnvironment(msalInstance: IPublicClientApplication, id: string): Promise<void> {
   const res = await authFetch(msalInstance, apiUrl(`/environments/${encodeURIComponent(id)}/start`), { method: 'POST' });
   await ensureOk(res);

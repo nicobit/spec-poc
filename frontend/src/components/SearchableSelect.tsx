@@ -29,26 +29,24 @@ export default function SearchableSelect({ options, value, onChange, placeholder
 
   return (
     <div ref={ref} className="relative">
-      <div className="flex items-center gap-2">
+      <div className="relative">
         <input
           placeholder={placeholder}
           value={input}
-          onChange={(e) => { setInput(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onChange={(e) => { setInput(e.target.value); setOpen(true); onChange(e.target.value || undefined); }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') { setOpen(false); onChange(input || undefined); }
             if (e.key === 'Escape') { setOpen(false); }
           }}
-          className={`${themeClasses.field} rounded px-2 py-1 text-sm`}
+          className={`${themeClasses.field} w-full rounded-lg px-3 py-2 text-sm`}
           style={{ minWidth: 120 }}
         />
-        <button type="button" className={`${themeClasses.select} rounded px-2 py-1 text-sm`} onClick={() => setOpen((o) => !o)}>
-          {value || 'All'}
-        </button>
       </div>
       {open && (
-        <div className="absolute z-50 mt-1 w-[18rem] max-h-72 overflow-auto rounded border bg-[var(--surface-elevated)] p-1 shadow">
+        <div className="absolute z-50 mt-1 w-full min-w-[18rem] max-h-72 overflow-auto rounded-lg border bg-[var(--surface-elevated)] p-1 shadow">
           {filtered.slice(0, maxVisible).map((o) => (
-            <div key={o} className="p-1 hover:bg-[var(--surface-hover)] rounded cursor-pointer" onClick={() => { onChange(o); setOpen(false); }}>
+            <div key={o} className="p-1 hover:bg-[var(--surface-hover)] rounded cursor-pointer" onClick={() => { onChange(o); setInput(o); setOpen(false); }}>
               {o}
             </div>
           ))}

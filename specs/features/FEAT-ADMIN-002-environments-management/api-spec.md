@@ -22,6 +22,10 @@ PUT /api/environments/{id}
 - Response: `{ updated: EnvInstance }`.
 - Authorization: `admin` | `environment-manager` | `client-admin` for existing environment's client.
 
+DELETE /api/environments/{id}
+- Response: `{ deleted: string }`.
+- Authorization: `admin` | `environment-manager` | `client-admin` for existing environment's client.
+
 POST /api/environments/{id}/start
 POST /api/environments/{id}/stop
 - Mock lifecycle endpoints. Return status and stage info. Authorization as above.
@@ -99,6 +103,10 @@ Returns environment and stage summaries, including lifecycle status and high-lev
 ### GET `/api/environments/{environmentId}`
 
 Returns environment details, including stages and current orchestration configuration summary.
+
+### DELETE `/api/environments/{environmentId}`
+
+Deletes an environment record and records an audit event for the deletion request.
 
 ### PUT `/api/environments/{environmentId}/stages/{stageId}/configuration`
 
