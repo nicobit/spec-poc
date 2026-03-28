@@ -80,13 +80,7 @@ jobs:
           path: reports/**, reports/coverage.xml
       - name: Backend compileall
         run: python -m compileall backend tests/backend
-      - name: Post backend test summary to PR
-        if: always()
-        uses: dorny/test-reporter@v1
-        with:
-          name: backend-tests
-          path: reports/junit.xml
-          reporter: junit
+      # NOTE: PR summary step removed due to reporter input error; re-add with a compatible reporter or a github-script summary
 
   build:
     runs-on: ubuntu-latest
@@ -116,13 +110,7 @@ jobs:
         with:
           name: frontend-reports
           path: frontend/reports/**, frontend/coverage/**
-      - name: Post frontend test summary to PR
-        if: always()
-        uses: dorny/test-reporter@v1
-        with:
-          name: frontend-tests
-          path: frontend/reports/junit.xml
-          reporter: junit
+      # NOTE: PR summary step removed due to reporter input error; re-add with a compatible reporter or a github-script summary
 
   backend-asgi-image:
     runs-on: ubuntu-latest
