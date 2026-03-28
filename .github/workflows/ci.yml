@@ -163,13 +163,9 @@ jobs:
         with:
           name: frontend-reports
         continue-on-error: true
-      - name: Merge coverage and upload to Codecov (placeholder)
+      - name: Merge coverage reports (placeholder)
         run: |
           echo "Merge coverage reports here if desired (coverage combine / lcov-result-merger)"
-      - name: Upload to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          files: backend-reports/reports/coverage.xml, frontend-reports/coverage/lcov.info
 
   publish-coverage-pages:
     runs-on: ubuntu-latest
@@ -197,9 +193,8 @@ jobs:
           if [ -d "coverage" ]; then mkdir -p coverage-site/frontend && cp -r coverage/* coverage-site/frontend/ || true; fi
           # also copy vitest reports if present
           if [ -d "reports" ]; then cp -r reports coverage-site/reports || true; fi
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v1
+      - name: Deploy coverage-site to gh-pages
+        uses: peaceiris/actions-gh-pages@v3
         with:
-          path: coverage-site
-      - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v1
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./coverage-site
