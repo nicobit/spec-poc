@@ -1,0 +1,37 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "westeurope"
+    },
+    "appServicePlanName": {
+      "value": "admin-portal-backend-plan"
+    },
+    "webAppName": {
+      "value": "admin-portal-backend-app"
+    },
+    "appServicePlanSku": {
+      "value": "B1"
+    },
+    "linuxFxVersion": {
+      "value": "DOCKER|ghcr.io/example/admin-portal-backend:latest"
+    },
+    "containerRegistryUrl": {
+      "value": "https://ghcr.io"
+    },
+    "containerRegistryUsername": {
+      "value": "example-user"
+    },
+    "containerRegistryPassword": {
+      "value": "replace-me"
+    },
+    "appSettings": {
+      "value": {
+        "AZURE_CLIENT_ID": "replace-me",
+        "AZURE_TENANT_ID": "replace-me",
+        "KEY_VAULT_CORE_URI": "https://example-kv.vault.azure.net/"
+      }
+    }
+  }
+}

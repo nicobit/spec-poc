@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Local git pre-push hook to enforce spec-first policy for feature branches.
+SCRIPT_ROOT=$(cd "$(dirname "$0")/.." && pwd)
+python "$SCRIPT_ROOT/tools/ensure_spec.py"
+if [ $? -ne 0 ]; then
+  echo "Pre-push spec check failed. See message above."
+  exit 1
+fi
+exit 0

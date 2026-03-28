@@ -1,0 +1,32 @@
+.react-grid-placeholder {
+    background: rgba(25, 118, 210, 0.25) !important;
+    border: 2px dashed rgba(25, 118, 210, 0.6);
+}
+
+.editing-grid {
+    background-image: linear-gradient(to right, rgba(0, 0, 0, 0.08) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0, 0, 0, 0.08) 1px, transparent 1px);
+    background-size: 30px 30px;
+    cursor: move;
+}
+
+/* Resize handles visibility & style */
+.layout:not(.editing-grid) .react-resizable-handle {
+    display: none;
+}
+
+.editing-grid .react-resizable-handle {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    right: 4px;
+    bottom: 4px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 2px;
+    cursor: se-resize;
+    z-index: 20;
+}
+
+.drag-handle {
+    cursor: move;
+}

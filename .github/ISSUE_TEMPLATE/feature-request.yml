@@ -1,0 +1,73 @@
+name: Feature Request
+description: Start a new feature in the spec-driven workflow.
+title: "[Feature]: "
+labels:
+  - feature
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Start from the spec package, not from code.
+
+        Before implementation, create or update a feature package under:
+        `specs/features/FEAT-<area>-<id>-<short-name>/`
+  - type: input
+    id: feature_id
+    attributes:
+      label: Feature ID
+      description: Use the repository feature naming convention.
+      placeholder: FEAT-ADMIN-003-example-feature
+    validations:
+      required: true
+  - type: input
+    id: spec_path
+    attributes:
+      label: Feature Spec Path
+      description: Path to the feature specification file.
+      placeholder: specs/features/FEAT-ADMIN-003-example-feature/feature-spec.md
+    validations:
+      required: true
+  - type: input
+    id: test_plan_path
+    attributes:
+      label: Test Plan Path
+      description: Path to the test plan for this feature.
+      placeholder: specs/features/FEAT-ADMIN-003-example-feature/test-plan.md
+    validations:
+      required: true
+  - type: textarea
+    id: business_need
+    attributes:
+      label: Business Need
+      description: Describe the user or business problem to solve.
+      placeholder: What outcome is needed, and for whom?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and Non-Scope
+      description: Describe what this feature should and should not do.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: Provide testable acceptance criteria or link the spec section that contains them.
+      placeholder: |
+        - Given ...
+        - When ...
+        - Then ...
+    validations:
+      required: true
+  - type: dropdown
+    id: implementation_ready
+    attributes:
+      label: Is this ready for implementation?
+      description: Use No if the spec still needs refinement first.
+      options:
+        - "No - spec refinement needed first"
+        - "Yes - spec package is ready"
+    validations:
+      required: true

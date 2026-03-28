@@ -1,0 +1,98 @@
+.loading-indicator {
+    font-family: sans-serif;
+    font-size: 16px;
+    color: #555;
+    display: inline-block;
+    margin: 10px;
+  }
+  
+  .dots::after {
+    content: '...';
+    animation: blink 1.4s infinite;
+  }
+  
+  @keyframes blink {
+    0% { opacity: 0.2; }
+    20% { opacity: 1; }
+    100% { opacity: 0.2; }
+  }
+
+  .shimmer-text {
+    background: linear-gradient(
+      90deg,
+      #ccc,
+      #fff,
+      #ccc
+    );
+    background-size: 200% auto;
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    animation: shimmer 4s infinite;
+  }
+  
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+  
+  
+  .reveal-text {
+    display: inline-block;
+    /* Set the final text color */
+    color: #000;
+    /* Create a mask gradient from transparent to opaque */
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 50%, black 100%);
+            mask-image: linear-gradient(90deg, transparent 0%, black 50%, black 100%);
+    /* Double the mask size to allow movement */
+    -webkit-mask-size: 200% 100%;
+            mask-size: 200% 100%;
+    /* Animate the mask position over 4 seconds, infinitely */
+    animation: revealAnimation 8s infinite;
+  }
+  
+  @keyframes revealAnimation {
+    0% {
+      -webkit-mask-position: 0 0;
+              mask-position: 0 0;
+    }
+    50% {
+      -webkit-mask-position: 200% 0;
+              mask-position: 200% 0;
+    }
+    100% {
+      -webkit-mask-position: 0 0;
+              mask-position: 0 0;
+    }
+  }
+
+  .revealing-light{
+
+    position: relative;
+    font-family: sans-serif;
+    /*text-transform: uppercase;*/
+    /*font-size: 2em;*/
+    letter-spacing: 4px;
+    overflow: hidden;
+    background: linear-gradient(90deg, #000, #fff, #000);
+    background-repeat: no-repeat;
+    background-size: 80%;
+    background-clip: text;
+    animation: revealingLightAnimation 3s linear infinite;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: rgba(255, 255, 255, 0);
+  }
+  
+
+  @keyframes revealingLightAnimation {
+    0% {
+      background-position: -500%;
+    }
+    100% {
+      background-position: 500%;
+    }
+  }

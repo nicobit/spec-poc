@@ -1,0 +1,24 @@
+/* src/styles/worldmap.css */
+
+/* Target the SVG wrapper that react‑svg‑worldmap creates */
+.react-svg-world-map svg {
+    width: 100% !important;   /* fill the parent container’s width */
+    height: auto !important;  /* maintain aspect ratio */
+    display: block;           /* remove unwanted inline spacing */
+  }
+  
+  /* Optional: style the highlighted countries */
+  .react-svg-world-map .high-value {
+    fill: #1976d2 !important; /* your primary color */
+  }
+
+
+  .worldmap__figure-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin:0;
+  }

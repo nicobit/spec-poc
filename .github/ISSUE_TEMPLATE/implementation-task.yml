@@ -1,0 +1,54 @@
+name: Implementation Task
+description: Request code changes against an existing approved feature package.
+title: "[Task]: "
+labels:
+  - implementation
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template only when the feature package already exists and is ready.
+        If the request is still ambiguous, open a Feature Request instead.
+  - type: input
+    id: feature_id
+    attributes:
+      label: Feature ID
+      placeholder: FEAT-ADMIN-003-example-feature
+    validations:
+      required: true
+  - type: input
+    id: spec_path
+    attributes:
+      label: Feature Spec Path
+      placeholder: specs/features/FEAT-ADMIN-003-example-feature/feature-spec.md
+    validations:
+      required: true
+  - type: input
+    id: test_plan_path
+    attributes:
+      label: Test Plan Path
+      placeholder: specs/features/FEAT-ADMIN-003-example-feature/test-plan.md
+    validations:
+      required: true
+  - type: textarea
+    id: requested_change
+    attributes:
+      label: Requested Change
+      description: Describe the implementation slice to deliver.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance_criteria_refs
+    attributes:
+      label: Acceptance Criteria References
+      description: List the exact acceptance criteria or requirement IDs affected.
+      placeholder: AC-1, AC-3, REQ-2
+    validations:
+      required: true
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of Scope
+      description: Call out anything that should not be changed in this task.
+    validations:
+      required: false

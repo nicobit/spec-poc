@@ -1,0 +1,159 @@
+{
+  "default_timeout_seconds": 3.5,
+  "services": [
+    {
+      "name": "sql",
+      "type": "sql_db",
+      "enabled": true,
+      "config": {
+        "conn_str": {
+          "source": "kv",
+          "key_vault": {
+            "vault_uri": "https://my-vault.vault.azure.net/",
+            "secret_name": "sql-odbc-connstr"
+          }
+        }
+      }
+    },
+    {
+      "name": "kv",
+      "type": "key_vault",
+      "enabled": true,
+      "config": {
+        "vault_uri": {
+          "source": "settings",
+          "setting_name": "KEY_VAULT_URI"
+        },
+        "test_secret_name": {
+          "source": "inline",
+          "value": "health-probe-secret"
+        }
+      }
+    },
+    {
+      "name": "blob",
+      "type": "storage_blob",
+      "enabled": true,
+      "config": {
+        "connection_string": {
+          "source": "kv",
+          "key_vault": {
+            "vault_uri": "https://my-vault.vault.azure.net/",
+            "secret_name": "blob-connstr"
+          }
+        },
+        "endpoint": {
+          "source": "settings",
+          "setting_name": "BLOB_ENDPOINT"
+        },
+        "container": {
+          "source": "inline",
+          "value": "health-check"
+        }
+      }
+    },
+    {
+      "name": "table",
+      "type": "storage_table",
+      "enabled": true,
+      "config": {
+        "connection_string": {
+          "source": "settings",
+          "setting_name": "STORAGE_CONNSTR"
+        },
+        "endpoint": {
+          "source": "settings",
+          "setting_name": "TABLES_ENDPOINT"
+        },
+        "table_name": {
+          "source": "inline",
+          "value": "healthTable"
+        }
+      }
+    },
+    {
+      "name": "search",
+      "type": "ai_search",
+      "enabled": true,
+      "config": {
+        "endpoint": {
+          "source": "settings",
+          "setting_name": "AI_SEARCH_ENDPOINT"
+        },
+        "index_name": {
+          "source": "inline",
+          "value": "products"
+        }
+      }
+    },
+    {
+      "name": "aoai",
+      "type": "azure_openai",
+      "enabled": true,
+      "config": {
+        "endpoint": {
+          "source": "settings",
+          "setting_name": "AZURE_OPENAI_ENDPOINT"
+        },
+        "api_version": {
+          "source": "inline",
+          "value": "2024-10-21"
+        },
+        "live_call": {
+          "source": "inline",
+          "value": false
+        },
+        "deployment": {
+          "source": "settings",
+          "setting_name": "AZURE_OPENAI_DEPLOYMENT"
+        }
+      }
+    },
+    {
+      "name": "sb-orders",
+      "type": "service_bus",
+      "enabled": true,
+      "config": {
+        "namespace": {
+          "source": "settings",
+          "setting_name": "SERVICEBUS_NAMESPACE"
+        },
+        "entity": {
+          "type": {
+            "source": "inline",
+            "value": "queue"
+          },
+          "queue_name": {
+            "source": "inline",
+            "value": "orders"
+          }
+        }
+      }
+    },
+    {
+      "name": "sb-topic",
+      "type": "service_bus",
+      "enabled": false,
+      "config": {
+        "namespace": {
+          "source": "settings",
+          "setting_name": "SERVICEBUS_NAMESPACE"
+        },
+        "entity": {
+          "type": {
+            "source": "inline",
+            "value": "subscription"
+          },
+          "topic_name": {
+            "source": "inline",
+            "value": "events"
+          },
+          "subscription_name": {
+            "source": "inline",
+            "value": "health-probe"
+          }
+        }
+      }
+    }
+  ]
+}

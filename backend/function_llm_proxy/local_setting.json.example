@@ -1,0 +1,28 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "PYTHON_ENABLE_WORKER_EXTENSIONS": "1",
+
+    "TENANT_ID": "<your-tenant-guid>",
+    "AUDIENCE": "api://openai-proxy",              // App ID URI or client ID as audience
+    "ALLOWED_TENANTS": "*",                        // or "common" or specific GUIDs comma-separated
+
+    "AZURE_OPENAI_ENDPOINT": "https://<your-aoai>.openai.azure.com",
+    "AZURE_OPENAI_API_VERSION": "2024-06-01",
+    "AZURE_OPENAI_KEY_VIA_KV": "false",
+    "AZURE_OPENAI_API_KEY": "<aoai-key>",          // used if not pulling from KV
+
+    "KEY_VAULT_URI": "https://<kv-name>.vault.azure.net",
+    "KEY_VAULT_SECRET_NAME": "AzureOpenAI--ApiKey",
+
+    "STORAGE_ACCOUNT_NAME": "<storage-account>",
+    "USAGE_TABLE_NAME": "UsageTokens",
+    "AUDIT_BLOB_CONTAINER": "auditlogs",
+    "ENABLE_BLOB_AUDIT": "false",
+
+    "DEFAULT_DAILY_QUOTA": "200000",               // tokens/day per user
+    "ENFORCE_QUOTA": "true"
+  }
+}

@@ -1,0 +1,6 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Spec-Driven Delivery Guide
+    url: https://github.com/OWNER/REPO/blob/main/delivery/workflows/spec-driven-delivery.md
+    about: Read the repository workflow before opening a feature or implementation request.
+

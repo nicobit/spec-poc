@@ -1,0 +1,110 @@
+[
+  {
+    "environment": "env-test",
+    "client": "client-x",
+    "action": "run",
+    "seq": 0,
+    "timestamp": "2026-03-28T07:06:04.601799Z"
+  },
+  {
+    "environment": "env-test",
+    "client": "client-x",
+    "action": "run",
+    "seq": 1,
+    "timestamp": "2026-03-28T07:06:04.602569Z"
+  },
+  {
+    "environment": "env-test",
+    "client": "client-x",
+    "action": "run",
+    "seq": 2,
+    "timestamp": "2026-03-28T07:06:04.603491Z"
+  },
+  {
+    "environment": "env-test",
+    "client": "client-x",
+    "action": "run",
+    "seq": 3,
+    "timestamp": "2026-03-28T07:06:04.604378Z"
+  },
+  {
+    "environment": "env-test",
+    "client": "client-x",
+    "action": "run",
+    "seq": 4,
+    "timestamp": "2026-03-28T07:06:04.605339Z"
+  },
+  {
+    "environment": "env-test",
+    "client": "client-x",
+    "action": "run",
+    "seq": 5,
+    "timestamp": "2026-03-28T07:06:04.606248Z"
+  },
+  {
+    "environment": "env-test",
+    "client": "client-x",
+    "action": "run",
+    "seq": 6,
+    "timestamp": "2026-03-28T07:06:04.607244Z"
+  },
+  {
+    "environment": "env-ff153a34",
+    "client": "test-client",
+    "action": "create",
+    "status": "success",
+    "eventType": "environment-created",
+    "requestedBy": "test-admin",
+    "timestamp": "2026-03-28T07:06:04.766488Z"
+  },
+  {
+    "environment": "env-ff153a34",
+    "client": "test-client",
+    "stage": "default",
+    "action": "start",
+    "status": "requested",
+    "eventType": "manual-lifecycle",
+    "requestedBy": "test-admin",
+    "timestamp": "2026-03-28T07:06:04.772115Z"
+  },
+  {
+    "environment": "env-ff153a34",
+    "client": "test-client",
+    "stage": "default",
+    "action": "stop",
+    "status": "requested",
+    "eventType": "manual-lifecycle",
+    "requestedBy": "test-admin",
+    "timestamp": "2026-03-28T07:06:04.785872Z"
+  },
+  {
+    "environment": "env-290e17c3",
+    "client": "client-a",
+    "action": "create",
+    "status": "success",
+    "eventType": "environment-created",
+    "requestedBy": "test",
+    "timestamp": "2026-03-28T07:06:04.823559Z"
+  },
+  {
+    "environment": "env-1",
+    "client": "client-a",
+    "action": "update",
+    "status": "success",
+    "eventType": "environment-updated",
+    "requestedBy": "ca@example.com",
+    "timestamp": "2026-03-28T07:06:04.860824Z"
+  },
+  {
+    "environment": "DEV",
+    "client": "client-x",
+    "stage": "stage1",
+    "action": "start",
+    "status": "success",
+    "eventType": "schedule-created",
+    "scheduleId": "sched-9923c18f",
+    "notificationGroupCount": 0,
+    "requestedBy": "system",
+    "timestamp": "2026-03-28T07:06:05.165349Z"
+  }
+]

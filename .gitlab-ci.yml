@@ -1,0 +1,110 @@
+stages:
+  - lint
+  - test
+  - build
+  - container
+  - deploy
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  NPM_CONFIG_CACHE: "$CI_PROJECT_DIR/frontend/.npm"
+  DOCKER_TLS_CERTDIR: "/certs"
+
+cache:
+  paths:
+    - .cache/pip
+    - frontend/.npm
+
+repo_checks:
+  stage: lint
+  image: python:3.13
+  script:
+    - python scripts/repo_checks.py
+
+mr_traceability:
+  stage: lint
+  image: python:3.13
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  script:
+    - python scripts/verify_pr_traceability.py
+  variables:
+    PR_BODY: "$CI_MERGE_REQUEST_DESCRIPTION"
+
+mr_spec_changes:
+  stage: lint
+  image: python:3.13
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  before_script:
+    - git fetch origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+  script:
+    - python scripts/verify_spec_changes.py "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+
+repo_tests:
+  stage: test
+  image: python:3.13
+  script:
+    - python -m unittest discover -s tests/repo -p "test_*.py"
+    - python -m compileall backend
+
+backend_tests:
+  stage: test
+  image: python:3.13
+  script:
+    - python -m unittest discover -s tests/backend -p "test_*.py"
+    - python -m compileall backend tests/backend
+
+frontend_typecheck:
+  stage: build
+  image: node:20
+  script:
+    - cd frontend
+    - npm ci
+    - npm run typecheck
+
+frontend_build:
+  stage: build
+  image: node:20
+  script:
+    - cd frontend
+    - npm ci
+    - npm run build
+
+backend_asgi_image:
+  stage: container
+  image: docker:27
+  services:
+    - docker:27-dind
+  script:
+    - docker build -f backend/Dockerfile -t $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHORT_SHA .
+
+backend_asgi_publish:
+  stage: container
+  image: docker:27
+  services:
+    - docker:27-dind
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
+  script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
+    - docker build -f backend/Dockerfile -t $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHORT_SHA -t $CI_REGISTRY_IMAGE/backend:latest .
+    - docker push $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHORT_SHA
+    - docker push $CI_REGISTRY_IMAGE/backend:latest
+
+deploy_backend_appservice:
+  stage: deploy
+  image: mcr.microsoft.com/azure-cli:2.64.0
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
+  script:
+    - az login --service-principal -u "$AZURE_CLIENT_ID" -p "$AZURE_CLIENT_SECRET" --tenant "$AZURE_TENANT_ID"
+    - az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+    - az webapp config container set --name "$AZURE_BACKEND_WEBAPP_NAME" --resource-group "$AZURE_BACKEND_RESOURCE_GROUP" --container-image-name "${BACKEND_IMAGE_NAME:-$CI_REGISTRY_IMAGE/backend}:$CI_COMMIT_SHORT_SHA" --container-registry-url "$CONTAINER_REGISTRY_URL" --container-registry-user "$CONTAINER_REGISTRY_USERNAME" --container-registry-password "$CONTAINER_REGISTRY_PASSWORD"
+    - az webapp restart --name "$AZURE_BACKEND_WEBAPP_NAME" --resource-group "$AZURE_BACKEND_RESOURCE_GROUP"
+    - |
+      if [ -n "$BACKEND_HEALTHCHECK_URL" ]; then
+        curl --fail --silent --show-error "$BACKEND_HEALTHCHECK_URL"
+      else
+        echo "BACKEND_HEALTHCHECK_URL not configured; skipping smoke check."
+      fi

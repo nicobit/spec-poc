@@ -1,0 +1,117 @@
+Here’s a set of **20 challenging, high‑coverage natural‑language questions** you can use to test an NL‑to‑SQL system against the **AdventureWorks** schema. These span aggregations, windowing, subqueries, analytics, and edge cases common in OLTP databases.
+
+> **Summary:** You’ll find questions that exercise joins across multiple schemas, grouping and aggregation, window functions, correlated subqueries, date‑based filters, conditional logic, and existence/anti‑existence checks. Running your NL‑to‑SQL pipeline on these will surface whether it can handle real‑world complexity in the AdventureWorks sample database.
+
+---
+
+## Core sales and inventory analytics
+
+1. **Top sales performers**  
+   “Find the top 5 salespersons by total sales amount in 2024.”
+2. **Product inventory gaps**  
+   “List all products that have never been sold in any sales order.”   
+3. **Monthly sales trend**  
+   “Show the monthly total sales for each month of 2023, ordered chronologically.” 
+4. **Year‑over‑year growth**  
+   “Calculate the percentage growth in total sales from 2022 to 2023.” 
+
+---
+
+## Human resources and payroll insights
+
+5. **Salary by department**  
+   “Get the average, minimum, and maximum pay rate per department for employees hired after 2015.” 
+6. **Long‑tenured employees**  
+   “Find employees who have never changed departments since hire.” 
+7. **Managerial salary comparison**  
+   “List employees whose current pay rate exceeds the average pay rate of their manager’s team.” 
+
+---
+
+## Customer and order segmentation
+
+8. **Cross‑channel customers**  
+   “Identify customers who have placed orders through both the Online and Reseller sales channels.” 
+9. **Regional order counts**  
+   “Show the number of sales orders per customer country, excluding customers with fewer than 5 orders.” 
+10. **Large‑order customers**  
+    “Find customers whose single order total exceeded $10,000 in 2023.” 
+
+---
+
+## Advanced subqueries and window functions
+
+11. **Inventory turnover**  
+    “For each product, compute the ratio of total quantity sold to average daily inventory level.” 
+12. **Ranked products by color**  
+    “Within each product subcategory, rank products by list price and show the top 3 per subcategory.” 
+13. **First and last order dates**  
+    “List each customer’s first and most recent order dates.” 
+14. **Moving average of daily sales**  
+    “Compute the 7‑day moving average of daily total sales for March 2024.” 
+15. **Customers with lapsed activity**  
+    “Find customers who placed an order in 2022 but none in 2023.” 
+
+---
+
+## Correlated and anti‑existence patterns
+
+16. **Suppliers of high‑cost parts**  
+    “Identify vendors who supply parts with a standard cost above $1,000.” 
+17. **Branches missing orders**  
+    “Which sales territories have no orders in the past quarter?” 
+18. **Discontinued‑product customers**  
+    “List customers who have ordered at least one discontinued product.” 
+
+---
+
+## Temporal and conditional logic
+
+19. **Credit card expirations**  
+    “Find all credit cards that will expire next month.” 
+20. **Order ship‑time distribution**  
+    “Compute the average number of days between order date and ship date by shipping method.” 
+
+---
+
+Each question here leverages key AdventureWorks tables—**Sales.SalesOrderHeader**, **Sales.SalesOrderDetail**, **Production.Product**, **HumanResources.Employee**, **HumanResources.EmployeePayHistory**, **Person.Person**, **Purchasing.Vendor**, **Sales.Customer**, etc.—and pushes an NL‑to‑SQL system through typical real‑world query complexities. 
+
+**To validate**: feed these as natural‑language inputs to your pipeline and verify the generated T‑SQL against manually written solutions. The breadth of topics (aggregates, windowing, subqueries, dates, existence) ensures a comprehensive test.
+
+
+
+OTHER QUESTIONS
+
+Which customers have placed orders totaling more than $10,000 in the last fiscal year, and what are their respective total order amounts?​
+
+List the top 5 products by sales volume in each region for the previous quarter.​
+
+Identify employees who have not received any bonuses in the past two years but have maintained an average performance rating above 4.5.​
+
+Find the average delivery time for orders shipped via each carrier, excluding any orders that were delayed due to weather conditions.​
+
+Retrieve the names of suppliers who provide both electronic components and mechanical parts, along with the count of distinct products they supply in each category.​
+
+Determine the month-over-month growth rate in new customer sign-ups for the current year.​
+arXiv
++1
+OpenAI Community
++1
+
+List all projects that exceeded their budget by more than 15% and were completed more than 30 days past their original deadline.​
+
+Identify the top 3 sales representatives in each department based on total sales revenue generated in the last six months.​
+
+Find all customers who have made purchases in every quarter of the past year.​
+
+Calculate the average time between a customer's first inquiry and their first purchase, segmented by customer industry.​
+
+List all products that have had a return rate exceeding 10% in any of the past four quarters.​
+
+Retrieve the names of employees who have managed more than three projects simultaneously at any point in their tenure.​
+
+Determine the correlation between advertising spend and sales revenue across different marketing channels over the past year.​
+
+Identify customers who have downgraded their subscription plans more than once in the last 12 months.​
+
+Find the average customer satisfaction score for support tickets resolved within 24 hours versus those resolved after 24 hours.
