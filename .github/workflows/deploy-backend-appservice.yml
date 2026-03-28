@@ -1,11 +1,9 @@
 name: Deploy Backend App Service
 
 on:
+  # Automatic deployment via push to main/master is disabled to prevent
+  # accidental production deploys. Use manual workflow dispatch instead.
   workflow_dispatch:
-  push:
-    branches:
-      - main
-      - master
 
 permissions:
   contents: read
