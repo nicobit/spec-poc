@@ -1,6 +1,7 @@
 import json
 import datetime
 import os
+import logging
 import azure.functions as func
 from shared.scheduler_store import get_due_schedules as mem_get_due_schedules, mark_schedule_next_run as mem_mark_next_run
 from shared.cosmos_store import get_cosmos_store
@@ -10,9 +11,20 @@ COSMOS_ENABLED = bool(os.environ.get("COSMOS_CONNECTION_STRING"))
 
 cosmos = get_cosmos_store() if COSMOS_ENABLED else None
 
+# optional azure queue client import (used when output binding is not configured)
+try:
+    from azure.storage.queue import QueueClient
+except Exception:
+    QueueClient = None
+
+logger = logging.getLogger("function_scheduler_timer")
+if not logger.handlers:
+    # basic config for local logging when running under func host
+    logging.basicConfig()
 
 
-def main(mytimer: func.TimerRequest, outputQueueItem: func.Out[str]) -> None:
+
+def main(mytimer: func.TimerRequest, outputQueueItem: func.Out[str] = None) -> None:
     now = datetime.datetime.utcnow()
     now_iso = now.isoformat()
     # Prefer in-memory schedules when present (useful for tests). If none,
@@ -49,8 +61,26 @@ def main(mytimer: func.TimerRequest, outputQueueItem: func.Out[str]) -> None:
             mem_mark_next_run(s.get("id"), next_run)
 
     if messages:
-        # send as single JSON payload; worker will iterate
-        outputQueueItem.set(json.dumps(messages))
+        payload = json.dumps(messages)
+        # Prefer platform binding if available (used by tests and Functions output binding)
+        if outputQueueItem is not None:
+            try:
+                outputQueueItem.set(payload)
+            except Exception as e:
+                logger.exception("Failed to set output binding for schedule messages: %s", e)
+        else:
+            # Attempt to send programmatically if Azure storage is configured.
+            conn_str = os.environ.get("AzureWebJobsStorage") or os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+            if conn_str and QueueClient is not None:
+                try:
+                    queue_client = QueueClient.from_connection_string(conn_str, queue_name="env-schedule-queue")
+                    # ensure queue exists
+                    queue_client.create_queue()
+                    queue_client.send_message(payload)
+                except Exception:
+                    logger.exception("Failed to enqueue schedule messages via QueueClient; continuing without crashing.")
+            else:
+                logger.warning("No output binding and no queue client available; messages dropped: %s", payload)
 
 
 import sys
