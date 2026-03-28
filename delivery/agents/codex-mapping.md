@@ -1,6 +1,6 @@
 # Codex Agent Mapping
 
-This document maps the Codex agent layer to the canonical framework agent model.
+This document maps the Codex adapter layer to the canonical framework agent model.
 
 Use it together with:
 
@@ -8,49 +8,28 @@ Use it together with:
 - `../roles/agent-role-catalog.md`
 - `../workflows/agent-orchestration.md`
 
-## Mapping Summary
+## Mapping Table (updated 2026-03-28)
 
-| Codex Agent Or Mechanism | Canonical Agent | Status | Notes |
-| --- | --- | --- | --- |
-| `feature-orchestrator.md` | `Feature Orchestrator` | fallback adapter | delegates orchestration through `role-routing.md` until a richer native orchestrator exists |
-| `role-routing.md` | `Feature Orchestrator` fallback | partial | routing guidance used by the orchestrator adapter |
-| `business-analyst.md` | `Business Analyst` | direct | aligned |
-| `architect.md` | `Solution Architect` | direct | aligned |
-| `test-manager.md` | `Test Manager` | direct | aligned |
-| `reactjs-expert.md` | `Frontend Engineer` | specialization | technology-specific frontend specialization |
-| `python-engineer.md` | `Backend Engineer` | specialization | technology-specific backend specialization |
-| `devops-engineer.md` | `DevOps Engineer` | direct | aligned |
+| Mechanism / file (expected) | Canonical agent | Adapter path | Status | Notes |
+| --- | --- | --- | --- | --- |
+| `feature-orchestrator.md` | `Feature Orchestrator` | (not present) | missing | Codex currently relies on prompt/skill routing rather than concrete adapter files |
+| `role-routing.md` | `Feature Orchestrator` (fallback) | (not present) | partial | routing guidance used as an orchestrator substitute in prose |
+| `business-analyst.md` | `Business Analyst` | (not present) | missing | |
+| `architect.md` | `Solution Architect` | (not present) | missing | |
+| `test-manager.md` | `Test Manager` | (not present) | missing | |
+| `reactjs-expert.md` | `Frontend Engineer` (specialization) | (not present) | missing | technology specialization — prefer canonical mapping in delivery/ |
+| `python-engineer.md` | `Backend Engineer` (specialization) | (not present) | missing | technology specialization — prefer canonical mapping in delivery/ |
+| `devops-engineer.md` | `DevOps Engineer` | (not present) | missing | |
 
-## Coverage Assessment
+## Coverage assessment
 
-Codex currently supports the core design and implementation path, but it does not yet expose:
+Codex currently uses feature-delivery prompts and skills for many responsibilities; it does not expose dedicated adapter files under a `.codex/` directory in this repository. Update this table if adapter files are added.
 
-- direct gate/review agents for `UX Expert`
-- `Automation Tester`
-- `Security Reviewer`
-- `Documentation Owner`
-- `QA Reviewer`
+## Adapter guidance
 
-Those responsibilities currently exist through the feature-delivery prompt, skills, or routing guidance rather than dedicated agent adapters.
+- Keep canonical sequencing in `delivery/` rather than platform-only prose.
+- When adding Codex adapter files, add `last-updated: YYYY-MM-DD` frontmatter and update this table's `Adapter path` and `Status`.
 
-## Framework Interpretation
+## Recommended next step
 
-For Codex, the current fallback mapping is:
-
-- `role-routing.md` acts as the orchestrator substitute
-- the feature-delivery prompt and skills carry some gate/review behavior
-- direct agents cover only a reduced core subset
-
-This is workable, but weaker than the canonical model.
-
-## Adapter Rule
-
-When updating Codex adapters:
-
-1. treat `role-routing.md` as a temporary orchestrator fallback, not the final model
-2. prefer adding missing gate/review agents only when Codex can expose them cleanly as adapters
-3. keep canonical sequencing in `delivery/`, not in Codex-only prose
-
-## Recommended Next Step
-
-Add direct gate/review agent adapters only when they provide clearer execution than the feature-delivery prompt or skills.
+Decide whether to add a `.codex/` adapter directory with explicit adapter files, or to keep Codex behavior as prompt/skill-based guidance.

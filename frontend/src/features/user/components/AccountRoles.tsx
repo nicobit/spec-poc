@@ -18,7 +18,7 @@ export default function AccountRoles() {
         // Try to get an id token via acquireTokenSilent to read claims reliably
         const silentReq = { scopes: ["User.Read"], account } as any;
         const resp = await instance.acquireTokenSilent(silentReq);
-        const claims = resp.idTokenClaims || {};
+        const claims = (resp.idTokenClaims || {}) as any;
         if (mounted) {
           setRoles((claims.roles as string[]) || []);
           if (claims.groups) {
@@ -33,7 +33,7 @@ export default function AccountRoles() {
         // (some MSAL runtime setups keep claims on the account)
         try {
           // @ts-ignore
-          const acctClaims = account.idTokenClaims || account.idToken || null;
+          const acctClaims = (account.idTokenClaims || account.idToken || null) as any;
           if (mounted && acctClaims) {
             setRoles((acctClaims.roles as string[]) || []);
             if (acctClaims.groups) setGroups(Array.isArray(acctClaims.groups) ? (acctClaims.groups as string[]) : [String(acctClaims.groups)]);

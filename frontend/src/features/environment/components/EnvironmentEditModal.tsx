@@ -15,6 +15,7 @@ type Props = {
 export default function EnvironmentEditModal({ open, env, instance, onClose }: Props) {
   const [name, setName] = useState('');
   const [client, setClient] = useState('');
+  const [type, setType] = useState('');
   const [stages, setStages] = useState<EnvironmentStage[]>([]);
   const [saving, setSaving] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);

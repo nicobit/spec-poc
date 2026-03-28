@@ -1,6 +1,6 @@
 # Claude Agent Mapping
 
-This document maps the Claude agent layer to the canonical framework agent model.
+This document maps the Claude adapter layer to the canonical framework agent model.
 
 Use it together with:
 
@@ -8,48 +8,33 @@ Use it together with:
 - `../roles/agent-role-catalog.md`
 - `../workflows/agent-orchestration.md`
 
-## Mapping Summary
+## Mapping Table (updated 2026-03-28)
 
-| Claude Agent Or Mechanism | Canonical Agent | Status | Notes |
-| --- | --- | --- | --- |
-| `feature-orchestrator.md` | `Feature Orchestrator` | fallback adapter | delegates orchestration through `role-routing.md` until a richer native orchestrator exists |
-| `role-routing.md` | `Feature Orchestrator` fallback | partial | routing guidance used by the orchestrator adapter |
-| `business-analyst.md` | `Business Analyst` | direct | aligned |
-| `architect.md` | `Solution Architect` | direct | aligned |
-| `test-manager.md` | `Test Manager` | direct | aligned |
-| `reactjs-expert.md` | `Frontend Engineer` | specialization | technology-specific frontend specialization |
-| `python-engineer.md` | `Backend Engineer` | specialization | technology-specific backend specialization |
-| `devops-engineer.md` | `DevOps Engineer` | direct | aligned |
-| `ux-expert.md` | `UX Expert` | direct | gate/review agent |
-| `automation-tester.md` | `Automation Tester` | direct | gate/review agent |
-| `security-reviewer.md` | `Security Reviewer` | direct | gate/review agent |
-| `documentation-owner.md` | `Documentation Owner` | direct | gate/review agent |
-| `qa-reviewer.md` | `QA Reviewer` | direct | gate/review agent |
+| Mechanism / file (expected) | Canonical agent | Adapter path | Status | Notes |
+| --- | --- | --- | --- | --- |
+| `feature-orchestrator.md` | `Feature Orchestrator` | (not present) | missing | Claude currently relies on routing guidance as a fallback |
+| `role-routing.md` | `Feature Orchestrator` (fallback) | (not present) | partial | routing guidance used as an orchestrator substitute in prose |
+| `business-analyst.md` | `Business Analyst` | (not present) | missing | |
+| `architect.md` | `Solution Architect` | (not present) | missing | |
+| `test-manager.md` | `Test Manager` | (not present) | missing | |
+| `reactjs-expert.md` | `Frontend Engineer` (specialization) | (not present) | missing | technology specialization — prefer canonical mapping in delivery/ |
+| `python-engineer.md` | `Backend Engineer` (specialization) | (not present) | missing | technology specialization — prefer canonical mapping in delivery/ |
+| `devops-engineer.md` | `DevOps Engineer` | (not present) | missing | |
+| `ux-expert.md` | `UX Expert` | (not present) | missing | gate/review agent |
+| `automation-tester.md` | `Automation Tester` | (not present) | missing | gate/review agent |
+| `security-reviewer.md` | `Security Reviewer` | (not present) | missing | gate/review agent |
+| `documentation-owner.md` | `Documentation Owner` | (not present) | missing | gate/review agent |
+| `qa-reviewer.md` | `QA Reviewer` | (not present) | missing | gate/review agent |
 
-## Coverage Assessment
+## Coverage assessment
 
-Claude now covers the full canonical agent set: all core agents and all gate/review agents are represented.
+Claude mappings currently exist as descriptive guidance (in this file) rather than concrete adapter files under a `.claude/` directory. Update the table above if adapter files are added.
 
-The only remaining gap from the canonical model is the orchestrator: `role-routing.md` still acts as a fallback substitute rather than a first-class orchestrator adapter.
+## Adapter guidance
 
-## Framework Interpretation
+- Keep canonical sequencing in `delivery/` rather than platform-only prose.
+- When adding Claude adapter files, add a one-line `last-updated: YYYY-MM-DD` frontmatter to each adapter file and update this table's `Adapter path` and `Status` fields.
 
-For Claude, the current mapping is:
+## Recommended next step
 
-- `role-routing.md` acts as the orchestrator substitute
-- all core and gate/review agents have direct adapter files
-- technology specializations (`reactjs-expert.md`, `python-engineer.md`) are used in place of generic `Frontend Engineer` and `Backend Engineer`
-
-This is aligned with the canonical model except for the orchestrator gap.
-
-## Adapter Rule
-
-When updating Claude adapters:
-
-1. treat `role-routing.md` as a temporary orchestrator fallback, not the final model
-2. prefer adding missing gate/review agents only when the Claude platform can expose them cleanly
-3. keep canonical sequencing in `delivery/`, not in Claude-only prose
-
-## Recommended Next Step
-
-Add direct gate/review agent adapters only when they provide clearer execution than commands or routing guidance.
+Decide whether to add a `.claude/` adapter directory with explicit adapter files. If not, keep this file as guidance and mark entries `missing` until adapters are available.

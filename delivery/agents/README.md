@@ -16,13 +16,6 @@ Use these files to answer:
 - `claude-mapping.md`: how Claude agent adapters map to the canonical model
 - `codex-mapping.md`: how Codex agent adapters map to the canonical model
 
-## Files
-
-- `agent-model.md`: canonical framework agent categories and rules
-- `github-mapping.md`: how GitHub agent adapters map to the canonical model
-- `claude-mapping.md`: how Claude agent adapters map to the canonical model
-- `codex-mapping.md`: how Codex agent adapters map to the canonical model
-
 ## Boundary
 
 Use `delivery/roles/` for role responsibilities and handoffs.

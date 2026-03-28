@@ -60,37 +60,38 @@ export default function EnvironmentDashboard({ instance: msalInstance }: Props) 
     void refresh();
   }, [refresh]);
 
-  const loadActivityPage = useCallback(async (envId: string, page: number, filters?: Filters) => {
+  const totalPages = Math.max(1, Math.ceil(totalEnvs / perPage));
+  const stageCount = instances.reduce((acc, e) => acc + (e.stages?.length || 0), 0);
+  const selectedActivityEnv = instances.find((i) => i.id === selectedActivityEnvId) ?? null;
+  const activityEntries = selectedActivityEnvId ? activityMap[selectedActivityEnvId] || [] : [];
+  const activityCount = selectedActivityEnvId ? activityTotal[selectedActivityEnvId] || 0 : 0;
+  const activityCurrentPage = selectedActivityEnvId ? activityPage[selectedActivityEnvId] ?? 0 : 0;
+  const activityPages = Math.max(1, Math.ceil((activityCount || 0) / 10));
+
+  const loadActivityPage = useCallback(async (envId: string, pageNum: number, filters?: Filters) => {
     setActivityLoading((state) => ({ ...state, [envId]: true }));
     try {
       const effective = filters ?? activityFilters[envId] ?? {};
       const response = await getActivity(msalInstance, envId, {
-        page,
+        page: pageNum,
         perPage: 10,
         client: effective.client,
-                        <div className="mb-2 flex items-center justify-between">
-                          <h4 className="text-md font-semibold">Live environments</h4>
-                          <div className="flex items-center gap-2">
-                            <a href="/environment/manage" className={`${themeClasses.buttonSecondary} rounded-lg px-3 py-1.5 text-sm`}>Manage environments</a>
-                            <div className="flex items-center gap-2">
-                              <button
-                                disabled={page <= 0}
-                                onClick={() => { setPage((p) => Math.max(0, p - 1)); void refresh(); }}
-                                className={`${themeClasses.buttonSecondary} rounded px-2 py-1 text-sm disabled:opacity-50`}
-                              >
-                                Prev
-                              </button>
-                              <div className="text-sm ui-text-muted">Page {page + 1} / {totalPages}</div>
-                              <button
-                                disabled={page >= totalPages - 1}
-                                onClick={() => { setPage((p) => p + 1); void refresh(); }}
-                                className={`${themeClasses.buttonSecondary} rounded px-2 py-1 text-sm disabled:opacity-50`}
-                              >
-                                Next
-                              </button>
-                            </div>
-                          </div>
-                        </div>
+        stage: effective.stage,
+        action: effective.action,
+      });
+
+      setActivityMap((state) => ({ ...state, [envId]: response.activity || [] }));
+      setActivityTotal((state) => ({ ...state, [envId]: response.total || 0 }));
+      setActivityPage((state) => ({ ...state, [envId]: response.page || pageNum }));
+    } catch (error) {
+      // noop - errors are surfaced via UI elsewhere
+    } finally {
+      setActivityLoading((state) => ({ ...state, [envId]: false }));
+    }
+  }, [msalInstance, activityFilters]);
+
+  return (
+    <div className="space-y-6">
       <PageHeader
         title="Environment dashboard"
         description="Monitor stage status and recent activity here. Use the Resources and Schedules pages for configuration and scheduling."

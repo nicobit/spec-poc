@@ -8,47 +8,31 @@ Use it together with:
 - `../roles/agent-role-catalog.md`
 - `../workflows/agent-orchestration.md`
 
-## Mapping Summary
+## Mapping Table (updated 2026-03-28)
 
-| GitHub Agent | Canonical Agent | Status | Notes |
-| --- | --- | --- | --- |
-| `Feature Orchestrator` | `Feature Orchestrator` | direct | strongest current framework-aligned adapter |
-| `Business Analyst` | `Business Analyst` | direct | aligned |
-| `Solution Architect` | `Solution Architect` | direct | aligned |
-| `Test Manager` | `Test Manager` | direct | aligned |
-| `ReactJS Expert` | `Frontend Engineer` | specialization | technology-specific frontend specialization |
-| `Python Engineer` | `Backend Engineer` | specialization | technology-specific backend specialization |
-| `DevOps Engineer` | `DevOps Engineer` | direct | aligned |
-| `UX Expert` | `UX Expert` | direct | gate/review agent |
-| `Automation Tester` | `Automation Tester` | direct | gate/review agent |
-| `Security Reviewer` | `Security Reviewer` | direct | gate/review agent |
-| `Documentation Owner` | `Documentation Owner` | direct | gate/review agent |
+| Platform agent file | Canonical agent | Adapter path | Status | Notes |
+| --- | --- | --- | --- | --- |
+| `feature-orchestrator.agent.md` | `Feature Orchestrator` | `.github/agents/feature-orchestrator.agent.md` | aligned | Primary orchestrator adapter |
+| `business-analyst.agent.md` | `Business Analyst` | `.github/agents/business-analyst.agent.md` | aligned | |
+| `architect.agent.md` | `Solution Architect` | `.github/agents/architect.agent.md` | aligned | |
+| `test-manager.agent.md` | `Test Manager` | `.github/agents/test-manager.agent.md` | aligned | |
+| `reactjs-expert.agent.md` | `Frontend Engineer` (specialization) | `.github/agents/reactjs-expert.agent.md` | aligned | Technology specialization — map to `Frontend Engineer` in orchestration logic |
+| `python-engineer.agent.md` | `Backend Engineer` (specialization) | `.github/agents/python-engineer.agent.md` | aligned | Technology specialization — map to `Backend Engineer` in orchestration logic |
+| `devops-engineer.agent.md` | `DevOps Engineer` | `.github/agents/devops-engineer.agent.md` | aligned | |
+| `ux-expert.agent.md` | `UX Expert` | `.github/agents/ux-expert.agent.md` | aligned | Gate/review agent |
+| `automation-tester.agent.md` | `Automation Tester` | `.github/agents/automation-tester.agent.md` | aligned | Gate/review agent |
+| `security-reviewer.agent.md` | `Security Reviewer` | `.github/agents/security-reviewer.agent.md` | aligned | Gate/review agent |
+| `documentation-owner.agent.md` | `Documentation Owner` | `.github/agents/documentation-owner.agent.md` | aligned | Gate/review agent |
 
-## Coverage Assessment
+## Coverage assessment
 
-GitHub currently has the best alignment with the canonical framework because it provides:
+GitHub provides the most complete set of platform adapters for the canonical model. The adapter files in `.github/agents/` are the authoritative GitHub-side implementations; orchestration code in `delivery/` should reference canonical agent names and map to these specialized adapters where necessary.
 
-- an explicit orchestrator adapter
-- the full core sequence except for generic `Frontend Engineer` and `Backend Engineer`
-- direct gate/review agents for UX, automation, security, and documentation
+## Adapter guidance
 
-## Gaps
+- Keep platform adapters concise — map back to canonical names in `delivery/`.
+- Mark technology-specific adapters (`reactjs-expert`, `python-engineer`) explicitly as specializations in orchestration logic.
 
-GitHub still expresses implementation through technology-specialized agent names:
+## Maintenance
 
-- `ReactJS Expert` instead of `Frontend Engineer`
-- `Python Engineer` instead of `Backend Engineer`
-
-This is acceptable as a platform adapter, but the canonical orchestration logic should continue to use the framework-level names.
-
-## Adapter Rule
-
-When updating GitHub agents:
-
-1. preserve `Feature Orchestrator` as the primary sequential entrypoint
-2. keep GitHub-only behavior limited to tool scopes and GitHub-specific agent syntax
-3. map new GitHub agents back to a canonical agent before introducing them
-
-## Recommended Next Step
-
-Optionally add explicit notes in GitHub agent files that they are specializations of canonical framework agents where applicable.
+When adding or changing a GitHub adapter, update this file's table `Adapter path` and set the `Status` to `aligned` / `partial` / `missing`. Consider adding a `last-updated` annotation in the adapter file's YAML/frontmatter.
