@@ -6,7 +6,7 @@
         "dev": "vite",
         "lint": "eslint src --ext .ts,.tsx",
         "test": "vitest run",
-            "test:ci": "vitest run --coverage --reporter=vitest-junit",
+            "test:ci": "mkdir -p reports && vitest run --coverage --reporter=json > reports/vitest-report.json",
         "test:watch": "vitest",
         "typecheck": "tsc --noEmit",
         "build": "vite build",
@@ -57,7 +57,6 @@
         "typescript": "^5.3.0",
         "typescript-eslint": "^8.26.1",
         "vite": "^8.0.1",
-        "vitest": "^3.2.4",
-        "vitest-junit": "^0.6.0"
+        "vitest": "^3.2.4"
     }
 }
