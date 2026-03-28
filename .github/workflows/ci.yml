@@ -1,5 +1,8 @@
 name: CI
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 on:
   push:
     branches:
@@ -19,6 +22,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
       - name: Repository checks
         run: python scripts/repo_checks.py
 
@@ -46,6 +51,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
       - name: Run repository tests
         run: python -m unittest discover -s tests/repo -p "test_*.py"
       - name: Backend Python syntax smoke check
@@ -58,6 +65,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
       - name: Run backend tests
         run: python -m unittest discover -s tests/backend -p "test_*.py"
       - name: Backend compileall
