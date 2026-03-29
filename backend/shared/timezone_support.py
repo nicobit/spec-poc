@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import timezone
 from zoneinfo import ZoneInfo
 
 
@@ -35,3 +36,17 @@ def is_valid_iana_timezone(value: str) -> bool:
         return True
     except Exception:
         return normalized in FALLBACK_IANA_TIMEZONES
+
+
+def get_timezone_info(value: str):
+    normalized = str(value or "").strip()
+    if not normalized:
+        raise ValueError("timezone is required")
+    try:
+        return ZoneInfo(normalized)
+    except Exception:
+        if normalized == "UTC":
+            return timezone.utc
+        if normalized in FALLBACK_IANA_TIMEZONES:
+            return ZoneInfo("UTC")
+        raise

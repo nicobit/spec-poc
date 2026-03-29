@@ -1,11 +1,12 @@
 import os
 import uuid
 from typing import Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import azure.functions as func
 from fastapi import FastAPI, Request, Response, HTTPException
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field, ValidationError
 from croniter import croniter
 
@@ -13,6 +14,7 @@ from shared import scheduler_store as mem_store
 from shared.context import get_current_user
 from shared.authz import has_any_role, has_client_admin_for
 from shared.cosmos_store import get_cosmos_store
+from shared.timezone_support import get_timezone_info
 from shared.environment_store import (
     get_default_stage,
     get_environment as get_environment_item,
@@ -34,6 +36,13 @@ from shared.client_store import (
 from shared.environment_repository import get_environment_store
 from shared.environment_store import create_environment
 from shared.audit_store import append_audit
+from shared.execution_store import (
+    get_stage_execution as get_stage_execution_item,
+    get_stage_execution_store,
+    get_latest_stage_execution,
+    list_stage_executions_for_schedule,
+    list_stage_executions_for_stage,
+)
 from app.utils.cors_helper import CORSHelper
 
 fast_app = FastAPI()
@@ -46,6 +55,18 @@ import logging
 
 logger = logging.getLogger("function_environment")
 import inspect
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _utc_now_iso() -> str:
+    return _utc_now().isoformat()
+
+
+def _validation_error_detail(exc: ValidationError):
+    return jsonable_encoder(exc.errors(), custom_encoder={ValueError: str})
 
 
 async def _resolve_user(req: Request):
@@ -77,6 +98,7 @@ async def log_requests(request: Request, call_next):
 
 COSMOS_ENABLED = bool(os.environ.get("COSMOS_CONNECTION_STRING"))
 cosmos = get_cosmos_store() if COSMOS_ENABLED else None
+stage_execution_store = get_stage_execution_store() if COSMOS_ENABLED else None
 
 
 class ScheduleIn(BaseModel):
@@ -138,11 +160,12 @@ class ClientRetireIn(BaseModel):
 
 
 def compute_next_run(cron_expr: str, tz: str) -> str:
-    now = datetime.now(ZoneInfo(tz))
+    tzinfo = get_timezone_info(tz)
+    now = datetime.now(tzinfo)
     it = croniter(cron_expr, now)
     nr = it.get_next(datetime)
     # normalize to UTC
-    return nr.astimezone(ZoneInfo("UTC")).isoformat()
+    return nr.astimezone(timezone.utc).isoformat()
 
 
 env_store = get_environment_store()
@@ -361,6 +384,77 @@ def _decorate_schedule_for_response(item: dict, environments: Optional[list[dict
     return decorated
 
 
+def _execution_response_payload(item: dict) -> dict:
+    return dict(item)
+
+
+def _list_stage_execution_refs(stage_id: str, *, limit: int = 20) -> list[dict]:
+    if stage_execution_store:
+        try:
+            return stage_execution_store.list_stage_executions_for_stage(stage_id, limit=limit)
+        except Exception:
+            logger.exception("Failed to read stage executions from Cosmos; falling back to in-memory store")
+    return list_stage_executions_for_stage(stage_id, limit=limit)
+
+
+def _list_schedule_execution_refs(schedule_id: str, *, limit: int = 20) -> list[dict]:
+    if stage_execution_store:
+        try:
+            return stage_execution_store.list_stage_executions_for_schedule(schedule_id, limit=limit)
+        except Exception:
+            logger.exception("Failed to read schedule executions from Cosmos; falling back to in-memory store")
+    return list_stage_executions_for_schedule(schedule_id, limit=limit)
+
+
+def _get_latest_stage_execution_ref(stage_id: str) -> Optional[dict]:
+    if stage_execution_store:
+        try:
+            return stage_execution_store.get_latest_stage_execution(stage_id)
+        except Exception:
+            logger.exception("Failed to read latest stage execution from Cosmos; falling back to in-memory store")
+    return get_latest_stage_execution(stage_id)
+
+
+def _get_stage_execution_ref(execution_id: str) -> Optional[dict]:
+    if stage_execution_store:
+        try:
+            return stage_execution_store.get_stage_execution(execution_id)
+        except Exception:
+            logger.exception("Failed to read stage execution from Cosmos; falling back to in-memory store")
+    return get_stage_execution_item(execution_id)
+
+
+def _augment_schedule_with_execution_refs(schedule: dict) -> dict:
+    decorated = dict(schedule)
+    schedule_id = decorated.get("id")
+    if not schedule_id:
+        decorated["latestExecution"] = None
+        decorated["executionCount"] = 0
+        return decorated
+
+    executions = _list_schedule_execution_refs(schedule_id, limit=5)
+    decorated["executionCount"] = len(executions)
+    decorated["latestExecution"] = _execution_response_payload(executions[0]) if executions else None
+    return decorated
+
+
+def _augment_stage_with_execution_refs(stage: dict) -> dict:
+    decorated = dict(stage)
+    stage_id = decorated.get("id")
+    if not stage_id:
+        decorated["latestExecution"] = None
+        decorated["executions"] = []
+        decorated["executionCount"] = 0
+        return decorated
+
+    latest_execution = _get_latest_stage_execution_ref(stage_id)
+    executions = _list_stage_execution_refs(stage_id, limit=5)
+    decorated["latestExecution"] = _execution_response_payload(latest_execution) if latest_execution else None
+    decorated["executions"] = [_execution_response_payload(item) for item in executions]
+    decorated["executionCount"] = len(executions)
+    return decorated
+
+
 def _derive_type_from_stages(details: dict) -> Optional[str]:
     """Derive a simple environment type from stage resource action types.
 
@@ -461,10 +555,10 @@ async def create_client(req: Request, body: ClientIn):
 
     try:
         created = create_client_inmemory(item)
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=_validation_error_detail(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except ValidationError as exc:
-        raise HTTPException(status_code=400, detail=exc.errors()) from exc
 
     actor = user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid")
     append_audit(
@@ -498,10 +592,10 @@ async def update_client(client_id: str, req: Request, body: ClientIn):
 
     try:
         updated = update_client_inmemory(client_id, payload)
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=_validation_error_detail(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except ValidationError as exc:
-        raise HTTPException(status_code=400, detail=exc.errors()) from exc
 
     actor = user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid")
     append_audit(
@@ -707,7 +801,7 @@ async def post_environment(req: Request, body: EnvironmentIn):
 
     # attach created/updated timestamps and owner
     try:
-        now = datetime.utcnow().isoformat()
+        now = _utc_now_iso()
         owner_id = user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid")
         if created is not None:
             created.setdefault("owner", owner_id)
@@ -785,7 +879,7 @@ async def put_environment(env_id: str, req: Request, body: EnvironmentIn):
 
     # attach updated timestamp and requester
     try:
-        now = datetime.utcnow().isoformat()
+        now = _utc_now_iso()
         requester = user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid")
         if updated is not None:
             updated["updated_at"] = now
@@ -885,9 +979,9 @@ async def _legacy_duplicate_create_schedule(req: Request, body: ScheduleIn):
             # In-memory tests may supply cron/timezone formats that cause
             # third-party parsers to error; don't fail creation — fallback
             # to scheduling the job immediately.
-            item["next_run"] = datetime.utcnow().isoformat()
+            item["next_run"] = _utc_now_iso()
     else:
-        item["next_run"] = datetime.utcnow().isoformat()
+        item["next_run"] = _utc_now_iso()
 
     if cosmos:
         cosmos.upsert_schedule(item)
@@ -943,7 +1037,7 @@ async def _legacy_duplicate_update_schedule(req: Request, schedule_id: str, body
             item["next_run"] = compute_next_run(item["cron"], item.get("timezone", "UTC"))
         except Exception:
             # If cron parsing fails during update, fallback to now.
-            item["next_run"] = datetime.utcnow().isoformat()
+            item["next_run"] = _utc_now_iso()
     if cosmos:
         cosmos.upsert_schedule(item)
     else:
@@ -1034,7 +1128,7 @@ async def _legacy_duplicate_postpone_schedule(req: Request, schedule_id: str, bo
     if body.postponeUntil:
         postponed_until = body.postponeUntil
     elif body.postponeByMinutes:
-        postponed_until = (datetime.utcnow() + timedelta(minutes=body.postponeByMinutes)).isoformat()
+        postponed_until = (_utc_now() + timedelta(minutes=body.postponeByMinutes)).isoformat()
     else:
         raise HTTPException(status_code=400, detail="Either postponeUntil or postponeByMinutes is required")
 
@@ -1127,10 +1221,10 @@ async def start_environment(env_id: str, req: Request):
     env_client = None
     if env_store:
         env_tmp = env_store.get_environment(env_id)
-        env_client = env_tmp.get("client") if env_tmp else None
+        env_client = (env_tmp.get("clientId") or env_tmp.get("client")) if env_tmp else None
     else:
         env_tmp = get_environment_item(env_id)
-        env_client = env_tmp.get("client") if env_tmp else None
+        env_client = (env_tmp.get("clientId") or env_tmp.get("client")) if env_tmp else None
     if not (has_any_role(user, ["admin", "environment-manager"]) or (env_client and has_client_admin_for(user, env_client))):
         raise HTTPException(status_code=403, detail="Forbidden")
     # prefer persistent store when available
@@ -1174,10 +1268,10 @@ async def stop_environment(env_id: str, req: Request):
     env_client = None
     if env_store:
         env_tmp = env_store.get_environment(env_id)
-        env_client = env_tmp.get("client") if env_tmp else None
+        env_client = (env_tmp.get("clientId") or env_tmp.get("client")) if env_tmp else None
     else:
         env_tmp = get_environment_item(env_id)
-        env_client = env_tmp.get("client") if env_tmp else None
+        env_client = (env_tmp.get("clientId") or env_tmp.get("client")) if env_tmp else None
     if not (has_any_role(user, ["admin", "environment-manager"]) or (env_client and has_client_admin_for(user, env_client))):
         raise HTTPException(status_code=403, detail="Forbidden")
     if env_store:
@@ -1269,12 +1363,14 @@ async def put_stage_configuration(env_id: str, stage_id: str, req: Request, body
 @fast_app.post("/api/environments/{env_id}/stages/{stage_id}/start")
 async def start_stage(env_id: str, stage_id: str, req: Request):
     user = await _resolve_user(req)
-    env_client = (get_environment_item(env_id) or {}).get("client")
+    env_client = None
+    env_item = get_environment_item(env_id) or {}
+    env_client = env_item.get("clientId") or env_item.get("client")
     if env_store:
         try:
             env_tmp = env_store.get_environment(env_id)
             if env_tmp:
-                env_client = env_tmp.get("client")
+                env_client = env_tmp.get("clientId") or env_tmp.get("client")
         except Exception:
             pass
     if not (has_any_role(user, ["admin", "environment-manager"]) or (env_client and has_client_admin_for(user, env_client))):
@@ -1301,12 +1397,14 @@ async def start_stage(env_id: str, stage_id: str, req: Request):
 @fast_app.post("/api/environments/{env_id}/stages/{stage_id}/stop")
 async def stop_stage(env_id: str, stage_id: str, req: Request):
     user = await _resolve_user(req)
-    env_client = (get_environment_item(env_id) or {}).get("client")
+    env_client = None
+    env_item = get_environment_item(env_id) or {}
+    env_client = env_item.get("clientId") or env_item.get("client")
     if env_store:
         try:
             env_tmp = env_store.get_environment(env_id)
             if env_tmp:
-                env_client = env_tmp.get("client")
+                env_client = env_tmp.get("clientId") or env_tmp.get("client")
         except Exception:
             pass
     if not (has_any_role(user, ["admin", "environment-manager"]) or (env_client and has_client_admin_for(user, env_client))):
@@ -1335,14 +1433,19 @@ async def list_schedules():
     environments = _list_environment_refs()
     if cosmos:
         items = cosmos.list_schedules()
-        return {"schedules": [_decorate_schedule_for_response(item, environments) for item in items]}
+        return {"schedules": [_augment_schedule_with_execution_refs(_decorate_schedule_for_response(item, environments)) for item in items]}
     else:
-        return {"schedules": [_decorate_schedule_for_response(item, environments) for item in mem_store.SCHEDULES]}
+        return {
+            "schedules": [
+                _augment_schedule_with_execution_refs(_decorate_schedule_for_response(item, environments))
+                for item in mem_store.SCHEDULES
+            ]
+        }
 
 
 @fast_app.post("/api/environments/schedules")
 async def create_schedule(req: Request, body: ScheduleIn):
-    user = await get_current_user(req)
+    user = await _resolve_user(req)
     # authorize using robust role extraction and optional group->role mapping
     if not has_any_role(user, ["admin", "environment-manager"]):
         raise HTTPException(status_code=403, detail="Forbidden")
@@ -1370,7 +1473,7 @@ async def create_schedule(req: Request, body: ScheduleIn):
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid cron/timezone: {e}")
     else:
-        item["next_run"] = datetime.utcnow().isoformat()
+        item["next_run"] = _utc_now_iso()
 
     if cosmos:
         cosmos.upsert_schedule(item)
@@ -1481,7 +1584,7 @@ async def update_schedule(req: Request, schedule_id: str, body: ScheduleIn):
 
 @fast_app.delete("/api/environments/schedules/{schedule_id}")
 async def delete_schedule(req: Request, schedule_id: str):
-    user = await get_current_user(req)
+    user = await _resolve_user(req)
     if not has_any_role(user, ["admin", "environment-manager"]):
         raise HTTPException(status_code=403, detail="Forbidden")
 
@@ -1528,7 +1631,7 @@ def _can_postpone(user: dict, schedule: dict) -> bool:
 
 @fast_app.post("/api/environments/schedules/{schedule_id}/postpone")
 async def postpone_schedule(req: Request, schedule_id: str, body: PostponeIn):
-    user = await get_current_user(req)
+    user = await _resolve_user(req)
     schedule = cosmos.get_schedule(schedule_id) if cosmos else next((s for s in mem_store.SCHEDULES if s.get("id") == schedule_id), None)
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
@@ -1544,7 +1647,7 @@ async def postpone_schedule(req: Request, schedule_id: str, body: PostponeIn):
     if body.postponeUntil:
         postponed_until = body.postponeUntil
     elif body.postponeByMinutes:
-        postponed_until = (datetime.utcnow() + timedelta(minutes=body.postponeByMinutes)).isoformat()
+        postponed_until = (_utc_now() + timedelta(minutes=body.postponeByMinutes)).isoformat()
     else:
         raise HTTPException(status_code=400, detail="Either postponeUntil or postponeByMinutes is required")
 
@@ -1625,7 +1728,7 @@ async def get_environment_by_id(env_id: str):
                     str(environment.get("name") or "").lower(),
                 ):
                     schedules.append(decorated)
-        details["schedules"] = schedules
+        details["schedules"] = [_augment_schedule_with_execution_refs(item) for item in schedules]
     except Exception:
         details["schedules"] = []
 
@@ -1646,11 +1749,100 @@ async def get_environment_by_id(env_id: str):
     except Exception:
         pass
 
+    try:
+        stage_executions = []
+        stages = []
+        for stage in details.get("stages", []) or []:
+            decorated_stage = _augment_stage_with_execution_refs(stage)
+            stage_executions.extend(decorated_stage.get("executions", []))
+            stages.append(decorated_stage)
+        details["stages"] = stages
+        stage_executions.sort(key=lambda item: item.get("requestedAt") or "", reverse=True)
+        details["executions"] = stage_executions[:20]
+    except Exception:
+        details["executions"] = []
+
     return details
 
 
 async def main(req: func.HttpRequest, context: func.Context) -> func.HttpResponse:
     return await func.AsgiMiddleware(fast_app).handle_async(req, context)
+
+
+@fast_app.get("/api/environments/executions/{execution_id}")
+async def get_stage_execution_detail(execution_id: str, req: Request):
+    user = await _resolve_user(req)
+    execution = _get_stage_execution_ref(execution_id)
+    if not execution:
+        raise HTTPException(status_code=404, detail="Stage execution not found")
+
+    client_id = execution.get("clientId")
+    if not (has_any_role(user, ["admin", "environment-manager"]) or (client_id and has_client_admin_for(user, client_id))):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    return {"execution": _execution_response_payload(execution)}
+
+
+@fast_app.get("/api/environments/{env_id}/executions")
+async def list_environment_stage_executions(env_id: str, req: Request):
+    user = await _resolve_user(req)
+    environment = None
+    if env_store:
+        try:
+            environment = env_store.get_environment(env_id)
+        except Exception:
+            environment = None
+    if not environment:
+        environment = get_environment_item(env_id)
+    if not environment:
+        raise HTTPException(status_code=404, detail="Environment not found")
+
+    env_client = environment.get("clientId") or environment.get("client")
+    if not (has_any_role(user, ["admin", "environment-manager"]) or (env_client and has_client_admin_for(user, env_client))):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    q = req.query_params
+    stage_id = q.get("stage_id")
+    schedule_id = q.get("schedule_id")
+    try:
+        limit = int(q.get("limit", "20"))
+    except Exception:
+        limit = 20
+    limit = max(1, min(limit, 100))
+
+    stages = environment.get("stages") or []
+    valid_stage_ids = {item.get("id") for item in stages if item.get("id")}
+    if stage_id and stage_id not in valid_stage_ids:
+        raise HTTPException(status_code=400, detail="stage_id does not belong to environment")
+
+    if schedule_id:
+        schedule_refs = _list_schedule_execution_refs(schedule_id, limit=limit)
+        executions = [
+            _execution_response_payload(item)
+            for item in schedule_refs
+            if item.get("environmentId") == env_id and (not stage_id or item.get("stageId") == stage_id)
+        ]
+    else:
+        target_stage_ids = [stage_id] if stage_id else [item.get("id") for item in stages if item.get("id")]
+        executions = []
+        seen_execution_ids = set()
+        for target_stage_id in target_stage_ids:
+            for item in _list_stage_execution_refs(target_stage_id, limit=limit):
+                execution_id_val = item.get("executionId") or item.get("id")
+                if execution_id_val in seen_execution_ids:
+                    continue
+                seen_execution_ids.add(execution_id_val)
+                executions.append(_execution_response_payload(item))
+        executions.sort(key=lambda item: item.get("requestedAt") or "", reverse=True)
+        executions = executions[:limit]
+
+    return {
+        "executions": executions,
+        "total": len(executions),
+        "environmentId": env_id,
+        "stageId": stage_id,
+        "scheduleId": schedule_id,
+    }
 
 
 @fast_app.post("/api/environments/control")
@@ -1729,6 +1921,7 @@ async def control_environment(req: Request):
                 "status": "requested",
                 "eventType": "scheduled-lifecycle",
                 "scheduleId": data.get("scheduleId"),
+                "executionId": data.get("executionId"),
             }
         )
     except Exception:
@@ -1742,6 +1935,7 @@ async def control_environment(req: Request):
         "stage": stage_label or stage_id,
         "stage_id": stage_id,
         "action": action,
+        "executionId": data.get("executionId"),
         "status": "requested (mock)",
     }
 
@@ -1749,7 +1943,7 @@ async def control_environment(req: Request):
 @fast_app.get("/api/environments/{env_id}/activity")
 async def get_environment_activity(env_id: str, req: Request):
     """Return activity/audit entries for an environment with server-side pagination and filtering."""
-    user = await get_current_user(req)
+    user = await _resolve_user(req)
     if not has_any_role(user, ["admin", "environment-manager"]):
         raise HTTPException(status_code=403, detail="Forbidden")
 

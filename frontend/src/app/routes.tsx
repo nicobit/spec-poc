@@ -16,6 +16,7 @@ const EnvironmentResourcesPage = lazy(() => import('@/features/environment/pages
 const EnvironmentSchedulesPage = lazy(() => import('@/features/environment/pages/EnvironmentSchedulesPage'));
 const EnvironmentScheduleCreatePage = lazy(() => import('@/features/environment/pages/EnvironmentScheduleCreatePage'));
 const EnvironmentDetailsPage = lazy(() => import('@/features/environment/pages/EnvironmentDetailsPage'));
+const EnvironmentExecutionHistoryPage = lazy(() => import('@/features/environment/pages/EnvironmentExecutionHistoryPage'));
 const EnvironmentEditPage = lazy(() => import('@/features/environment/pages/EnvironmentEditPage'));
 const ChatPage = lazy(() => import('@/features/chat/pages/ChatPage'));
 const QuestionQueryExamplePage = lazy(() => import('@/features/examples/pages/QuestionQueryExamplePage'));
@@ -47,6 +48,7 @@ export const authenticatedRouteConfigs: AppRouteConfig[] = [
   { path: '/environment/create', component: EnvironmentCreatePage },
   { path: '/environment/manage', component: EnvironmentManagePage },
   { path: '/environment/edit/:id', component: EnvironmentEditPage },
+  { path: '/environment/:id/executions', component: EnvironmentExecutionHistoryPage },
   { path: '/environment/:id', component: EnvironmentDetailsPage },
   { path: '/environment/resources', component: EnvironmentResourcesPage },
   { path: '/environment/schedules', component: EnvironmentSchedulesPage },

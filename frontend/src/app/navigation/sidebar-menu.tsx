@@ -58,7 +58,7 @@ export const getMenuItems = (isAdmin: boolean): MenuItem[] => [
       name: "Manage",
       path: "/environment/manage",
       icon: SlidersHorizontal,
-      activePatterns: ["/environment/create", "/environment/edit/:id", "/environment/:id"],
+      activePatterns: ["/environment/create", "/environment/edit/:id", "/environment/:id", "/environment/:id/executions"],
       inactivePatterns: ["/environment/schedules"],
     },
       { name: "Schedules", path: "/environment/schedules", icon: CalendarClock, activePatterns: ["/environment/schedules/create"] },

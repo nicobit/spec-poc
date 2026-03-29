@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { IPublicClientApplication } from '@azure/msal-browser';
-import { CalendarClock, Plus } from 'lucide-react';
+import { AlertTriangle, CalendarClock, CheckCircle2, Loader2, Plus, XCircle } from 'lucide-react';
 import { enqueueSnackbar } from 'notistack';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
-import { type EnvInstance, type Schedule, listEnvironments, listSchedules, postponeSchedule } from '../api';
+import { type EnvInstance, type Schedule, type StageExecution, getEnvironment, listEnvironments, listSchedules, postponeSchedule } from '../api';
 import { themeClasses } from '@/theme/themeClasses';
 import { describeSchedule } from '../scheduleRecurrence';
 
@@ -24,6 +24,7 @@ export default function EnvironmentSchedulesManager({ instance: msalInstance, re
 
   const [instances, setInstances] = useState<EnvInstance[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [selectedEnvDetails, setSelectedEnvDetails] = useState<EnvInstance | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
@@ -91,14 +92,41 @@ export default function EnvironmentSchedulesManager({ instance: msalInstance, re
     [selectedEnv, selectedStageId],
   );
 
+  const selectedDetailedStage = useMemo(
+    () => selectedEnvDetails?.stages?.find((item) => item.id === selectedStage?.id) ?? selectedStage ?? null,
+    [selectedEnvDetails, selectedStage],
+  );
+
   const stageSchedules = useMemo(() => {
+    const sourceSchedules = selectedEnvDetails?.schedules || schedules;
     if (!selectedEnv || !selectedStage) return [];
-    return schedules.filter(
+    return sourceSchedules.filter(
       (schedule) =>
         (schedule.environment_id ? schedule.environment_id === selectedEnv.id : schedule.environment === selectedEnv.name) &&
         (schedule.stage_id ? schedule.stage_id === selectedStage.id : schedule.stage === selectedStage.name),
     );
-  }, [schedules, selectedEnv, selectedStage]);
+  }, [selectedEnvDetails?.schedules, schedules, selectedEnv, selectedStage]);
+
+  useEffect(() => {
+    if (!selectedEnv?.id) {
+      setSelectedEnvDetails(null);
+      return;
+    }
+    let mounted = true;
+    void (async () => {
+      try {
+        const details = await getEnvironment(msalInstance, selectedEnv.id);
+        if (!mounted) return;
+        setSelectedEnvDetails(details);
+      } catch {
+        if (!mounted) return;
+        setSelectedEnvDetails(null);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [msalInstance, selectedEnv?.id]);
 
   useEffect(() => {
     if (!instances.length || initializedRef.current) return;
@@ -159,6 +187,45 @@ export default function EnvironmentSchedulesManager({ instance: msalInstance, re
   const createHref = `/environment/schedules/create?clientId=${encodeURIComponent(selectedClient || '')}&environmentId=${encodeURIComponent(
     selectedEnv?.id || '',
   )}&stageId=${encodeURIComponent(selectedStage?.id || '')}`;
+
+  function formatTimestamp(value?: string | null) {
+    if (!value) return 'n/a';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleString();
+  }
+
+  function getExecutionStatusTone(status?: StageExecution['status'] | null) {
+    switch (status) {
+      case 'succeeded':
+        return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300';
+      case 'failed':
+        return 'border-red-500/30 bg-red-500/10 text-red-300';
+      case 'partially_failed':
+        return themeClasses.warningChip;
+      case 'in_progress':
+      case 'pending':
+        return 'border-sky-500/30 bg-sky-500/10 text-sky-300';
+      default:
+        return 'border-[var(--border-subtle)] bg-[var(--surface-panel-muted)] text-[var(--text-secondary)]';
+    }
+  }
+
+  function getExecutionStatusIcon(status?: StageExecution['status'] | null) {
+    switch (status) {
+      case 'succeeded':
+        return <CheckCircle2 className="h-3.5 w-3.5" />;
+      case 'failed':
+        return <XCircle className="h-3.5 w-3.5" />;
+      case 'partially_failed':
+        return <AlertTriangle className="h-3.5 w-3.5" />;
+      case 'in_progress':
+      case 'pending':
+        return <Loader2 className="h-3.5 w-3.5 animate-spin" />;
+      default:
+        return null;
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -229,9 +296,28 @@ export default function EnvironmentSchedulesManager({ instance: msalInstance, re
               <div className={`${themeClasses.helperText} mt-1`}>{selectedEnv.name}</div>
             </div>
             <div className={`${themeClasses.subsectionCard} rounded-2xl p-4`}>
-              <div className={themeClasses.sectionEyebrow}>Status</div>
-              <div className="mt-2 text-lg font-semibold capitalize text-[var(--text-primary)]">{selectedStage.status}</div>
-              <div className={`${themeClasses.helperText} mt-1`}>{scheduleCountLabel}</div>
+              <div className={themeClasses.sectionEyebrow}>Latest execution</div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${getExecutionStatusTone(
+                    selectedDetailedStage?.latestExecution?.status,
+                  )}`}
+                >
+                  {getExecutionStatusIcon(selectedDetailedStage?.latestExecution?.status)}
+                  {selectedDetailedStage?.latestExecution
+                    ? selectedDetailedStage.latestExecution.status.replace(/_/g, ' ')
+                    : 'No execution yet'}
+                </span>
+              </div>
+              <div className={`${themeClasses.helperText} mt-1`}>
+                {selectedDetailedStage?.latestExecution
+                  ? formatTimestamp(
+                      selectedDetailedStage.latestExecution.completedAt ||
+                        selectedDetailedStage.latestExecution.startedAt ||
+                        selectedDetailedStage.latestExecution.requestedAt,
+                    )
+                  : scheduleCountLabel}
+              </div>
             </div>
             <div className={`${themeClasses.subsectionCard} rounded-2xl p-4`}>
               <div className={themeClasses.sectionEyebrow}>Azure services</div>
@@ -315,6 +401,32 @@ export default function EnvironmentSchedulesManager({ instance: msalInstance, re
                         </div>
                         <div>Next run: {schedule.next_run ? new Date(schedule.next_run).toLocaleString() : 'n/a'}</div>
                       </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${getExecutionStatusTone(
+                            schedule.latestExecution?.status,
+                          )}`}
+                        >
+                          {getExecutionStatusIcon(schedule.latestExecution?.status)}
+                          {schedule.latestExecution ? schedule.latestExecution.status.replace(/_/g, ' ') : 'No execution yet'}
+                        </span>
+                        {schedule.executionCount ? (
+                          <span className="rounded-full bg-[var(--surface-panel-muted)] px-2.5 py-1 text-xs text-[var(--text-secondary)]">
+                            {schedule.executionCount} execution{schedule.executionCount === 1 ? '' : 's'}
+                          </span>
+                        ) : null}
+                      </div>
+                      {schedule.latestExecution ? (
+                        <div className={`${themeClasses.helperText} mt-2`}>
+                          Last execution:{' '}
+                          {formatTimestamp(
+                            schedule.latestExecution.completedAt ||
+                              schedule.latestExecution.startedAt ||
+                              schedule.latestExecution.requestedAt,
+                          )}
+                          {schedule.latestExecution.message ? ` · ${schedule.latestExecution.message}` : ''}
+                        </div>
+                      ) : null}
                     </div>
 
                     <button

@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, List, Tuple
 
@@ -26,6 +26,10 @@ def _to_primitive(value: Any):
 _TABLES_CONN = os.environ.get("AZURE_TABLES_CONNECTION_STRING") or os.environ.get("AZURE_STORAGE_CONNECTION_STRING") or os.environ.get("AzureWebJobsStorage")
 _TABLE_NAME = os.environ.get("AZURE_TABLES_AUDIT_TABLE", "EnvironmentAudit")
 _table_client = None
+
+
+def _utc_now_iso_z() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def _get_table_client():
@@ -51,7 +55,7 @@ def _get_table_client():
 
 
 def append_audit(entry: Dict[str, Any]) -> None:
-    ts = datetime.utcnow().isoformat() + "Z"
+    ts = _utc_now_iso_z()
     entry = dict(entry)
     entry["timestamp"] = ts
 

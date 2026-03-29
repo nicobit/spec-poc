@@ -21,6 +21,7 @@ class ResourceDescriptor(BaseModel):
     type: str
     subscriptionId: Optional[str] = None
     resourceGroup: Optional[str] = None
+    region: Optional[str] = None
     # free-form service-specific properties
     properties: Optional[Dict[str, Any]] = None
 

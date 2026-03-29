@@ -97,6 +97,7 @@ Reference:
 
 - Azure Table Storage for audit and some table-backed feature persistence
 - Azure Cosmos DB for schedule persistence and optional environment persistence
+- Azure Cosmos DB as the recommended first-release durable store for stage execution records
 - Azure Queue Storage for schedule execution handoff
 
 ### Observability

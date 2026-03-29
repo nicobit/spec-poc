@@ -7,28 +7,51 @@ export type ResourceAction =
       type: 'sql-vm';
       subscriptionId?: string;
       resourceGroup?: string;
+      region?: string;
       serverName?: string;
+      properties?: {
+        vmName?: string;
+      };
     }
   | {
       id?: string;
       type: 'sql-managed-instance';
       subscriptionId?: string;
       resourceGroup?: string;
+      region?: string;
       instanceName?: string;
+      properties?: {
+        managedInstanceName?: string;
+      };
     }
   | {
       id?: string;
       type: 'synapse-sql-pool';
       subscriptionId?: string;
+      resourceGroup?: string;
+      region?: string;
       workspaceName?: string;
       sqlPoolName?: string;
+      properties?: {
+        workspaceName?: string;
+        sqlPoolName?: string;
+      };
     }
   | {
       id?: string;
       type: 'service-bus-message';
+      subscriptionId?: string;
+      resourceGroup?: string;
+      region?: string;
       namespace?: string;
       queueOrTopic?: string;
       messageType?: string;
+      properties?: {
+        namespace?: string;
+        entityType?: 'queue' | 'topic';
+        entityName?: string;
+        messageTemplate?: string;
+      };
     };
 
 export type NotificationGroup = {
@@ -51,6 +74,9 @@ export type EnvironmentStage = {
   notificationGroups: NotificationGroup[];
   postponementPolicy?: PostponementPolicy;
   azureConfig?: Record<string, any>;
+  latestExecution?: StageExecution | null;
+  executions?: StageExecution[];
+  executionCount?: number;
 };
 
 export type EnvInstance = {
@@ -62,6 +88,46 @@ export type EnvInstance = {
   clientId?: string;
   lifecycle?: string;
   stages: EnvironmentStage[];
+  schedules?: Schedule[];
+  executions?: StageExecution[];
+  activity?: {
+    entries?: ActivityEntry[];
+    total?: number;
+  };
+};
+
+export type StageExecutionActionResult = {
+  resourceActionId: string;
+  type: string;
+  status: 'pending' | 'in_progress' | 'succeeded' | 'failed' | 'skipped';
+  subscriptionId?: string | null;
+  region?: string | null;
+  resourceIdentifier?: string | null;
+  message?: string | null;
+  errorCode?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+};
+
+export type StageExecution = {
+  id: string;
+  executionId: string;
+  clientId: string;
+  environmentId: string;
+  stageId: string;
+  scheduleId?: string | null;
+  action: 'start' | 'stop';
+  source: 'portal' | 'schedule';
+  requestedAt: string;
+  requestedBy?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  status: 'pending' | 'in_progress' | 'succeeded' | 'partially_failed' | 'failed';
+  resourceActionResults: StageExecutionActionResult[];
+  message?: string | null;
+  correlationId?: string | null;
+  environmentName?: string | null;
+  stageName?: string | null;
 };
 
 export type Schedule = {
@@ -84,6 +150,8 @@ export type Schedule = {
   postponed_by?: string | null;
   postpone_reason?: string | null;
   next_run?: string | null;
+  latestExecution?: StageExecution | null;
+  executionCount?: number;
 };
 
 export async function listEnvironments(
@@ -107,9 +175,9 @@ export async function listEnvironments(
 export async function getEnvironment(
   msalInstance: IPublicClientApplication,
   id: string,
-): Promise<any> {
+): Promise<EnvInstance> {
   const res = await authFetch(msalInstance, apiUrl(`/environments/${encodeURIComponent(id)}`), { method: 'GET' });
-  const body = await getJson<any>(res);
+  const body = await getJson<EnvInstance>(res);
   return body;
 }
 
@@ -210,6 +278,14 @@ export type ActivityPage = {
   per_page: number;
 };
 
+export type StageExecutionPage = {
+  executions: StageExecution[];
+  total: number;
+  environmentId: string;
+  stageId?: string | null;
+  scheduleId?: string | null;
+};
+
 export async function getActivity(
   msalInstance: IPublicClientApplication,
   envId: string,
@@ -236,6 +312,32 @@ export async function getActivity(
   const res = await authFetch(msalInstance, url, { method: 'GET' });
   const body = await getJson<ActivityPage>(res);
   return body;
+}
+
+export async function listEnvironmentExecutions(
+  msalInstance: IPublicClientApplication,
+  envId: string,
+  options?: {
+    stageId?: string;
+    scheduleId?: string;
+    limit?: number;
+  },
+): Promise<StageExecutionPage> {
+  const params: Record<string, string | number | undefined> = {
+    stage_id: options?.stageId,
+    schedule_id: options?.scheduleId,
+    limit: options?.limit ?? 100,
+  };
+  const url = withQuery(apiUrl(`/environments/${encodeURIComponent(envId)}/executions`), params as any);
+  const res = await authFetch(msalInstance, url, { method: 'GET' });
+  const body = await getJson<StageExecutionPage>(res);
+  return {
+    executions: body.executions || [],
+    total: body.total || 0,
+    environmentId: body.environmentId || envId,
+    stageId: body.stageId,
+    scheduleId: body.scheduleId,
+  };
 }
 
 export async function createSchedule(

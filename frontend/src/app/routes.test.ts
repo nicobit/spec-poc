@@ -19,7 +19,7 @@ describe('app route configuration', () => {
 
   it('includes the main feature routes', () => {
     expect(authenticatedRouteConfigs.map((route) => route.path)).toEqual(
-      expect.arrayContaining(['/', '/chat', '/question', '/status', '/costs']),
+      expect.arrayContaining(['/', '/chat', '/question', '/status', '/costs', '/environment/:id/executions']),
     );
   });
 });

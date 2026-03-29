@@ -91,9 +91,23 @@ def has_any_role(claims: Dict[str, Any], allowed: List[str]) -> bool:
             return True
     # allow common synonyms: environment-manager <- environment-admin, envadmin
     if "environment-manager" in allowed_lower:
+        environment_role_aliases = {
+            "environment-manager",
+            "environment-admin",
+            "environmentadmin",
+            "environmenteditor",
+            "environment-editor",
+            "envadmin",
+            "env-manager",
+            "envmanager",
+            "environmentsadmin",
+            "environments-manager",
+        }
         for r in user_roles:
-            # treat common synonyms as allowed: e.g. 'environment-admin', 'envadmin', 'env-manager'
-            if ("environment" in r) or ("admin" in r or "manager" in r or r.startswith("env")):
+            normalized_role = str(r).strip().lower()
+            scoped_role = normalized_role.split(":", 1)[0]
+            # treat only explicit environment-management aliases as allowed
+            if scoped_role in environment_role_aliases:
                 return True
 
     # match wildcard-like client-scoped roles (e.g., client-admin:client-a)

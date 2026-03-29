@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from .client_model import ClientModel
@@ -47,6 +47,10 @@ CLIENTS: List[Dict[str, Any]] = [
 ]
 
 
+def _utc_now_iso_z() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 def list_clients(*, include_retired: bool = False) -> List[Dict[str, Any]]:
     items = deepcopy(CLIENTS)
     if include_retired:
@@ -83,7 +87,7 @@ def _assert_unique(candidate: Dict[str, Any], *, exclude_id: Optional[str] = Non
 
 def create_client(data: Dict[str, Any]) -> Dict[str, Any]:
     payload = deepcopy(data)
-    ClientModel.parse_obj(payload)
+    ClientModel.model_validate(payload)
     _assert_unique(payload)
     CLIENTS.append(payload)
     return deepcopy(payload)
@@ -95,7 +99,7 @@ def update_client(client_id: str, data: Dict[str, Any]) -> Optional[Dict[str, An
         return None
     payload = deepcopy(data)
     payload["id"] = client_id
-    ClientModel.parse_obj(payload)
+    ClientModel.model_validate(payload)
     _assert_unique(payload, exclude_id=client_id)
     ref.clear()
     ref.update(payload)
@@ -107,7 +111,7 @@ def retire_client(client_id: str, *, retired_by: Optional[str] = None) -> Option
     if not ref:
         return None
     ref["retired"] = True
-    ref["retiredAt"] = datetime.utcnow().isoformat() + "Z"
+    ref["retiredAt"] = _utc_now_iso_z()
     ref["retiredBy"] = retired_by
     return deepcopy(ref)
 

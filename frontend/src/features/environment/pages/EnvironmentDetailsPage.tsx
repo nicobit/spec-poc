@@ -10,8 +10,13 @@ import {
   Layers,
   PencilLine,
   Play,
+  RotateCcw,
   Server,
   Square,
+  AlertTriangle,
+  CheckCircle2,
+  Loader2,
+  XCircle,
 } from 'lucide-react';
 import { enqueueSnackbar } from 'notistack';
 
@@ -21,6 +26,8 @@ import { themeClasses } from '@/theme/themeClasses';
 
 import {
   type EnvInstance,
+  type ResourceAction,
+  type StageExecution,
   getEnvironment,
   startEnvironment,
   startStage,
@@ -77,16 +84,46 @@ function getResourceTypeLabel(type: string) {
   }
 }
 
-function getResourceSummary(action: Record<string, any>) {
+function getResourceProperty(action: ResourceAction, key: string) {
+  const properties = (action as any).properties || {};
+  if (properties && properties[key] != null) return properties[key];
+  return (action as any)[key];
+}
+
+function getResourceSummary(action: ResourceAction) {
   switch (action.type) {
     case 'sql-vm':
-      return [action.subscriptionId, action.resourceGroup, action.serverName].filter(Boolean).join(' | ');
+      return [
+        action.subscriptionId,
+        action.resourceGroup,
+        getResourceProperty(action, 'vmName') || getResourceProperty(action, 'serverName'),
+      ]
+        .filter(Boolean)
+        .join(' | ');
     case 'sql-managed-instance':
-      return [action.subscriptionId, action.resourceGroup, action.instanceName].filter(Boolean).join(' | ');
+      return [
+        action.subscriptionId,
+        action.resourceGroup,
+        getResourceProperty(action, 'managedInstanceName') || getResourceProperty(action, 'instanceName'),
+      ]
+        .filter(Boolean)
+        .join(' | ');
     case 'synapse-sql-pool':
-      return [action.subscriptionId, action.workspaceName, action.sqlPoolName].filter(Boolean).join(' | ');
+      return [
+        action.subscriptionId,
+        getResourceProperty(action, 'workspaceName'),
+        getResourceProperty(action, 'sqlPoolName') || getResourceProperty(action, 'poolName'),
+      ]
+        .filter(Boolean)
+        .join(' | ');
     case 'service-bus-message':
-      return [action.namespace, action.queueOrTopic, action.messageType].filter(Boolean).join(' | ');
+      return [
+        getResourceProperty(action, 'namespace'),
+        getResourceProperty(action, 'entityType'),
+        getResourceProperty(action, 'entityName'),
+      ]
+        .filter(Boolean)
+        .join(' | ');
     default:
       return '';
   }
@@ -114,6 +151,45 @@ function formatTimestamp(value?: string | null) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString();
+}
+
+function getExecutionStatusTone(status?: StageExecution['status'] | null) {
+  switch (status) {
+    case 'succeeded':
+      return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300';
+    case 'failed':
+      return 'border-red-500/30 bg-red-500/10 text-red-300';
+    case 'partially_failed':
+      return themeClasses.warningChip;
+    case 'in_progress':
+    case 'pending':
+      return 'border-sky-500/30 bg-sky-500/10 text-sky-300';
+    default:
+      return 'border-[var(--border-subtle)] bg-[var(--surface-panel-muted)] text-[var(--text-secondary)]';
+  }
+}
+
+function getExecutionStatusIcon(status?: StageExecution['status'] | null) {
+  switch (status) {
+    case 'succeeded':
+      return <CheckCircle2 className="h-3.5 w-3.5" />;
+    case 'failed':
+      return <XCircle className="h-3.5 w-3.5" />;
+    case 'partially_failed':
+      return <AlertTriangle className="h-3.5 w-3.5" />;
+    case 'in_progress':
+    case 'pending':
+      return <Loader2 className="h-3.5 w-3.5 animate-spin" />;
+    default:
+      return null;
+  }
+}
+
+function getExecutionSummary(execution?: StageExecution | null) {
+  if (!execution) return 'No execution recorded yet.';
+  const completed = execution.completedAt || execution.startedAt || execution.requestedAt;
+  const prefix = execution.source === 'schedule' ? 'Scheduled run' : 'Manual run';
+  return `${prefix}: ${formatTimestamp(completed)}`;
 }
 
 export default function EnvironmentDetailsPage() {
@@ -200,6 +276,13 @@ export default function EnvironmentDetailsPage() {
               >
                 <CalendarClock className="h-4 w-4" />
                 Schedules
+              </button>
+              <button
+                className={`${themeClasses.buttonSecondary} inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm`}
+                onClick={() => navigate(`/environment/${id}/executions`)}
+              >
+                <RotateCcw className="h-4 w-4" />
+                Execution history
               </button>
               <button
                 className={`${themeClasses.buttonPrimary} inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm`}
@@ -404,6 +487,20 @@ export default function EnvironmentDetailsPage() {
                             ).join(', ')}
                           </span>
                         ) : null}
+                        {stage.latestExecution ? (
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${getExecutionStatusTone(
+                              stage.latestExecution.status,
+                            )}`}
+                          >
+                            {getExecutionStatusIcon(stage.latestExecution.status)}
+                            {stage.latestExecution.status.replace(/_/g, ' ')}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className={`${themeClasses.helperText} mt-3`}>
+                        {getExecutionSummary(stage.latestExecution)}
+                        {stage.latestExecution?.message ? ` · ${stage.latestExecution.message}` : ''}
                       </div>
                     </div>
 
@@ -483,7 +580,7 @@ export default function EnvironmentDetailsPage() {
                                   </span>
                                 </div>
                                 <div className={`${themeClasses.helperText} mt-2`}>
-                                  {getResourceSummary(resourceAction as Record<string, any>) || 'Configuration summary not available.'}
+                                  {getResourceSummary(resourceAction as ResourceAction) || 'Configuration summary not available.'}
                                 </div>
                               </div>
                             ))}
@@ -556,6 +653,24 @@ export default function EnvironmentDetailsPage() {
                       <div className={`${themeClasses.helperText} mt-1`}>
                         Next run: {formatTimestamp(schedule.next_run)}
                       </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${getExecutionStatusTone(
+                            schedule.latestExecution?.status,
+                          )}`}
+                        >
+                          {getExecutionStatusIcon(schedule.latestExecution?.status)}
+                          {schedule.latestExecution ? schedule.latestExecution.status.replace(/_/g, ' ') : 'No execution yet'}
+                        </span>
+                        {schedule.executionCount ? (
+                          <span className="rounded-full bg-[var(--surface-panel-muted)] px-2.5 py-1 text-xs text-[var(--text-secondary)]">
+                            {schedule.executionCount} execution{schedule.executionCount === 1 ? '' : 's'}
+                          </span>
+                        ) : null}
+                      </div>
+                      {schedule.latestExecution?.message ? (
+                        <div className={`${themeClasses.helperText} mt-2`}>{schedule.latestExecution.message}</div>
+                      ) : null}
                     </div>
                   ))}
                 </div>
@@ -567,8 +682,19 @@ export default function EnvironmentDetailsPage() {
             </div>
 
             <div className={`${themeClasses.formSection} rounded-3xl p-6`}>
-              <div className={themeClasses.sectionEyebrow}>Recent activity</div>
-              <p className={`${themeClasses.helperText} mt-2`}>Latest recorded events for this environment.</p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className={themeClasses.sectionEyebrow}>Recent activity</div>
+                  <p className={`${themeClasses.helperText} mt-2`}>Latest recorded events for this environment.</p>
+                </div>
+                <button
+                  className={`${themeClasses.buttonSecondary} inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm`}
+                  onClick={() => navigate(`/environment/${id}/executions`)}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  View execution history
+                </button>
+              </div>
 
               {((env as any).activity?.entries || []).length > 0 ? (
                 <div className="mt-4 space-y-3">

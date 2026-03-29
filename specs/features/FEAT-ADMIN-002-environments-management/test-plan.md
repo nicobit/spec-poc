@@ -21,6 +21,11 @@ Validate the expanded Environments Management capability covering stage configur
 
 - Stage Azure service configuration validation rules
 - Azure action type mapping and request validation
+- Type-specific `resourceActions[].properties` validation:
+  - `sql-vm`
+  - `sql-managed-instance`
+  - `synapse-sql-pool`
+  - `service-bus-message`
 - Schedule creation/update validation
 - Structured recurrence to stored schedule mapping for supported patterns
 - Unsupported or advanced persisted recurrence handling
@@ -77,20 +82,25 @@ Validate the expanded Environments Management capability covering stage configur
 1. Configure a stage with SQL VM start/stop metadata and save successfully
 2. Configure a stage with Synapse SQL pool start/stop metadata and save successfully
 3. Configure a stage action that dispatches a Service Bus message as part of a workflow
-4. Trigger immediate start for a configured stage and record successful activity
-5. Trigger immediate stop for a configured stage and record successful activity
-6. Create a stage-level schedule with recipient groups and postponement policy
-7. Create a stage-level weekday schedule using action, time, and timezone inputs and verify the human-readable summary
-8. Create a stage-level selected-days schedule and verify day-of-week validation
-9. Load an existing schedule whose stored recurrence is outside the supported simple builder model and verify it is labeled as advanced or unsupported
-10. Notification event is recorded before scheduled execution
-11. Authorized notified user postpones a scheduled action successfully
-12. Unauthorized user attempts postponement and receives correct denial
-13. Activity view displays configuration, notification, postponement, and execution events
-14. Authorized user deletes an environment from the manage list and the list refreshes without repeating the page title
-15. A user can understand from the UI that stage Azure services are configured in create/edit, while timing, notifications, and postponement are managed in schedules
-16. Rename a stage after creating a schedule and verify the schedule still appears under the correct stage using canonical identifiers
-17. Attempt to update a legacy schedule whose label-based stage reference is ambiguous and verify the system rejects the change clearly
+4. Reject a SQL VM stage action when `properties.vmName` is missing
+5. Reject a SQL Managed Instance stage action when `properties.managedInstanceName` is missing
+6. Reject a Synapse SQL pool stage action when `properties.workspaceName` or `properties.sqlPoolName` is missing
+7. Reject a Service Bus stage action when `properties.namespace`, `properties.entityType`, `properties.entityName`, or `properties.messageTemplate` is missing
+8. Accept a stage containing resource actions in different subscriptions and regions
+9. Trigger immediate start for a configured stage and record successful activity
+10. Trigger immediate stop for a configured stage and record successful activity
+11. Create a stage-level schedule with recipient groups and postponement policy
+12. Create a stage-level weekday schedule using action, time, and timezone inputs and verify the human-readable summary
+13. Create a stage-level selected-days schedule and verify day-of-week validation
+14. Load an existing schedule whose stored recurrence is outside the supported simple builder model and verify it is labeled as advanced or unsupported
+15. Notification event is recorded before scheduled execution
+16. Authorized notified user postpones a scheduled action successfully
+17. Unauthorized user attempts postponement and receives correct denial
+18. Activity view displays configuration, notification, postponement, and execution events
+19. Authorized user deletes an environment from the manage list and the list refreshes without repeating the page title
+20. A user can understand from the UI that stage Azure services are configured in create/edit, while timing, notifications, and postponement are managed in schedules
+21. Rename a stage after creating a schedule and verify the schedule still appears under the correct stage using canonical identifiers
+22. Attempt to update a legacy schedule whose label-based stage reference is ambiguous and verify the system rejects the change clearly
 
 ## Authorization Validation
 

@@ -2,6 +2,10 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Dict
 from .schedule_model import Schedule
 
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
 # In-memory schedule store for scaffolding and tests. Replace with DB in production.
 SCHEDULES: List[Dict] = [
     {
@@ -15,7 +19,7 @@ SCHEDULES: List[Dict] = [
         "action": "start",
         "cron": None,
         "timezone": "UTC",
-        "next_run": (datetime.utcnow() - timedelta(seconds=30)).isoformat(),
+        "next_run": (_utc_now() - timedelta(seconds=30)).isoformat(),
         "enabled": True,
         "owner": "system",
         "notify_before_minutes": 30,
@@ -29,11 +33,13 @@ SCHEDULES: List[Dict] = [
 
 
 def get_due_schedules(now: datetime = None):
-    now = now or datetime.utcnow()
+    now = now or _utc_now()
     due = []
     for s in SCHEDULES:
         try:
             nr = datetime.fromisoformat(s.get("next_run"))
+            if nr.tzinfo is None:
+                nr = nr.replace(tzinfo=timezone.utc)
         except Exception:
             continue
         if s.get("enabled") and nr <= now:

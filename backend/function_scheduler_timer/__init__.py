@@ -2,6 +2,7 @@ import json
 import datetime
 import os
 import logging
+import uuid
 import azure.functions as func
 from shared.scheduler_store import get_due_schedules as mem_get_due_schedules, mark_schedule_next_run as mem_mark_next_run
 from shared.cosmos_store import get_cosmos_store
@@ -23,9 +24,17 @@ if not logger.handlers:
     logging.basicConfig()
 
 
+def _utc_now() -> datetime.datetime:
+    return datetime.datetime.now(datetime.timezone.utc)
+
+
+def _utc_now_iso_z() -> str:
+    return _utc_now().isoformat().replace("+00:00", "Z")
+
+
 
 def main(mytimer: func.TimerRequest, outputQueueItem: func.Out[str] = None) -> None:
-    now = datetime.datetime.utcnow()
+    now = _utc_now()
     now_iso = now.isoformat()
     # Prefer in-memory schedules when present (useful for tests). If none,
     # fall back to Cosmos when configured.
@@ -44,6 +53,7 @@ def main(mytimer: func.TimerRequest, outputQueueItem: func.Out[str] = None) -> N
     messages = []
     for s in due:
         msg = {
+            "executionId": f"exec-{uuid.uuid4().hex[:12]}",
             "scheduleId": s.get("id"),
             "environment": s.get("environment"),
             "environment_id": s.get("environment_id"),
@@ -53,7 +63,7 @@ def main(mytimer: func.TimerRequest, outputQueueItem: func.Out[str] = None) -> N
             "stage_id": s.get("stage_id"),
             "action": s.get("action"),
             "requestedBy": s.get("owner") or "system",
-            "requestedAt": now.isoformat() + "Z",
+            "requestedAt": _utc_now_iso_z(),
         }
         messages.append(msg)
         # mark next_run +1 hour as placeholder (real cron calculation later)

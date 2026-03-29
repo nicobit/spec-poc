@@ -26,6 +26,7 @@ describe('sidebar menu', () => {
     expect(matchesMenuItemPath(manage!, '/environment/create')).toBe(true);
     expect(matchesMenuItemPath(manage!, '/environment/edit/env-1')).toBe(true);
     expect(matchesMenuItemPath(manage!, '/environment/env-1')).toBe(true);
+    expect(matchesMenuItemPath(manage!, '/environment/env-1/executions')).toBe(true);
     expect(matchesMenuItemPath(manage!, '/environment/schedules')).toBe(false);
   });
 });

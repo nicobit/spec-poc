@@ -122,4 +122,33 @@ describe('ClientsPage', () => {
     expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Retire' })).toBeTruthy();
   });
+
+  it('shows an empty state when no clients are returned', async () => {
+    listClientsMock.mockResolvedValue({
+      clients: [],
+      total: 0,
+      page: 0,
+      per_page: 20,
+    });
+
+    render(
+      <MemoryRouter>
+        <ClientsPage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('No clients found. Create the first client record to start using a canonical client identity.')).toBeTruthy();
+  });
+
+  it('shows a load error when client retrieval fails', async () => {
+    listClientsMock.mockRejectedValue(new Error('Failed to load clients.'));
+
+    render(
+      <MemoryRouter>
+        <ClientsPage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('Failed to load clients.')).toBeTruthy();
+  });
 });

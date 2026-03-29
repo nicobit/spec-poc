@@ -106,6 +106,7 @@ Current uses:
 
 - schedule persistence
 - optional environment persistence when Cosmos-backed environment storage is selected
+- recommended first-release durable persistence for stage execution records
 
 ### Azure Queue Storage
 
@@ -139,8 +140,10 @@ Current local or dev-friendly fallbacks:
 2. Frontend calls backend schedule endpoints.
 3. Schedule data is persisted in Cosmos DB when configured, otherwise in-memory for local or test scenarios.
 4. Scheduler timer finds due schedules and enqueues work on `env-schedule-queue`.
-5. Scheduler worker consumes queue messages and calls the environment API to perform the action.
-6. Audit events are recorded for execution, notification, and postponement activity.
+5. The queued message identifies the target client, environment, stage, and requested action.
+6. Scheduler worker consumes queue messages and resolves the current stage configuration.
+7. Scheduler worker executes the Azure service `resourceActions` configured on that stage.
+8. Execution and audit results are written durably for portal readback, notification, and postponement activity.
 
 ## Current Architectural Observations
 
@@ -148,6 +151,9 @@ Current local or dev-friendly fallbacks:
 - The backend is in transition from Azure Functions-first adapters toward a more portable shared and ASGI-capable structure.
 - Environment persistence and schedule persistence currently use different backing paths.
 - Audit persistence is separate from environment and schedule persistence.
+- Schedule recurrence and stage Azure service configuration are intentionally separate concerns:
+  - schedules define when a stage action is due
+  - stages define the Azure service actions to execute
 - The system already benefits from durable architecture views because runtime topology and storage responsibilities are not obvious from feature specs alone.
 
 ## Current Containers Summary
@@ -161,7 +167,7 @@ Current local or dev-friendly fallbacks:
 | Scheduler worker | Process queued schedule actions | Azure Functions queue trigger |
 | ASGI runtime shell | Alternative unified backend hosting surface | FastAPI |
 | Table storage | Environment and audit persistence | Azure Table Storage |
-| Cosmos DB | Schedule persistence and optional environment persistence | Azure Cosmos DB |
+| Cosmos DB | Schedule persistence, optional environment persistence, and recommended stage execution persistence | Azure Cosmos DB |
 | Queue storage | Schedule execution handoff | Azure Queue Storage |
 
 ## Follow-Up Candidates

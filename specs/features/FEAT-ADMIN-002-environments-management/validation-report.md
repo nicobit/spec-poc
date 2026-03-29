@@ -21,12 +21,13 @@ Environment manage, create/edit, and details page refinements implemented. Valid
 - Frontend navigation and wording updated to remove the dedicated user-facing `Resources` destination, shift Azure service setup language into create/edit, and make schedules the distinct automation workflow
 - Schedule identity handling updated to prefer canonical `Environment.id` and `Stage.id` references, while preserving legacy label fallback only where resolution is safe
 - Automated frontend and backend tests added for the updated manage page, create/details pages, and delete flow
+- Backend schedule API tests expanded for canonical schedule creation, timer enqueue, and postponement authorization/policy handling
 
 ## Pending
 
 - Authorization documentation impact review
 - Broader end-to-end validation across create, details, edit, and delete navigation
-- Schedule-builder implementation and validation for business-oriented recurrence authoring
+- More schedule-builder edge-case validation for business-oriented recurrence authoring
 
 ## Notes
 
@@ -61,8 +62,17 @@ Environment manage, create/edit, and details page refinements implemented. Valid
   - frontend schedule creation posting canonical environment/stage ids
   - frontend details rendering preferring the current stage name when `stage_id` is present
   - backend syntax validation for updated schedule model and route handling
+- Validation extended for schedule integration behavior with:
+  - backend tests for canonical `environment_id` / `stage_id` schedule creation
+  - backend tests for rejecting a `stage_id` that does not belong to the environment
+  - backend timer test proving due schedules enqueue the expected payload
+  - backend postponement tests for eligible notification recipients, unrelated-user rejection, and policy-limit enforcement
+  - schedule endpoint auth-path alignment through `_resolve_user`
+  - timezone portability fix for `compute_next_run()` using the shared timezone-support helper
+  - focused backend validation with `$env:PYTHONPATH='backend'; .\.venv\Scripts\python.exe -m pytest tests/backend/test_schedules.py`
 - Validation extended for canonical client linkage with:
   - environment create/edit posting `clientId` alongside display label fallback
   - schedule create and selector flows preferring canonical `clientId`
   - backend environment responses decorating current client display names from `clientId`
   - focused frontend validation across create, schedules, details, and clients pages
+- Current automated schedule test slice still shows upstream `croniter` deprecation warnings on Python 3.13 because the library uses `utcfromtimestamp()` internally; this is not currently breaking behavior but should be watched for future dependency updates

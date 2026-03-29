@@ -20,7 +20,7 @@ export default function ClientsPageLayout({ title, description, actions, loading
         <div className="flex items-center gap-2">{actions}</div>
       </div>
 
-      {loading ? <PageLoadingBar /> : null}
+      <PageLoadingBar loading={loading} />
 
       <div className="space-y-4">{children}</div>
     </div>

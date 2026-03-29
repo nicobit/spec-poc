@@ -154,6 +154,7 @@ Notes:
 - the current backend model still contains stage-level notification and postponement fields
 - the current user-facing direction is to keep Azure service setup at stage level and make schedules own notifications and postponement behavior
 - this is a useful place to watch for future model cleanup or explicit inheritance rules
+- the stage is also the canonical source of the Azure service/action definitions executed by start/stop orchestration
 
 ### Resource Descriptor
 
@@ -171,6 +172,7 @@ Important fields:
 - `type`
 - `subscriptionId`
 - `resourceGroup`
+- `region`
 - `properties`
 
 Examples of service-specific values currently represented across the codebase:
@@ -180,10 +182,27 @@ Examples of service-specific values currently represented across the codebase:
 - Synapse SQL pool
 - Service Bus message
 
+Expected first-release required `properties` by type:
+
+- `sql-vm`
+  - `vmName`
+- `sql-managed-instance`
+  - `managedInstanceName`
+- `synapse-sql-pool`
+  - `workspaceName`
+  - `sqlPoolName`
+- `service-bus-message`
+  - `namespace`
+  - `entityType`
+  - `entityName`
+  - `messageTemplate`
+
 Notes:
 
 - service-specific metadata may live partly in top-level fields in sample records and partly in `properties`
 - this is a logical domain entity even when the precise field shape varies by resource type
+- these descriptors are authored in Environment Management and later consumed by the orchestration runtime
+- schedules do not define a second independent resource list; they point to the stage that already owns these descriptors
 
 ### Notification Group
 
@@ -268,6 +287,58 @@ Notes:
 - the intended direction is to standardize schedule linkage on the existing stable `Environment.id` and `Stage.id` values
 - historical archived specs already pointed toward explicit `environment_id` plus `stage_id` references
 - environment and stage labels should remain display-oriented values or legacy fallback rather than the canonical linkage fields
+- the schedule defines when a `start` or `stop` action is due for the stage
+- the schedule is not the source of the Azure service/action definitions to execute
+
+### Stage Execution
+
+Primary purpose:
+
+- record one immediate or scheduled start/stop execution against a stage
+
+Current status:
+
+- architecturally defined for `FEAT-ADMIN-004 Start/Stop Services`
+- first-release recommended durable persistence is Azure Cosmos DB
+- persistence and runtime implementation are still evolving
+
+Expected key fields:
+
+- `executionId`
+- `clientId`
+- `environmentId`
+- `stageId`
+- `scheduleId` when applicable
+- `action`
+- `source`
+- `requestedAt`
+- `startedAt`
+- `completedAt`
+- `status`
+- `resourceActionResults`
+
+Notes:
+
+- this is the durable execution/result entity that bridges scheduler evaluation and portal readback
+- it should represent last known orchestration result rather than guaranteed live Azure truth in first release
+
+### Stage Execution Action Result
+
+Primary purpose:
+
+- record the outcome of one executed stage `resourceAction`
+
+Expected key fields:
+
+- `resourceActionId`
+- `type`
+- `status`
+- `subscriptionId`
+- `region`
+- `resourceIdentifier`
+- `message`
+- `errorCode`
+- timestamps where relevant
 
 ### Audit Event
 
@@ -333,6 +404,20 @@ Cosmos-backed schedule store:
 - container default: `schedules`
 - partition key path: `/client`
 
+### Stage Execution Persistence
+
+Current intended options:
+
+- Azure Cosmos DB as the recommended first-release durable store
+- in-memory store for local development and tests
+
+Recommended Cosmos-backed execution store:
+
+- database default: `adminportal`
+- container default: `stageexecutions`
+- partition key path: `/clientId`
+- document id: `executionId`
+
 ### Audit Persistence
 
 Current options:
@@ -354,6 +439,8 @@ Table-backed audit store:
 | Environment | Stage | one-to-many, currently nested |
 | Stage | Resource Descriptor | one-to-many, currently nested |
 | Stage | Schedule | intended one-to-many, schedule references stage context |
+| Stage | Stage Execution | one-to-many over time |
+| Stage Execution | Stage Execution Action Result | one-to-many |
 | Schedule | Notification Group | one-to-many |
 | Schedule | Postponement Policy | one-to-one or optional |
 | Environment or Schedule activity | Audit Event | one-to-many over time |
@@ -366,6 +453,7 @@ Table-backed audit store:
 - Stage-level notification and postponement fields still exist in the environment model even though the intended user-facing ownership has moved toward schedules.
 - Resource descriptors may mix normalized shared fields and service-specific free-form properties.
 - Environment, schedule, and audit persistence are not yet unified behind one shared physical storage strategy.
+- The durable `Stage Execution` persistence model is defined conceptually and now has a recommended first-release Cosmos-backed storage path, but runtime implementation details are still pending.
 
 ## Useful Next Steps
 

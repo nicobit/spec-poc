@@ -5,9 +5,10 @@ import { MemoryRouter } from 'react-router-dom';
 const mockMsalInstance = {} as never;
 const navigateMock = vi.fn();
 
-const { listEnvironmentsMock, listSchedulesMock, createScheduleMock, postponeScheduleMock } = vi.hoisted(() => ({
+const { listEnvironmentsMock, listSchedulesMock, getEnvironmentMock, createScheduleMock, postponeScheduleMock } = vi.hoisted(() => ({
   listEnvironmentsMock: vi.fn(),
   listSchedulesMock: vi.fn(),
+  getEnvironmentMock: vi.fn(),
   createScheduleMock: vi.fn(),
   postponeScheduleMock: vi.fn(),
 }));
@@ -31,6 +32,7 @@ vi.mock('react-router-dom', async () => {
 vi.mock('../api', () => ({
   listEnvironments: (...args: unknown[]) => listEnvironmentsMock(...args),
   listSchedules: (...args: unknown[]) => listSchedulesMock(...args),
+  getEnvironment: (...args: unknown[]) => getEnvironmentMock(...args),
   createSchedule: (...args: unknown[]) => createScheduleMock(...args),
   postponeSchedule: (...args: unknown[]) => postponeScheduleMock(...args),
 }));
@@ -43,6 +45,7 @@ describe('Environment schedules pages', () => {
     navigateMock.mockReset();
     listEnvironmentsMock.mockReset();
     listSchedulesMock.mockReset();
+    getEnvironmentMock.mockReset();
     createScheduleMock.mockReset();
     postponeScheduleMock.mockReset();
 
@@ -70,6 +73,35 @@ describe('Environment schedules pages', () => {
       per_page: 10,
     });
     listSchedulesMock.mockResolvedValue([]);
+    getEnvironmentMock.mockResolvedValue({
+      id: 'env-1',
+      name: 'AIT',
+      client: 'CLIENT-001',
+      status: 'stopped',
+      stages: [
+        {
+          id: 'stage-1',
+          name: 'STG',
+          status: 'stopped',
+          latestExecution: {
+            executionId: 'exec-1',
+            id: 'exec-1',
+            clientId: 'client-001',
+            environmentId: 'env-1',
+            stageId: 'stage-1',
+            action: 'start',
+            source: 'schedule',
+            requestedAt: '2026-03-29T08:00:00Z',
+            status: 'succeeded',
+            resourceActionResults: [],
+          },
+          resourceActions: [{ type: 'sql-vm' }],
+          notificationGroups: [{ name: 'Operations', recipients: ['ops@example.com'] }],
+          postponementPolicy: { enabled: true, maxPostponeMinutes: 30, maxPostponements: 1 },
+        },
+      ],
+      schedules: [],
+    });
     createScheduleMock.mockResolvedValue({ id: 'schedule-1' });
     postponeScheduleMock.mockResolvedValue({ id: 'schedule-1' });
   });

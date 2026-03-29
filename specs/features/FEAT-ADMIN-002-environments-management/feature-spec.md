@@ -90,6 +90,8 @@ The system shall display client-owned environments and their stages with current
 
 The system shall allow `Admin` and `EnvironmentManager` users to create and update the Azure services linked to a stage so lifecycle workflows can execute correctly.
 
+Environment Management shall be the user-facing configuration surface where operators define the supported Azure service/action types for each stage and enter the type-specific properties required for runtime execution.
+
 ### REQ-ENV-003 Supported stage action types
 
 The system shall support stage orchestration definitions that include one or more of the following Azure action types:
@@ -265,6 +267,8 @@ The UI shall allow authorized users to:
   - operational unit within an environment
 - `StageResourceAction`
   - Azure service/action definition used in a start/stop workflow
+  - authored and maintained in Environment Management
+  - executed at runtime by `FEAT-ADMIN-004 Start/Stop Services`
 - `Schedule`
   - recurring automation definition for a stage
 - `NotificationGroup`
@@ -295,6 +299,7 @@ The UI shall allow authorized users to:
 - Scheduler worker/timer execution path
 - Notification integration or notification provider abstraction
 - Audit/activity persistence
+- `FEAT-ADMIN-004 Start/Stop Services` for execution semantics of the configured stage resource actions
 
 ## Acceptance Criteria
 

@@ -128,6 +128,74 @@ Notes
 - `synapse-sql-pool`
 - `service-bus-message`
 
+#### Canonical stage `resourceAction` shape
+
+Each configured stage resource action should include:
+
+- `id`
+- `type`
+- `subscriptionId`
+- `resourceGroup`
+- `region`
+- `properties`
+
+The `properties` object is type-specific and is the canonical place for execution-required fields.
+
+#### Required `properties` by `resourceActions[].type`
+
+##### `sql-vm`
+
+Required:
+
+- `vmName`
+
+Recommended optional fields:
+
+- `resourceId`
+
+##### `sql-managed-instance`
+
+Required:
+
+- `managedInstanceName`
+
+Recommended optional fields:
+
+- `resourceId`
+
+##### `synapse-sql-pool`
+
+Required:
+
+- `workspaceName`
+- `sqlPoolName`
+
+Recommended optional fields:
+
+- `resourceId`
+
+##### `service-bus-message`
+
+Required:
+
+- `namespace`
+- `entityType`
+  - `queue` or `topic`
+- `entityName`
+- `messageTemplate`
+
+Recommended optional fields:
+
+- `contentType`
+- `applicationProperties`
+- `sessionIdTemplate`
+
+Notes:
+
+- `service-bus-message` is the stage resource action name already used in Environment Management
+- at execution time this maps to the Service Bus dispatch action handled by `FEAT-ADMIN-004 Start/Stop Services`
+- for `entityType = topic`, downstream subscriptions remain outside the stage configuration contract
+
 ### POST `/api/environments/{environmentId}/stages/{stageId}/start`
 
 Executes an immediate stage start workflow using the configured Azure resource actions.
@@ -221,6 +289,8 @@ Returns activity entries for the selected environment, including:
 
 - A stage cannot be scheduled unless required Azure service configuration is present for the selected action flow
 - Resource action definitions must contain the required metadata for their type
+- `resourceActions[].properties` must contain the required fields for the selected `type`
+- `resourceActions[].subscriptionId`, `resourceActions[].resourceGroup`, and `resourceActions[].region` are required even when different stage resource actions target different subscriptions or regions
 - Schedule creation and update must validate supported day patterns, valid time values, and timezone identifiers
 - Notification groups must be valid references or valid app-managed group definitions
 - Postponement requests must satisfy the configured postponement policy
@@ -252,3 +322,9 @@ For the supported simple schedule builder, the preferred request/response recurr
 - `timezone`
 
 The backend may additionally store or derive an internal cron-like expression as needed for execution, but the canonical user-facing contract should stay aligned with the business-oriented recurrence model.
+
+## Design Notes
+
+- Environment Management owns authoring of stage `resourceActions`
+- schedules point to the stage and requested `start` or `stop` action
+- the worker later resolves the configured stage `resourceActions` from the stage definition rather than from the schedule itself

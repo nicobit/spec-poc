@@ -81,26 +81,60 @@
   - edit page
   - logical retirement confirmation
 - Added frontend coverage for the dedicated `Clients` area and retirement flow
+- Added focused frontend coverage for client create/edit and editor behavior in:
+  - [ClientsPage.test.tsx](c:/Users/nicol/source/admin-portal/frontend/src/features/clients/__tests__/ClientsPage.test.tsx)
+  - [ClientPages.test.tsx](c:/Users/nicol/source/admin-portal/frontend/src/features/clients/__tests__/ClientPages.test.tsx)
+  - [ClientEditorForm.test.tsx](c:/Users/nicol/source/admin-portal/frontend/src/features/clients/__tests__/ClientEditorForm.test.tsx)
+  including:
+  - clients-list empty state
+  - clients-list load error state
+  - create page guarded-submit behavior
+  - edit page redirect on load failure
+  - edit page save failure snackbar
+  - client-admin email chip creation/removal
+  - inline invalid-email feedback
 - Widened first-release client-management authorization so `environment-manager` can also create, update, view, and retire client records in both the backend API and the dedicated frontend `Clients` area
+- Added backend API coverage in [test_clients.py](c:/Users/nicol/source/admin-portal/tests/backend/test_clients.py) for:
+  - `GET /api/clients`
+  - `GET /api/clients/{clientId}`
+  - `POST /api/clients`
+  - `PUT /api/clients/{clientId}`
+  - `POST /api/clients/{clientId}/retire`
+  - positive authorization for `Admin` and `EnvironmentManager`
+  - negative authorization for non-management roles
+  - duplicate short code rejection
+  - invalid country rejection
+  - invalid timezone rejection
+  - invalid client-admin email rejection
+  - missing-client retirement behavior
+- Fixed backend client validation response handling so invalid client payloads now return user-consumable `400` validation errors rather than surfacing as conflicts or non-serializable exception payloads
+- Replaced deprecated Pydantic `parse_obj` usage in the client store with `model_validate`
 - Aligned environment and schedule surfaces to prefer canonical `clientId`:
   - environment create/edit now submit `clientId`
   - environment and schedule selectors now group/filter by canonical client identity
   - backend environment responses now decorate the current client display name from `clientId`
   - in-memory environment and schedule seed data now carry `clientId` / `client_id`
 - Validated backend Python syntax with `python -m py_compile`
+- Validated focused backend client API tests with:
+  - `$env:PYTHONPATH='backend'; .\.venv\Scripts\python.exe -m pytest tests/backend/test_clients.py`
 - Validated frontend type safety with `cd frontend; npx tsc --noEmit`
 - Validated the dedicated `Clients` area tests with `cd frontend; npx vitest run src/features/clients/__tests__/ClientsPage.test.tsx`
+- Validated focused client frontend tests with:
+  - `cd frontend; npx vitest run src/features/clients/__tests__/ClientsPage.test.tsx src/features/clients/__tests__/ClientEditorForm.test.tsx src/features/clients/__tests__/ClientPages.test.tsx`
 - Validated focused environment/schedule/client flows with:
   - `cd frontend; npx vitest run src/features/environment/__tests__/EnvironmentCreatePage.test.tsx src/features/environment/__tests__/EnvironmentSchedulesPage.test.tsx src/features/environment/__tests__/EnvironmentDetailsPage.test.tsx src/features/clients/__tests__/ClientsPage.test.tsx`
 
 ## Validation Gaps
 
-- The current shell does not have `fastapi` or `pytest` available, so the backend API test file could not be executed through the FastAPI test client in this environment
 - Reset/recreation of persisted dev or early-stage records in canonical form still needs to be performed where old string-only data remains
 - Downstream domains beyond environments and schedules, such as future cost/incidents/problem records, still need canonical `clientId` adoption when they are introduced
+- Broader frontend edge-case coverage can still be expanded later for:
+  - retire error states
+  - create/edit loading placeholders
+  - longer chip-list overflow behavior
 
 ## Recommended Next Steps
 
 1. Finish any remaining environments and schedules alignment to canonical `clientId` where old string-based paths still appear
 2. Reset and recreate disposable dev or early-stage records in canonical form where needed
-3. Add executable backend API tests in an environment with `fastapi` and `pytest` available
+3. Expand frontend client edge-case coverage only if future UI complexity grows; the current create/edit/form baseline is now in place

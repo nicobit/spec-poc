@@ -22,16 +22,25 @@ ENVIRONMENTS: List[Dict[str, Any]] = [
                     {
                         "id": "ra-1",
                         "type": "sql-vm",
+                        "region": "eastus",
                         "resourceGroup": "rg-dev-eastus",
-                        "serverName": "sqlvm-dev-01",
                         "subscriptionId": "sub-dev",
+                        "properties": {
+                            "vmName": "sqlvm-dev-01",
+                        },
                     },
                     {
                         "id": "ra-2",
                         "type": "service-bus-message",
-                        "namespace": "sb-dev",
-                        "queueOrTopic": "environment-events",
-                        "messageType": "environment.lifecycle",
+                        "region": "eastus",
+                        "resourceGroup": "rg-dev-eastus",
+                        "subscriptionId": "sub-dev",
+                        "properties": {
+                            "namespace": "sb-dev",
+                            "entityType": "queue",
+                            "entityName": "environment-events",
+                            "messageTemplate": "environment.lifecycle",
+                        },
                     },
                 ],
                 "notificationGroups": [
@@ -63,16 +72,23 @@ ENVIRONMENTS: List[Dict[str, Any]] = [
                     {
                         "id": "ra-3",
                         "type": "synapse-sql-pool",
-                        "workspaceName": "synapse-qa-we",
-                        "sqlPoolName": "qa_dw",
+                        "region": "westeurope",
+                        "resourceGroup": "rg-qa-we",
                         "subscriptionId": "sub-qa",
+                        "properties": {
+                            "workspaceName": "synapse-qa-we",
+                            "sqlPoolName": "qa_dw",
+                        },
                     },
                     {
                         "id": "ra-4",
                         "type": "sql-managed-instance",
-                        "instanceName": "sqlmi-qa-01",
+                        "region": "westeurope",
                         "resourceGroup": "rg-qa-we",
                         "subscriptionId": "sub-qa",
+                        "properties": {
+                            "managedInstanceName": "sqlmi-qa-01",
+                        },
                     },
                 ],
                 "notificationGroups": [

@@ -46,8 +46,13 @@ Architecture governance and DSL conventions live under `delivery/governance/`.
 
 - `system-context.md`
 - `container-view.md`
+- `component-view.md`
 - `deployment-view.md`
 - `data-model.md`
+
+## Current Dynamic Views
+
+- `dynamic-views/scheduled-stage-execution.md`
 
 ## Structured Architecture Source
 

@@ -257,6 +257,19 @@ body {
   background: var(--surface-app);
 }
 
+.ui-page-loading-bar-slot {
+  height: 3px;
+  width: 100%;
+}
+
+.ui-page-loading-bar-slot .ui-page-loading-bar {
+  opacity: 0;
+}
+
+.ui-page-loading-bar-slot.is-loading .ui-page-loading-bar {
+  opacity: 1;
+}
+
 .ui-page-loading-bar {
   position: relative;
   height: 3px;
@@ -264,6 +277,7 @@ body {
   overflow: hidden;
   border-radius: 999px;
   background: color-mix(in srgb, var(--accent-primary) 12%, var(--surface-panel-muted));
+  transition: opacity 160ms ease;
 }
 
 .ui-page-loading-bar__indicator {
