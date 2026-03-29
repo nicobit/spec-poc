@@ -8,20 +8,25 @@ from fastapi.testclient import TestClient
 
 import backend.function_environment.__init__ as fe
 from shared import scheduler_store as mem_store
-from shared.environment_store import ENVIRONMENTS
+from shared import environment_store as environment_store_module
 
 client = TestClient(fe.fast_app)
+ORIGINAL_SCHEDULES = deepcopy(mem_store.SCHEDULES)
+ORIGINAL_ENVIRONMENTS = deepcopy(environment_store_module.ENVIRONMENTS)
 
 
 @pytest.fixture(autouse=True)
 def reset_schedule_and_environment_state():
-    schedule_snapshot = deepcopy(mem_store.SCHEDULES)
-    environment_snapshot = deepcopy(ENVIRONMENTS)
-    yield
+    original_env_store = fe.env_store
+    fe.env_store = None
     mem_store.SCHEDULES.clear()
-    mem_store.SCHEDULES.extend(schedule_snapshot)
-    ENVIRONMENTS.clear()
-    ENVIRONMENTS.extend(environment_snapshot)
+    mem_store.SCHEDULES.extend(deepcopy(ORIGINAL_SCHEDULES))
+    environment_store_module.ENVIRONMENTS = deepcopy(ORIGINAL_ENVIRONMENTS)
+    yield
+    fe.env_store = original_env_store
+    mem_store.SCHEDULES.clear()
+    mem_store.SCHEDULES.extend(deepcopy(ORIGINAL_SCHEDULES))
+    environment_store_module.ENVIRONMENTS = deepcopy(ORIGINAL_ENVIRONMENTS)
 
 
 def set_user(claims):
@@ -118,8 +123,8 @@ def test_create_schedule_prefers_canonical_environment_and_stage_ids(monkeypatch
     mem_store.SCHEDULES.clear()
     set_user({"roles": ["admin"], "preferred_username": "system"})
 
-    ENVIRONMENTS[0]["name"] = "DEV-RENAMED"
-    ENVIRONMENTS[0]["stages"][0]["name"] = "STG"
+    environment_store_module.ENVIRONMENTS[0]["name"] = "DEV-RENAMED"
+    environment_store_module.ENVIRONMENTS[0]["stages"][0]["name"] = "STG"
 
     response = client.post(
         "/api/environments/schedules",

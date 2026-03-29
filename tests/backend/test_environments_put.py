@@ -5,7 +5,7 @@ client = TestClient(fe.fast_app)
 
 
 def _fake_client_admin(req):
-    return {"roles": ["client-admin"], "client": "client-a", "preferred_username": "ca@example.com"}
+    return {"roles": ["client-admin"], "client_id": "client-001", "preferred_username": "ca@example.com"}
 
 
 def test_put_environment_client_admin_allowed():

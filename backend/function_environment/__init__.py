@@ -1451,9 +1451,10 @@ async def create_schedule(req: Request, body: ScheduleIn):
         raise HTTPException(status_code=403, detail="Forbidden")
 
     sid = f"sched-{uuid.uuid4().hex[:8]}"
+    envs = _list_environment_refs()
     item = _canonicalize_schedule_record(
         body.model_dump(),
-        environments=_list_environment_refs(),
+        environments=envs,
         allow_missing_environment_label=False,
     )
     item["id"] = sid
@@ -1493,7 +1494,7 @@ async def create_schedule(req: Request, body: ScheduleIn):
             "requestedBy": item.get("owner"),
         }
     )
-    return {"created": _decorate_schedule_for_response(item)}
+    return {"created": _decorate_schedule_for_response(item, envs)}
 
 
 @fast_app.put("/api/environments/schedules/{schedule_id}")
