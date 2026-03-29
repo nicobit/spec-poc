@@ -5,6 +5,7 @@ import { getEnvironment, updateEnvironment } from '../api';
 import EnvironmentEditorForm from '../components/EnvironmentEditorForm';
 import EnvironmentPageLayout from '../components/EnvironmentPageLayout';
 import type { EnvironmentStage } from '../api';
+import { listClients, type ClientRecord } from '@/features/clients/api';
 
 export default function EnvironmentEditPage() {
   const { instance } = useMsal();
@@ -16,6 +17,8 @@ export default function EnvironmentEditPage() {
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [client, setClient] = useState('');
+  const [clientId, setClientId] = useState('');
+  const [clientOptions, setClientOptions] = useState<ClientRecord[]>([]);
   const [stages, setStages] = useState<EnvironmentStage[]>([]);
   const [saving, setSaving] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
@@ -26,11 +29,13 @@ export default function EnvironmentEditPage() {
     (async () => {
       setLoading(true);
       try {
-        const env = await getEnvironment(instance, id!);
+        const [env, clients] = await Promise.all([getEnvironment(instance, id!), listClients(instance)]);
         if (!mounted) return;
         setName(env.name || '');
         setClient(env.client || '');
+        setClientId(env.clientId || '');
         setStages(env.stages || []);
+        setClientOptions(clients.clients || []);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to load environment');
       } finally {
@@ -43,7 +48,7 @@ export default function EnvironmentEditPage() {
   const onSave = async () => {
     const errors: string[] = [];
     if (!name.trim()) errors.push('Name is required');
-    if (!client.trim()) errors.push('Client is required');
+    if (!clientId.trim() && !client.trim()) errors.push('Client is required');
     stages.forEach((s, i) => { if (!s.name || !s.name.trim()) errors.push(`Stage ${i + 1} must have a name`); });
     setValidationErrors(errors);
     if (errors.length > 0) return;
@@ -51,7 +56,7 @@ export default function EnvironmentEditPage() {
     setSaving(true);
     setError(null);
     try {
-    await updateEnvironment(instance, id!, { name, client, stages });
+    await updateEnvironment(instance, id!, { name, client, clientId, stages });
       // return to manage preserving search params if present
       const returnTo = (location.state as any)?.from || '/environment/manage';
       navigate(returnTo + (location.search || ''));
@@ -65,17 +70,20 @@ export default function EnvironmentEditPage() {
   if (loading) return <div className="ui-panel-muted rounded-xl p-3 text-sm">Loading environment...</div>;
 
   return (
-    <EnvironmentPageLayout title="Edit Environment" description="Update details and save.">
+    <EnvironmentPageLayout title="Edit environment" description="Update the client, stages, and Azure services for this environment.">
       <EnvironmentEditorForm
         mode="edit"
         name={name}
         client={client}
+        clientId={clientId}
+        clientOptions={clientOptions}
         stages={stages}
         saving={saving}
         error={error}
         validationErrors={validationErrors}
         onNameChange={setName}
         onClientChange={setClient}
+        onClientIdChange={setClientId}
         onStagesChange={setStages}
         onCancel={() => navigate(-1)}
         onSubmit={onSave}

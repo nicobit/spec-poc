@@ -7,10 +7,14 @@ const DashboardPage = lazy(() => import('@/features/dashboard/pages/DashboardPag
 const LoginPage = lazy(() => import('@/pages/Login'));
 const SettingsPage = lazy(() => import('@/features/settings/pages/SettingsPage'));
 const EnvironmentPage = lazy(() => import('@/features/environment/pages/EnvironmentPage'));
+const ClientsPage = lazy(() => import('@/features/clients/pages/ClientsPage'));
+const ClientCreatePage = lazy(() => import('@/features/clients/pages/ClientCreatePage'));
+const ClientEditPage = lazy(() => import('@/features/clients/pages/ClientEditPage'));
 const EnvironmentCreatePage = lazy(() => import('@/features/environment/pages/EnvironmentCreatePage'));
 const EnvironmentManagePage = lazy(() => import('@/features/environment/pages/EnvironmentManagePage'));
 const EnvironmentResourcesPage = lazy(() => import('@/features/environment/pages/EnvironmentResourcesPage'));
 const EnvironmentSchedulesPage = lazy(() => import('@/features/environment/pages/EnvironmentSchedulesPage'));
+const EnvironmentScheduleCreatePage = lazy(() => import('@/features/environment/pages/EnvironmentScheduleCreatePage'));
 const EnvironmentDetailsPage = lazy(() => import('@/features/environment/pages/EnvironmentDetailsPage'));
 const EnvironmentEditPage = lazy(() => import('@/features/environment/pages/EnvironmentEditPage'));
 const ChatPage = lazy(() => import('@/features/chat/pages/ChatPage'));
@@ -37,12 +41,16 @@ export const authenticatedRouteConfigs: AppRouteConfig[] = [
   { path: '/question', component: QuestionQueryExamplePage },
   { path: '/settings', component: SettingsPage, adminOnly: true },
   { path: '/environment', component: EnvironmentPage },
+  { path: '/clients', component: ClientsPage },
+  { path: '/clients/create', component: ClientCreatePage },
+  { path: '/clients/:id/edit', component: ClientEditPage },
   { path: '/environment/create', component: EnvironmentCreatePage },
   { path: '/environment/manage', component: EnvironmentManagePage },
   { path: '/environment/edit/:id', component: EnvironmentEditPage },
   { path: '/environment/:id', component: EnvironmentDetailsPage },
   { path: '/environment/resources', component: EnvironmentResourcesPage },
   { path: '/environment/schedules', component: EnvironmentSchedulesPage },
+  { path: '/environment/schedules/create', component: EnvironmentScheduleCreatePage },
   { path: '/logs', component: LogsPage },
   { path: '/user', component: UserPage },
   { path: '/status', component: StatusPage },

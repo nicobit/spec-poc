@@ -13,6 +13,7 @@ Define the minimum sound design needed to implement the approved feature while p
 ## Required Outputs
 
 - architecture notes
+- architecture view updates under `specs/architecture/` when needed
 - API spec updates when needed
 - ADR when needed
 - integration and runtime considerations
@@ -23,6 +24,7 @@ Define the minimum sound design needed to implement the approved feature while p
 - call out hosting-specific constraints explicitly
 - minimize unnecessary complexity
 - identify operational and observability implications
+- update durable architecture views when boundaries, topology, interactions, or data structure materially change
 
 ## Handoff
 

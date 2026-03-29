@@ -9,9 +9,18 @@ This feature extends environments management from simple start/stop scheduling t
 - Environment stages can be configured with Azure service targets used for lifecycle actions
 - Supported initial stage action types include SQL VM, SQL Managed Instance, Synapse SQL pool, and Service Bus message dispatch
 - Administrators and environment managers can manage stage configuration and schedules
-- Recipient groups can be defined per environment/stage for notifications
+- Recipient groups can be defined for stage schedules for notifications
 - Authorized recipients can postpone scheduled actions
 - Activity history must include configuration changes, lifecycle actions, notifications, and postponements
+- The user-facing structure should emphasize:
+  - `Client` as the parent context
+  - `Environment` as the managed unit
+  - `Stage` as the operational unit
+  - `Schedule` as the stage-level automation unit
+- The preferred user-facing navigation should center on:
+  - `Manage`
+  - `Schedules`
+- The label `Resources` is not preferred as the long-term top-level navigation concept
 
 ## Business Constraints
 

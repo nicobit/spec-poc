@@ -95,20 +95,29 @@ describe('EnvironmentManagePage', () => {
   });
 
   it('renders the page title only once while keeping row actions available', async () => {
+    const user = userEvent.setup();
+
     render(
       <MemoryRouter>
         <EnvironmentManagePage />
       </MemoryRouter>
     );
 
-    await screen.findByText('CLIENT01 - DEV');
+    await screen.findByRole('button', { name: 'Expand CLIENT 1' });
 
-    expect(screen.getByRole('heading', { level: 1, name: 'Manage Environments' })).toBeTruthy();
-    expect(screen.getAllByText('Manage Environments')).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 1, name: 'Manage environments' })).toBeTruthy();
+    expect(screen.getAllByText('Manage environments')).toHaveLength(1);
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'New environment' })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 2, name: 'CLIENT 1' })).toBeTruthy();
     expect(screen.queryByText('Environment inventory')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Apply' })).toBeNull();
+
+    expect(screen.queryByText('CLIENT01 - DEV')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Expand CLIENT 1' }));
+
+    await screen.findByText('CLIENT01 - DEV');
     expect(screen.getByRole('button', { name: 'Details' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Delete' })).toBeTruthy();
@@ -123,10 +132,11 @@ describe('EnvironmentManagePage', () => {
       </MemoryRouter>
     );
 
+    await user.click(await screen.findByRole('button', { name: 'Expand CLIENT 1' }));
     await screen.findByText('CLIENT01 - DEV');
 
     await user.click(screen.getByRole('button', { name: 'Delete' }));
-    expect(screen.getByRole('dialog')).toBeTruthy();
+    expect(await screen.findByRole('dialog')).toBeTruthy();
 
     await user.click(screen.getByRole('button', { name: 'Confirm' }));
 

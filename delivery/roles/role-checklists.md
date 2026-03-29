@@ -28,6 +28,7 @@ Inputs:
 
 Outputs:
 - architecture notes
+- architecture view updates when needed
 - API spec when needed
 - ADR when needed
 
@@ -35,6 +36,13 @@ Checklist:
 - define system boundaries
 - call out hosting-specific vs portable logic
 - identify integration and operational impacts
+- decide whether `specs/architecture/` needs updates for:
+  - system context
+  - container view
+  - component view
+  - deployment view
+  - dynamic views
+  - data model
 
 ## UX Expert
 

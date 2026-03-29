@@ -15,6 +15,7 @@ Each significant feature should have links between:
 - acceptance criteria
 - API contract changes
 - architecture decisions
+- architecture view updates when relevant
 - implementation tasks
 - code changes
 - automated tests

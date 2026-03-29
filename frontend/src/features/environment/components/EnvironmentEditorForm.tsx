@@ -1,6 +1,7 @@
 import { Layers, Server, Sparkles } from 'lucide-react';
 
 import { themeClasses } from '@/theme/themeClasses';
+import type { ClientRecord } from '@/features/clients/api';
 
 import type { EnvironmentStage, ResourceAction } from '../api';
 import StageEditor from './StageEditor';
@@ -9,6 +10,8 @@ type Props = {
   mode: 'create' | 'edit';
   name: string;
   client: string;
+  clientId?: string;
+  clientOptions?: ClientRecord[];
   lifecycle?: string;
   stages: EnvironmentStage[];
   saving: boolean;
@@ -16,6 +19,7 @@ type Props = {
   validationErrors: string[];
   onNameChange: (value: string) => void;
   onClientChange: (value: string) => void;
+  onClientIdChange?: (value: string) => void;
   onLifecycleChange?: (value: string) => void;
   onStagesChange: (stages: EnvironmentStage[]) => void;
   onCancel: () => void;
@@ -51,6 +55,8 @@ export default function EnvironmentEditorForm({
   mode,
   name,
   client,
+  clientId,
+  clientOptions = [],
   lifecycle,
   stages,
   saving,
@@ -58,6 +64,7 @@ export default function EnvironmentEditorForm({
   validationErrors,
   onNameChange,
   onClientChange,
+  onClientIdChange,
   onLifecycleChange,
   onStagesChange,
   onCancel,
@@ -86,18 +93,18 @@ export default function EnvironmentEditorForm({
         </div>
       ) : null}
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(18rem,0.8fr)]">
-        <div className="ui-panel rounded-2xl p-5">
+      <section className="space-y-4">
+        <div className={`${themeClasses.formSection} rounded-3xl p-6`}>
           <div className="mb-4">
-            <div className="text-xs uppercase tracking-[0.18em] ui-text-muted">Environment details</div>
-            <p className="mt-2 text-sm text-[var(--text-secondary)]">
-              Start with the basic identity for the environment, then define the stages and resources below.
+            <div className={themeClasses.sectionEyebrow}>Environment details</div>
+            <p className={`${themeClasses.helperText} mt-2 max-w-3xl`}>
+              Start with the client and environment identity, then define the stages and Azure services below.
             </p>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label htmlFor="environment-name" className="block text-sm font-medium text-[var(--text-primary)]">
+              <label htmlFor="environment-name" className={`block ${themeClasses.fieldLabel}`}>
                 Name
               </label>
               <input
@@ -110,21 +117,42 @@ export default function EnvironmentEditorForm({
             </div>
 
             <div>
-              <label htmlFor="environment-client" className="block text-sm font-medium text-[var(--text-primary)]">
+              <label htmlFor="environment-client" className={`block ${themeClasses.fieldLabel}`}>
                 Client
               </label>
-              <input
-                id="environment-client"
-                className={`${themeClasses.field} mt-1 w-full rounded-lg px-3 py-2 text-sm`}
-                value={client}
-                onChange={(event) => onClientChange(event.target.value)}
-                placeholder="CLIENT 1"
-              />
+              {clientOptions.length > 0 && onClientIdChange ? (
+                <select
+                  id="environment-client"
+                  className={`${themeClasses.select} mt-1 w-full rounded-lg px-3 py-2 text-sm`}
+                  value={clientId || ''}
+                  onChange={(event) => {
+                    const nextId = event.target.value;
+                    const selectedClient = clientOptions.find((option) => option.id === nextId);
+                    onClientIdChange(nextId);
+                    onClientChange(selectedClient?.name || '');
+                  }}
+                >
+                  <option value="">Select a client</option>
+                  {clientOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.shortCode} - {option.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  id="environment-client"
+                  className={`${themeClasses.field} mt-1 w-full rounded-lg px-3 py-2 text-sm`}
+                  value={client}
+                  onChange={(event) => onClientChange(event.target.value)}
+                  placeholder="CLIENT 1"
+                />
+              )}
             </div>
 
             {onLifecycleChange ? (
               <div className="md:col-span-2 lg:max-w-xs">
-                <label htmlFor="environment-lifecycle" className="block text-sm font-medium text-[var(--text-primary)]">
+                <label htmlFor="environment-lifecycle" className={`block ${themeClasses.fieldLabel}`}>
                   Lifecycle
                 </label>
                 <input
@@ -139,35 +167,35 @@ export default function EnvironmentEditorForm({
           </div>
         </div>
 
-        <aside className="ui-panel rounded-2xl p-5">
-          <div className="text-xs uppercase tracking-[0.18em] ui-text-muted">Configuration summary</div>
-          <div className="mt-4 space-y-4">
-            <div className="flex items-start gap-3">
-              <div className="rounded-xl bg-[var(--surface-panel-muted)] p-2">
+        <aside className={`${themeClasses.formSection} rounded-3xl p-6`}>
+          <div className={themeClasses.sectionEyebrow}>Configuration summary</div>
+          <div className="mt-4 grid gap-3 xl:grid-cols-3">
+            <div className={`${themeClasses.subsectionCard} flex items-start gap-3 rounded-2xl p-4`}>
+              <div className="rounded-xl bg-[var(--surface-elevated)] p-2">
                 <Layers className="h-4 w-4 text-[var(--text-secondary)]" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="text-sm font-medium text-[var(--text-primary)]">{stages.length} stage{stages.length === 1 ? '' : 's'}</div>
-                <div className="text-sm text-[var(--text-secondary)]">Model each operating step as its own stage.</div>
+                <div className={themeClasses.helperText}>Model each operating step as its own stage.</div>
               </div>
             </div>
 
-            <div className="flex items-start gap-3">
-              <div className="rounded-xl bg-[var(--surface-panel-muted)] p-2">
+            <div className={`${themeClasses.subsectionCard} flex items-start gap-3 rounded-2xl p-4`}>
+              <div className="rounded-xl bg-[var(--surface-elevated)] p-2">
                 <Server className="h-4 w-4 text-[var(--text-secondary)]" />
               </div>
-              <div>
-                <div className="text-sm font-medium text-[var(--text-primary)]">{resourceCount} resource action{resourceCount === 1 ? '' : 's'}</div>
-                <div className="text-sm text-[var(--text-secondary)]">Add only the Azure resources needed for this environment.</div>
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-[var(--text-primary)]">{resourceCount} Azure service action{resourceCount === 1 ? '' : 's'}</div>
+                <div className={themeClasses.helperText}>Add only the Azure services needed for this environment.</div>
               </div>
             </div>
 
-            <div className="flex items-start gap-3">
-              <div className="rounded-xl bg-[var(--surface-panel-muted)] p-2">
+            <div className={`${themeClasses.subsectionCard} flex items-start gap-3 rounded-2xl p-4`}>
+              <div className="rounded-xl bg-[var(--surface-elevated)] p-2">
                 <Sparkles className="h-4 w-4 text-[var(--text-secondary)]" />
               </div>
-              <div>
-                <div className="text-sm font-medium text-[var(--text-primary)]">Derived type</div>
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-[var(--text-primary)]">Service types</div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {derivedTypes.length > 0 ? (
                     derivedTypes.map((type) => (
@@ -179,7 +207,7 @@ export default function EnvironmentEditorForm({
                       </span>
                     ))
                   ) : (
-                    <span className="text-sm text-[var(--text-secondary)]">No resource types yet. This will be derived from the stage resources.</span>
+                    <span className={themeClasses.helperText}>No service types yet. This will be derived from the Azure services configured for each stage.</span>
                   )}
                 </div>
               </div>
@@ -188,15 +216,15 @@ export default function EnvironmentEditorForm({
         </aside>
       </section>
 
-      <section className="ui-panel rounded-2xl p-5">
+      <section className={`${themeClasses.formSection} rounded-3xl p-6`}>
         <StageEditor stages={stages} onChange={onStagesChange} />
       </section>
 
-      <div className="ui-panel sticky bottom-4 flex items-center justify-between rounded-2xl px-5 py-4">
-        <div className="text-sm text-[var(--text-secondary)]">
+      <div className={`${themeClasses.formSection} sticky bottom-4 flex items-center justify-between rounded-3xl px-6 py-4`}>
+        <div className={themeClasses.helperText}>
           {mode === 'create'
-            ? 'Create the environment once the required details and stage configuration are ready.'
-            : 'Save your changes once the environment details and stage configuration are correct.'}
+            ? 'Create the environment once the client, stages, and Azure services are ready.'
+            : 'Save your changes once the environment details, stages, and Azure services are correct.'}
         </div>
         <div className="flex items-center gap-2">
           <button

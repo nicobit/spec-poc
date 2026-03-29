@@ -46,6 +46,7 @@ class EnvironmentModel(BaseModel):
     id: str
     name: str
     client: str
+    clientId: Optional[str] = None
     region: Optional[str] = None
     status: Optional[str] = "stopped"
     lifecycle: Optional[str] = None

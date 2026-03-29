@@ -16,7 +16,16 @@ def test_create_schedule_in_memory(monkeypatch, tmp_path):
     # clear in-memory schedules
     mem_store.SCHEDULES.clear()
 
-    payload = {"environment": "DEV", "client": "client-x", "stage": "stage1", "action": "start", "cron": "*/5 * * * *", "timezone": "UTC"}
+    payload = {
+        "environment_id": "env-1",
+        "environment": "dev-1",
+        "client": "client-a",
+        "stage_id": "stage-dev-sql",
+        "stage": "stage1",
+        "action": "start",
+        "cron": "*/5 * * * *",
+        "timezone": "UTC",
+    }
     r = client.post('/api/environments/schedules', json=payload)
     assert r.status_code == 200
     body = r.json()
@@ -33,7 +42,15 @@ def test_list_schedules_in_memory(monkeypatch):
     # ensure there's at least one schedule
     if not mem_store.SCHEDULES:
         mem_store.SCHEDULES.append({
-            'id': 'sched-test', 'environment': 'DEV', 'client': 'client-x', 'stage': 'stage1', 'action': 'start', 'next_run': (datetime.utcnow() - timedelta(seconds=10)).isoformat(), 'enabled': True
+            'id': 'sched-test',
+            'environment': 'dev-1',
+            'environment_id': 'env-1',
+            'client': 'client-a',
+            'stage': 'stage1',
+            'stage_id': 'stage-dev-sql',
+            'action': 'start',
+            'next_run': (datetime.utcnow() - timedelta(seconds=10)).isoformat(),
+            'enabled': True,
         })
     r = client.get('/api/environments/schedules')
     assert r.status_code == 200
@@ -47,7 +64,17 @@ def test_timer_enqueues_due(monkeypatch, tmp_path):
     # prepare a due schedule
     mem_store.SCHEDULES.clear()
     now = datetime.utcnow()
-    mem_store.SCHEDULES.append({'id': 's1', 'environment': 'DEV', 'client': 'client-x', 'stage': 'stage1', 'action': 'start', 'next_run': (now - timedelta(seconds=5)).isoformat(), 'enabled': True})
+    mem_store.SCHEDULES.append({
+        'id': 's1',
+        'environment': 'dev-1',
+        'environment_id': 'env-1',
+        'client': 'client-a',
+        'stage': 'stage1',
+        'stage_id': 'stage-dev-sql',
+        'action': 'start',
+        'next_run': (now - timedelta(seconds=5)).isoformat(),
+        'enabled': True,
+    })
 
     # create a fake Out collector
     class DummyOut:
@@ -61,6 +88,6 @@ def test_timer_enqueues_due(monkeypatch, tmp_path):
     assert out.value is not None
     messages = json.loads(out.value)
     assert isinstance(messages, list)
-    assert messages[0]['environment'] == 'DEV'
-    assert messages[0]['client'] == 'client-x'
+    assert messages[0]['environment'] == 'dev-1'
+    assert messages[0]['client'] == 'client-a'
 

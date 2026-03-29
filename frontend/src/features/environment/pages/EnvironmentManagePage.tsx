@@ -15,11 +15,13 @@ export default function EnvironmentManagePage() {
   const { ready, isAdmin, roles } = useAuthZ(instance);
   const canEdit = ready && (isAdmin || roles.includes('EnvironmentAdmin') || roles.includes('EnvironmentEditor'));
   const [refreshNonce, setRefreshNonce] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   return (
     <EnvironmentPageLayout
-      title="Manage Environments"
-      description="List, filter and manage environment records."
+      title="Manage environments"
+      description="Browse environments by client, then open details, edit the setup, or manage schedules."
+      loading={loading}
       actions={
         <>
           <button
@@ -43,7 +45,7 @@ export default function EnvironmentManagePage() {
         </>
       }
     >
-      <EnvironmentManageList instance={instance} refreshNonce={refreshNonce} />
+      <EnvironmentManageList instance={instance} refreshNonce={refreshNonce} onLoadingChange={setLoading} />
     </EnvironmentPageLayout>
   );
 }

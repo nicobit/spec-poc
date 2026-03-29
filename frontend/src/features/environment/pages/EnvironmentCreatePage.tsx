@@ -5,22 +5,42 @@ import { createEnvironment } from '../api';
 import EnvironmentEditorForm from '../components/EnvironmentEditorForm';
 import EnvironmentPageLayout from '../components/EnvironmentPageLayout';
 import type { EnvironmentStage } from '../api';
+import { listClients, type ClientRecord } from '@/features/clients/api';
+import { useEffect } from 'react';
 
 export default function EnvironmentCreatePage() {
   const { instance } = useMsal();
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [client, setClient] = useState('');
+  const [clientId, setClientId] = useState('');
+  const [clientOptions, setClientOptions] = useState<ClientRecord[]>([]);
   const [lifecycle, setLifecycle] = useState('DEV');
   const [stages, setStages] = useState<EnvironmentStage[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
+  useEffect(() => {
+    let mounted = true;
+    void listClients(instance)
+      .then((response) => {
+        if (mounted) {
+          setClientOptions(response.clients);
+        }
+      })
+      .catch(() => {
+        // leave free-text fallback unavailable only when options are missing
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [instance]);
+
   const onSave = async () => {
     const errors: string[] = [];
     if (!name.trim()) errors.push('Name is required');
-    if (!client.trim()) errors.push('Client is required');
+    if (!clientId.trim() && !client.trim()) errors.push('Client is required');
     stages.forEach((s, i) => { if (!s.name || !s.name.trim()) errors.push(`Stage ${i + 1} must have a name`); });
     setValidationErrors(errors);
     if (errors.length > 0) return;
@@ -28,7 +48,7 @@ export default function EnvironmentCreatePage() {
     setSaving(true);
     setError(null);
     try {
-      await createEnvironment(instance, { name, client, lifecycle, stages });
+      await createEnvironment(instance, { name, client, clientId, lifecycle, stages });
       navigate('/environment');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create environment');
@@ -43,6 +63,8 @@ export default function EnvironmentCreatePage() {
         mode="create"
         name={name}
         client={client}
+        clientId={clientId}
+        clientOptions={clientOptions}
         lifecycle={lifecycle}
         stages={stages}
         saving={saving}
@@ -50,6 +72,7 @@ export default function EnvironmentCreatePage() {
         validationErrors={validationErrors}
         onNameChange={setName}
         onClientChange={setClient}
+        onClientIdChange={setClientId}
         onLifecycleChange={setLifecycle}
         onStagesChange={setStages}
         onCancel={() => navigate('/environment')}

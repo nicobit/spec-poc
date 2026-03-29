@@ -53,14 +53,14 @@ Environments Management
 
 ## Summary
 
-Provide an Environments Management capability in the Admin Portal that allows authorized users to configure Azure stage resources, run immediate environment lifecycle actions, manage recurring schedules, notify environment-specific recipient groups, and allow authorized postponement of scheduled actions.
+Provide an Environments Management capability in the Admin Portal that allows authorized users to manage client-owned environments, configure Azure services for each stage, run immediate stage lifecycle actions, manage stage-level recurring schedules, notify schedule recipients, and allow authorized postponement of scheduled actions.
 
 ## Goals
 
-- Allow operators to view environment stages and their lifecycle status
-- Allow administrators to configure the Azure resource details required for stage orchestration
+- Allow operators to view client-owned environments and their stages with clear ownership context
+- Allow administrators to configure the Azure service details required for stage orchestration
 - Support coordinated start and stop workflows across multiple Azure service types
-- Support recurring schedules with notification recipients per environment/stage
+- Support recurring schedules with notification recipients per stage
 - Allow authorized recipients to postpone scheduled actions
 - Expose auditable activity for configuration changes, execution, notifications, and postponements
 
@@ -78,17 +78,17 @@ Provide an Environments Management capability in the Admin Portal that allows au
 - `EnvironmentManager`
   - manage environment/stage configuration, schedules, and lifecycle actions
 - `AuthorizedRecipient`
-  - receives notifications for a specific environment/stage and may postpone scheduled actions when policy allows
+  - receives notifications for a specific stage schedule and may postpone scheduled actions when policy allows
 
 ## Functional Requirements
 
 ### REQ-ENV-001 Stage inventory and status
 
-The system shall display managed environments and their stages with current lifecycle status, resource type summary, and recent activity context.
+The system shall display client-owned environments and their stages with current lifecycle status, Azure service summary, and recent activity context.
 
 ### REQ-ENV-002 Azure stage configuration
 
-The system shall allow `Admin` and `EnvironmentManager` users to create and update stage configuration required to execute lifecycle workflows.
+The system shall allow `Admin` and `EnvironmentManager` users to create and update the Azure services linked to a stage so lifecycle workflows can execute correctly.
 
 ### REQ-ENV-003 Supported stage action types
 
@@ -107,9 +107,20 @@ The system shall allow `Admin` and `EnvironmentManager` users to trigger immedia
 
 The system shall allow `Admin` and `EnvironmentManager` users to create, update, enable, disable, and delete recurring schedules for environment stages.
 
+The default schedule authoring flow shall use business-oriented inputs for:
+
+- action
+- supported day pattern
+- time
+- timezone
+
+The UI shall not require users to author raw cron syntax as the primary interaction.
+
+Schedules shall be linked to environments and stages by stable identifiers rather than mutable display names so later renames do not break schedule association or display.
+
 ### REQ-ENV-006 Notification recipient groups
 
-The system shall allow environment/stage schedules to define the recipient group or groups to be notified before a scheduled lifecycle action executes.
+The system shall allow stage schedules to define the recipient group or groups to be notified before a scheduled lifecycle action executes.
 
 ### REQ-ENV-007 Notification event recording
 
@@ -121,7 +132,7 @@ The system shall allow authorized recipients, `Admin`, and `EnvironmentManager` 
 
 ### REQ-ENV-009 Postponement policy
 
-The system shall support postponement policy metadata at the schedule or environment/stage level, including allowed postponement behavior and timing constraints.
+The system shall support postponement policy metadata at schedule level, including allowed postponement behavior and timing constraints.
 
 ### REQ-ENV-010 Activity and audit history
 
@@ -146,7 +157,7 @@ The system shall enforce authorization so that:
 The UI shall allow authorized users to:
 
 - view environment and stage status
-- manage stage configuration
+- manage stages and their Azure services
 - manage schedules
 - inspect activity
 - understand notification and postponement state
@@ -154,38 +165,110 @@ The UI shall allow authorized users to:
 ## UI Requirements
 
 - The application shall provide an `Environments` area in the main navigation
+- The user-facing hierarchy shall be expressed as:
+  - `Client`
+  - `Environment`
+  - `Stage`
+  - `Schedule`
 - The environment management experience shall include:
   - environment/stage inventory
-  - stage configuration management
+  - stage and Azure service configuration management
   - schedule management
   - activity history
   - notification/postponement context
+- The recommended primary navigation labels shall be:
+  - `Manage`
+  - `Schedules`
+- The recommended page labels within the environment flow shall be:
+  - `Manage environments`
+  - `Environment details`
+  - `Edit environment`
+  - `Environment schedules`
+- The label `Resources` shall not remain the preferred top-level user-facing label because it does not clearly communicate the page purpose
+- The label `Stage actions` shall not be preferred as a primary user-facing concept because it is too implementation-oriented for general operators
 - The environment inventory page shall use a single page title and shall not repeat the page title inside nested panels
+- The environment inventory page shall emphasize client ownership and make the client relationship visually primary when browsing environments
 - When an environment detail, create, or edit route is open, the related `Environments > Manage` navigation group in the left sidebar shall remain expanded and visually associated with the current page
-- The create and edit forms shall present environment details, stage configuration, and derived configuration summary as clearly separated sections, and shall avoid showing derived fields as editable inputs
-- The details page shall present environment overview, stage status, resource action summaries, schedules, and recent activity in structured sections rather than raw configuration dumps as the default view
+- The create and edit forms shall present environment details, stage structure, and Azure services as clearly separated concerns, and shall avoid showing derived fields as editable inputs
+- The details page shall present environment overview, stage status, Azure service summaries, schedules, and recent activity in structured sections rather than raw configuration dumps as the default view
 - Users shall be able to:
   - trigger start/stop for a stage
-  - inspect configured Azure resource actions
-  - manage notification recipients
+  - inspect configured Azure services for each stage
+  - inspect notification recipients
   - postpone eligible scheduled actions
 - The environment inventory rows shall expose details, edit, and delete actions through a compact interaction that expands on hover and keyboard focus while remaining accessible on non-hover devices
-- Stage resource editors shall show type-specific input fields for the selected Azure resource action instead of a single generic identifier field
+- Stage Azure service editors shall show type-specific input fields for the selected service/action instead of a single generic identifier field
 - The details page shall support stage start and stop actions from within each stage section while keeping those actions visually secondary to the status and configuration overview
+- The schedules experience shall be a distinct stage-level workflow and shall own:
+  - recurrence
+  - timezone
+  - scheduled action
+  - notifications
+  - postponement rules
+- The schedule create/edit experience shall:
+  - capture schedule intent using action, day pattern, time, and timezone
+  - present human-readable schedule summaries
+  - avoid exposing raw cron syntax as the default user input
+- The initial supported schedule patterns shall be:
+  - every day
+  - weekdays
+  - selected day(s) of week
+- If advanced or unsupported recurrence definitions exist in persisted data, the UI shall identify them clearly instead of misrepresenting them as a supported simple schedule
+- The application shall not require a dedicated top-level `Resources` page in the intended user-facing information architecture; Azure service setup shall belong to the create/edit environment flow
 - Loading, empty, error, and unauthorized states must be explicit
+
+## UX Structure Recommendation
+
+- `Manage environments`
+  - primary inventory and entry point
+  - browse client-owned environments
+  - open details
+  - create environment
+  - edit environment
+  - delete environment
+- `Environment details`
+  - read-oriented operational overview
+  - summarize stage status, Azure services, schedules, notifications, and recent activity
+  - provide clear entry points to edit the environment or manage schedules
+- `Edit environment`
+  - define environment basics
+  - define stages
+  - define Azure services linked to each stage
+- `Environment schedules`
+  - manage recurring schedules for a selected stage
+  - manage schedule notifications
+  - manage postponement rules
+  - use a human-readable schedule builder rather than raw cron as the default authoring experience
+- No dedicated `Resources` page
+  - Azure service setup is handled within `Edit environment`
+
+## Terminology Recommendation
+
+- Preferred user-facing terms:
+  - `Azure services`
+  - `Stages`
+  - `Schedules`
+  - `Notifications`
+  - `Postponement rules`
+- Avoid using the following as primary navigation or section concepts unless further clarified in-product:
+  - `Resources`
+  - `Stage actions`
+  - `Stage configuration`
 
 ## Data and Domain Concepts
 
+- `Client`
+  - business owner and primary parent context for one or more environments
 - `Environment`
-  - top-level managed environment grouping
+  - managed operational grouping under a client
 - `Stage`
   - operational unit within an environment
 - `StageResourceAction`
-  - Azure resource action definition used in a start/stop workflow
+  - Azure service/action definition used in a start/stop workflow
 - `Schedule`
-  - recurring action definition for a stage
+  - recurring automation definition for a stage
 - `NotificationGroup`
-  - group of recipients associated with a stage or schedule
+  - group of recipients associated with a schedule
 - `Postponement`
   - user-driven deferral of a scheduled action
 - `ActivityEntry`
@@ -196,6 +279,15 @@ The UI shall allow authorized users to:
 - Management capabilities require `Admin` or `EnvironmentManager`
 - Postponement requires explicit authorization and must be audited
 - The feature must update the central authorization documentation when roles or access behavior change
+
+## Identity and Linkage Rules
+
+- `Environment.id` is the canonical environment identity for API and persistence purposes
+- `Stage.id` is the canonical stage identity within an environment for API and persistence purposes
+- Schedule create, update, and read contracts shall use canonical `environmentId` and `stageId` linkage
+- Environment and stage names in schedule payloads are display values only and must not be treated as the canonical linkage fields
+- Existing legacy schedules that only contain environment or stage labels may be resolved to canonical identifiers when the match is unique
+- If a legacy schedule cannot be resolved uniquely, the system shall not guess; it shall surface the record as legacy/unresolved until corrected
 
 ## Dependencies
 
@@ -208,7 +300,7 @@ The UI shall allow authorized users to:
 
 ### AC-ENV-001
 
-Authorized users can view environments and stages with current lifecycle state and recent activity context.
+Authorized users can view client-owned environments and stages with current lifecycle state, clear client context, and recent activity context.
 
 ### AC-ENV-002
 
@@ -227,9 +319,13 @@ Authorized users can trigger immediate stage start and stop actions and see the 
 
 Authorized users can create and manage schedules that target an environment stage with recurrence, timezone, notification recipients, and postponement policy.
 
+The schedule authoring flow uses business-oriented inputs for day pattern and time, and the resulting schedule is presented in a human-readable form without requiring users to understand cron syntax.
+
+Schedules continue to point to the same environment/stage after those objects are renamed, and the UI displays the current environment/stage names rather than stale historical labels whenever canonical identifiers are available.
+
 ### AC-ENV-005
 
-Notification recipient groups can be associated with an environment/stage schedule and are visible in the management experience.
+Notification recipient groups can be associated with a stage schedule and are visible in the management experience.
 
 ### AC-ENV-006
 
@@ -237,7 +333,7 @@ An authorized notified user can postpone a scheduled action when policy permits,
 
 ### AC-ENV-007
 
-An unauthorized user cannot configure stage actions, manage schedules, or postpone actions and receives the correct authorization response.
+An unauthorized user cannot configure stage Azure services, manage schedules, or postpone actions and receives the correct authorization response.
 
 ### AC-ENV-008
 
@@ -257,11 +353,11 @@ The environment inventory page presents a single clear title, professional filte
 
 ### AC-ENV-012
 
-The environment create and edit forms use a guided layout with separate environment details, stage workspace, and configuration summary sections, while resource editors display labels specific to the selected action type.
+The environment create and edit forms use a guided layout with separate environment details, stage workspace, and Azure-service configuration sections, while service editors display labels specific to the selected action type.
 
 ### AC-ENV-013
 
-The environment details page uses a scan-friendly layout with overview cards, structured stage sections, readable schedule and activity summaries, and avoids presenting raw JSON as the primary content.
+The environment details page uses a scan-friendly layout with overview cards, structured stage sections, readable schedule and activity summaries, clear client ownership context, and avoids presenting raw JSON as the primary content.
 
 ## Risks and Open Questions
 

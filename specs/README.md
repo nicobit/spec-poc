@@ -8,7 +8,7 @@ This folder contains the repository's source-of-truth product and feature artifa
 - `features/`: feature packages derived from user needs
 - `ux/`: journey maps, interaction notes, accessibility expectations
 - `api/`: API contracts and integration expectations
-- `architecture/`: system design notes and runtime strategy
+- `architecture/`: durable system, container, component, deployment, dynamic, and data structure references
 - `test-cases/`: test inventories and feature-level testing artifacts
 - `nfr/`: non-functional requirements such as security, performance, and resilience
 - `decisions/`: ADRs and other durable technical decisions

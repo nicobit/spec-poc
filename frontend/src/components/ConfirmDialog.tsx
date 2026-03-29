@@ -1,4 +1,7 @@
 import React from 'react';
+import { X } from 'lucide-react';
+
+import { themeClasses } from '@/theme/themeClasses';
 
 type Props = {
   open: boolean;
@@ -15,16 +18,32 @@ export default function ConfirmDialog({ open, title, message, confirmLabel = 'Co
 
   return (
     <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
-      <div className="relative w-full max-w-md rounded bg-white p-6 shadow-lg">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
+      <div className={`${themeClasses.panel} relative mx-4 w-full max-w-md rounded-2xl p-6`}>
         <div className="flex items-start justify-between">
-          <h3 className="text-lg font-semibold">{title || 'Confirm'}</h3>
-          <button onClick={onCancel} aria-label="Close" className="ml-4">X</button>
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">{title || 'Confirm'}</h3>
+          <button
+            onClick={onCancel}
+            aria-label="Close"
+            className={`${themeClasses.buttonSecondary} ml-4 inline-flex h-9 w-9 items-center justify-center rounded-lg`}
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
-        {message ? <p className="mt-3 text-sm text-gray-700">{message}</p> : null}
+        {message ? <p className={`${themeClasses.helperText} mt-3 whitespace-pre-line`}>{message}</p> : null}
         <div className="mt-4 flex justify-end gap-2">
-          <button className="rounded px-3 py-1.5 text-sm bg-gray-100" onClick={onCancel}>{cancelLabel}</button>
-          <button className="rounded px-3 py-1.5 text-sm bg-blue-600 text-white" onClick={async () => { await onConfirm(); }}>{confirmLabel}</button>
+          <button
+            className={`${themeClasses.buttonSecondary} rounded-lg px-3 py-1.5 text-sm`}
+            onClick={onCancel}
+          >
+            {cancelLabel}
+          </button>
+          <button
+            className={`${themeClasses.buttonPrimary} rounded-lg px-3 py-1.5 text-sm`}
+            onClick={async () => { await onConfirm(); }}
+          >
+            {confirmLabel}
+          </button>
         </div>
       </div>
     </div>

@@ -21,10 +21,11 @@ describe('sidebar menu', () => {
     const manage = environments?.children?.find((item) => item.name === 'Manage');
 
     expect(manage).toBeTruthy();
+    expect(environments?.children?.find((item) => item.name === 'Resources')).toBeFalsy();
     expect(matchesMenuItemPath(manage!, '/environment/manage')).toBe(true);
     expect(matchesMenuItemPath(manage!, '/environment/create')).toBe(true);
     expect(matchesMenuItemPath(manage!, '/environment/edit/env-1')).toBe(true);
     expect(matchesMenuItemPath(manage!, '/environment/env-1')).toBe(true);
-    expect(matchesMenuItemPath(manage!, '/environment/resources')).toBe(false);
+    expect(matchesMenuItemPath(manage!, '/environment/schedules')).toBe(false);
   });
 });

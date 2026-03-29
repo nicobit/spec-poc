@@ -46,8 +46,11 @@ def main(mytimer: func.TimerRequest, outputQueueItem: func.Out[str] = None) -> N
         msg = {
             "scheduleId": s.get("id"),
             "environment": s.get("environment"),
+            "environment_id": s.get("environment_id"),
             "client": s.get("client"),
+            "client_id": s.get("client_id"),
             "stage": s.get("stage"),
+            "stage_id": s.get("stage_id"),
             "action": s.get("action"),
             "requestedBy": s.get("owner") or "system",
             "requestedAt": now.isoformat() + "Z",

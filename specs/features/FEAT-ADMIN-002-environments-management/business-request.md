@@ -14,7 +14,11 @@ The current Environments Management capability is limited to basic environment l
 
 ## Desired Outcome
 
-Provide an environment orchestration capability where administrators can define the Azure resources associated with a stage, configure start/stop actions and service-bus dispatch behavior, assign the people who should be notified for each environment, and manage schedules that can be postponed by authorized recipients.
+Provide an environment orchestration capability where administrators can manage environments in the context of a client, define the Azure services associated with each stage, configure start/stop actions and service-bus dispatch behavior, and manage stage-level schedules that can notify users and be postponed by authorized recipients.
+
+The scheduling experience should use business-oriented schedule authoring rather than requiring users to understand or enter raw cron syntax.
+
+The scheduling capability should remain consistent after environment or stage renames, so schedule linkage must use stable environment and stage identity rather than mutable display names.
 
 ## In Scope
 
@@ -26,7 +30,8 @@ Provide an environment orchestration capability where administrators can define 
 - Allow administrators to configure the Azure service connection/target details required for those stage actions
 - Allow immediate stage lifecycle actions
 - Allow recurring schedules for stage actions
-- Allow environment-specific notification recipient groups
+- Allow recurring schedules to be authored in business terms such as action, day(s) of week, time, and timezone
+- Allow schedule-specific notification recipient groups
 - Allow postponement of scheduled actions after notification by authorized recipients
 - Record activity and audit history for actions, notifications, and postponements
 
@@ -46,7 +51,7 @@ Provide an environment orchestration capability where administrators can define 
 ## Example Scenarios
 
 1. An administrator configures the `UAT` stage for a client so that a scheduled start sequence powers on a SQL VM, resumes a Synapse SQL pool, and sends a Service Bus message to downstream systems.
-2. An environment manager configures a nightly shutdown schedule and defines the support group that must be notified before the action occurs.
+2. An environment manager configures a nightly shutdown schedule for a stage and defines the support group that must be notified before the action occurs.
 3. A notified user receives a scheduled shutdown notice and postpones the action within the allowed window because testing is still in progress.
 
 ## Business Value

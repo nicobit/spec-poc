@@ -4,11 +4,14 @@ import { useMsal } from '@azure/msal-react';
 import {
   Activity,
   CalendarClock,
+  ChevronDown,
+  ChevronRight,
+  ExternalLink,
   Layers,
+  PencilLine,
   Play,
   Server,
   Square,
-  Zap,
 } from 'lucide-react';
 import { enqueueSnackbar } from 'notistack';
 
@@ -25,6 +28,7 @@ import {
   stopStage,
 } from '../api';
 import EnvironmentPageLayout from '../components/EnvironmentPageLayout';
+import { describeSchedule } from '../scheduleRecurrence';
 
 type ConfirmState = {
   open: boolean;
@@ -45,14 +49,14 @@ function StatCard({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="ui-panel rounded-2xl p-4">
+    <div className={`${themeClasses.formSection} rounded-3xl p-4`}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-xs uppercase tracking-[0.18em] ui-text-muted">{label}</div>
+          <div className={themeClasses.sectionEyebrow}>{label}</div>
           <div className="mt-2 text-2xl font-semibold text-[var(--text-primary)]">{value}</div>
-          {detail ? <div className="mt-1 text-sm text-[var(--text-secondary)]">{detail}</div> : null}
+          {detail ? <div className={`${themeClasses.helperText} mt-1`}>{detail}</div> : null}
         </div>
-        <div className="rounded-xl bg-[var(--surface-panel-muted)] p-2 text-[var(--text-secondary)]">{icon}</div>
+        <div className="rounded-xl bg-[var(--surface-subsection)] p-2 text-[var(--text-secondary)]">{icon}</div>
       </div>
     </div>
   );
@@ -88,6 +92,23 @@ function getResourceSummary(action: Record<string, any>) {
   }
 }
 
+function resolveScheduleStageLabel(
+  schedule: { stage?: string | null; stage_id?: string | null },
+  stages: Array<{ id: string; name: string }> = [],
+) {
+  if (schedule.stage_id) {
+    const matchedStage = stages.find((stage) => stage.id === schedule.stage_id);
+    if (matchedStage?.name) return matchedStage.name;
+  }
+  if (schedule.stage) {
+    const matchedStageByName = stages.find(
+      (stage) => String(stage.name || '').toLowerCase() === String(schedule.stage || '').toLowerCase(),
+    );
+    if (matchedStageByName?.name) return matchedStageByName.name;
+  }
+  return '';
+}
+
 function formatTimestamp(value?: string | null) {
   if (!value) return 'n/a';
   const date = new Date(value);
@@ -111,6 +132,7 @@ export default function EnvironmentDetailsPage() {
       ));
 
   const [confirmState, setConfirmState] = useState<ConfirmState>({ open: false });
+  const [expandedAzureServices, setExpandedAzureServices] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!id) return;
@@ -132,6 +154,13 @@ export default function EnvironmentDetailsPage() {
     };
   }, [id, instance]);
 
+  useEffect(() => {
+    if (!env) return;
+    setExpandedAzureServices((current) =>
+      Object.fromEntries(env.stages.map((stage) => [stage.id, current[stage.id] ?? false])),
+    );
+  }, [env]);
+
   const stageCount = env?.stages?.length || 0;
   const resourceCount = env?.stages?.reduce((total, stage) => total + (stage.resourceActions?.length || 0), 0) || 0;
   const scheduleCount = Array.isArray((env as any)?.schedules) ? (env as any).schedules.length : 0;
@@ -152,11 +181,26 @@ export default function EnvironmentDetailsPage() {
   return (
     <EnvironmentPageLayout
       title="Environment Details"
-      description="Inspect stages, lifecycle status, resource actions, schedules, and recent activity."
+      description="Inspect client context, stage status, Azure services, schedules, and recent activity."
+      loading={loading}
       actions={
         <>
           {canEdit ? (
             <>
+              <button
+                className={`${themeClasses.buttonSecondary} inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm`}
+                onClick={() => navigate(`/environment/edit/${id}`)}
+              >
+                <PencilLine className="h-4 w-4" />
+                Edit environment
+              </button>
+              <button
+                className={`${themeClasses.buttonSecondary} inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm`}
+                onClick={() => navigate('/environment/schedules')}
+              >
+                <CalendarClock className="h-4 w-4" />
+                Schedules
+              </button>
               <button
                 className={`${themeClasses.buttonPrimary} inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm`}
                 onClick={() => {
@@ -234,27 +278,27 @@ export default function EnvironmentDetailsPage() {
         </>
       }
     >
-      {loading ? (
-        <div className="ui-panel-muted rounded-xl p-3 text-sm">Loading environment details...</div>
-      ) : !env ? (
+      {!loading && !env ? (
         <div className="rounded-2xl border border-red-200 p-4">Environment not found.</div>
-      ) : (
+      ) : !loading && env ? (
         <div className="space-y-6">
           <section className="grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(20rem,0.9fr)]">
-            <div className="ui-panel rounded-2xl p-5">
-              <div className="text-xs uppercase tracking-[0.18em] ui-text-muted">Overview</div>
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                <h2 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">{env.name}</h2>
-                <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-panel-muted)] px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--text-secondary)]">
-                  {env.status || 'unknown'}
-                </span>
+            <div className={`${themeClasses.formSection} rounded-3xl p-6`}>
+              <div className={themeClasses.sectionEyebrow}>Overview</div>
+              <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0">
+                  {env.client ? (
+                    <div className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">{env.client}</div>
+                  ) : null}
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                    <h2 className="text-lg font-medium tracking-tight text-[var(--text-secondary)]">{env.name}</h2>
+                    <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-panel-muted)] px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+                      {env.status || 'unknown'}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {env.client ? (
-                  <span className="rounded-full bg-[var(--surface-panel-muted)] px-2.5 py-1 text-xs text-[var(--text-secondary)]">
-                    Client {env.client}
-                  </span>
-                ) : null}
+              <div className="mt-4 flex flex-wrap gap-2">
                 {env.region ? (
                   <span className="rounded-full bg-[var(--surface-panel-muted)] px-2.5 py-1 text-xs text-[var(--text-secondary)]">
                     Region {env.region}
@@ -268,8 +312,8 @@ export default function EnvironmentDetailsPage() {
               </div>
             </div>
 
-            <aside className="ui-panel rounded-2xl p-5">
-              <div className="text-xs uppercase tracking-[0.18em] ui-text-muted">Derived types</div>
+            <aside className={`${themeClasses.formSection} rounded-3xl p-6`}>
+              <div className={themeClasses.sectionEyebrow}>Derived types</div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {derivedTypes.length > 0 ? (
                   derivedTypes.map((type) => (
@@ -281,7 +325,7 @@ export default function EnvironmentDetailsPage() {
                     </span>
                   ))
                 ) : (
-                  <span className="text-sm text-[var(--text-secondary)]">No resource types configured yet.</span>
+                  <span className={themeClasses.helperText}>No resource types configured yet.</span>
                 )}
               </div>
             </aside>
@@ -290,9 +334,9 @@ export default function EnvironmentDetailsPage() {
           <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <StatCard label="Stages" value={stageCount} detail="Configured operating stages" icon={<Layers className="h-4 w-4" />} />
             <StatCard
-              label="Resource actions"
+              label="Azure services"
               value={resourceCount}
-              detail="Azure actions across all stages"
+              detail="Configured service actions across all stages"
               icon={<Server className="h-4 w-4" />}
             />
             <StatCard
@@ -309,19 +353,19 @@ export default function EnvironmentDetailsPage() {
             />
           </section>
 
-          <section className="ui-panel rounded-2xl p-5">
+          <section className={`${themeClasses.formSection} rounded-3xl p-6`}>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <div className="text-xs uppercase tracking-[0.18em] ui-text-muted">Stages</div>
-                <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                  Review each stage, its resource actions, and its current lifecycle status.
+                <div className={themeClasses.sectionEyebrow}>Stages</div>
+                <p className={`${themeClasses.helperText} mt-2`}>
+                  Review each stage, its Azure services, and its current lifecycle status.
                 </p>
               </div>
             </div>
 
             <div className="mt-5 space-y-4">
               {env.stages.map((stage) => (
-                <article key={stage.id} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
+                <article key={stage.id} className={`${themeClasses.stageCard} rounded-3xl p-5`}>
                   <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-3">
@@ -329,14 +373,37 @@ export default function EnvironmentDetailsPage() {
                         <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-panel-muted)] px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--text-secondary)]">
                           {stage.status}
                         </span>
+                        <button
+                          type="button"
+                          className={`${themeClasses.buttonSecondary} inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm`}
+                          aria-expanded={expandedAzureServices[stage.id] === true}
+                          aria-controls={`stage-details-${stage.id}`}
+                          onClick={() =>
+                            setExpandedAzureServices((current) => ({
+                              ...current,
+                              [stage.id]: !current[stage.id],
+                            }))
+                          }
+                        >
+                          {expandedAzureServices[stage.id] ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                          {expandedAzureServices[stage.id] ? 'Hide details' : 'View details'}
+                        </button>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2">
                         <span className="rounded-full bg-[var(--surface-panel-muted)] px-2.5 py-1 text-xs text-[var(--text-secondary)]">
-                          {stage.resourceActions.length} action{stage.resourceActions.length === 1 ? '' : 's'}
+                          {stage.resourceActions.length} Azure service action{stage.resourceActions.length === 1 ? '' : 's'}
                         </span>
-                        <span className="rounded-full bg-[var(--surface-panel-muted)] px-2.5 py-1 text-xs text-[var(--text-secondary)]">
-                          {stage.notificationGroups?.length || 0} notification group{stage.notificationGroups?.length === 1 ? '' : 's'}
-                        </span>
+                        {stage.resourceActions.length > 0 ? (
+                          <span className="rounded-full bg-[var(--surface-panel-muted)] px-2.5 py-1 text-xs text-[var(--text-secondary)]">
+                            {Array.from(
+                              new Set(stage.resourceActions.map((resourceAction) => getResourceTypeLabel(resourceAction.type))),
+                            ).join(', ')}
+                          </span>
+                        ) : null}
                       </div>
                     </div>
 
@@ -402,93 +469,111 @@ export default function EnvironmentDetailsPage() {
                     </div>
                   </div>
 
-                  <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(18rem,0.8fr)]">
-                    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-4">
-                      <div className="text-sm font-medium text-[var(--text-primary)]">Resource actions</div>
-                      {stage.resourceActions.length > 0 ? (
-                        <div className="mt-3 space-y-3">
-                          {stage.resourceActions.map((resourceAction, index) => (
-                            <div key={`${resourceAction.type}-${index}`} className="rounded-xl bg-[var(--surface-panel-muted)] px-3 py-3">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="rounded-full bg-[var(--surface-elevated)] px-2.5 py-1 text-xs text-[var(--text-secondary)]">
-                                  {getResourceTypeLabel(resourceAction.type)}
-                                </span>
+                  {expandedAzureServices[stage.id] && (
+                    <div id={`stage-details-${stage.id}`} className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(18rem,0.8fr)]">
+                      <div className={`${themeClasses.subsectionCard} rounded-2xl p-4`}>
+                        <div className={themeClasses.fieldLabel}>Azure services</div>
+                        {stage.resourceActions.length > 0 ? (
+                          <div className="mt-3 space-y-3">
+                            {stage.resourceActions.map((resourceAction, index) => (
+                              <div key={`${resourceAction.type}-${index}`} className="rounded-xl bg-[var(--surface-elevated)] px-3 py-3">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="rounded-full bg-[var(--surface-elevated)] px-2.5 py-1 text-xs text-[var(--text-secondary)]">
+                                    {getResourceTypeLabel(resourceAction.type)}
+                                  </span>
+                                </div>
+                                <div className={`${themeClasses.helperText} mt-2`}>
+                                  {getResourceSummary(resourceAction as Record<string, any>) || 'Configuration summary not available.'}
+                                </div>
                               </div>
-                              <div className="mt-2 text-sm text-[var(--text-secondary)]">
-                                {getResourceSummary(resourceAction as Record<string, any>) || 'Configuration summary not available.'}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="mt-3 text-sm text-[var(--text-secondary)]">No resource actions configured for this stage.</div>
-                      )}
-                    </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className={`${themeClasses.helperText} mt-3`}>No Azure services configured for this stage.</div>
+                        )}
+                      </div>
 
-                    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-panel)] p-4">
-                      <div className="text-sm font-medium text-[var(--text-primary)]">Stage configuration</div>
-                      {stage.azureConfig && Object.keys(stage.azureConfig).length > 0 ? (
-                        <div className="mt-3 space-y-2">
-                          {Object.entries(stage.azureConfig).map(([key, value]) => (
-                            <div key={key} className="rounded-xl bg-[var(--surface-panel-muted)] px-3 py-2">
-                              <div className="text-xs uppercase tracking-[0.16em] ui-text-muted">{key}</div>
-                              <div className="mt-1 text-sm text-[var(--text-secondary)]">
-                                {typeof value === 'string' ? value : JSON.stringify(value)}
+                      <div className={`${themeClasses.subsectionCard} rounded-2xl p-4`}>
+                        <div className={themeClasses.fieldLabel}>Additional settings</div>
+                        {stage.azureConfig && Object.keys(stage.azureConfig).length > 0 ? (
+                          <div className="mt-3 space-y-2">
+                            {Object.entries(stage.azureConfig).map(([key, value]) => (
+                              <div key={key} className="rounded-xl bg-[var(--surface-elevated)] px-3 py-2">
+                                <div className={themeClasses.sectionEyebrow}>{key}</div>
+                                <div className={`${themeClasses.helperText} mt-1`}>
+                                  {typeof value === 'string' ? value : JSON.stringify(value)}
+                                </div>
                               </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="mt-3 text-sm text-[var(--text-secondary)]">No additional Azure config recorded for this stage.</div>
-                      )}
+                            ))}
+                          </div>
+                        ) : (
+                          <div className={`${themeClasses.helperText} mt-3`}>No additional Azure config recorded for this stage.</div>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </article>
               ))}
             </div>
           </section>
 
           <section className="grid gap-4 xl:grid-cols-2">
-            <div className="ui-panel rounded-2xl p-5">
-              <div className="text-xs uppercase tracking-[0.18em] ui-text-muted">Schedules</div>
-              <p className="mt-2 text-sm text-[var(--text-secondary)]">Review the recurring actions configured for this environment.</p>
+            <div className={`${themeClasses.formSection} rounded-3xl p-6`}>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className={themeClasses.sectionEyebrow}>Schedules</div>
+                  <p className={`${themeClasses.helperText} mt-2`}>Review the recurring actions configured for this environment.</p>
+                </div>
+                <button
+                  className={`${themeClasses.buttonSecondary} inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm`}
+                  onClick={() => navigate('/environment/schedules')}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Manage schedules
+                </button>
+              </div>
 
               {Array.isArray((env as any).schedules) && (env as any).schedules.length > 0 ? (
                 <div className="mt-4 space-y-3">
                   {(env as any).schedules.map((schedule: any) => (
-                    <div key={schedule.id || schedule.stage || schedule.action} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
+                    <div key={schedule.id || schedule.stage || schedule.action} className={`${themeClasses.subsectionCard} rounded-2xl p-4`}>
+                      {(() => {
+                        const scheduleStageLabel = resolveScheduleStageLabel(schedule, env.stages || []);
+                        return (
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="font-medium text-[var(--text-primary)]">
-                          {schedule.action} {schedule.stage ? `- ${schedule.stage}` : ''}
+                          {schedule.action} {scheduleStageLabel ? `- ${scheduleStageLabel}` : ''}
                         </div>
                         <span className="rounded-full bg-[var(--surface-panel-muted)] px-2.5 py-1 text-xs text-[var(--text-secondary)]">
                           {schedule.enabled === false ? 'Disabled' : 'Enabled'}
                         </span>
                       </div>
-                      <div className="mt-2 text-sm text-[var(--text-secondary)]">
-                        Next run: {formatTimestamp(schedule.next_run)}
+                        );
+                      })()}
+                      <div className={`${themeClasses.helperText} mt-2`}>
+                        {describeSchedule(schedule.action, schedule.cron, schedule.timezone)}
                       </div>
-                      <div className="mt-1 text-sm text-[var(--text-secondary)]">
-                        Timezone: {schedule.timezone || 'UTC'}
+                      <div className={`${themeClasses.helperText} mt-1`}>
+                        Next run: {formatTimestamp(schedule.next_run)}
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="mt-4 rounded-2xl border border-dashed border-[var(--border-subtle)] px-4 py-8 text-sm text-[var(--text-secondary)]">
+                <div className={`${themeClasses.emptyState} mt-4 rounded-2xl px-4 py-8 text-sm`}>
                   No schedules configured.
                 </div>
               )}
             </div>
 
-            <div className="ui-panel rounded-2xl p-5">
-              <div className="text-xs uppercase tracking-[0.18em] ui-text-muted">Recent activity</div>
-              <p className="mt-2 text-sm text-[var(--text-secondary)]">Latest recorded events for this environment.</p>
+            <div className={`${themeClasses.formSection} rounded-3xl p-6`}>
+              <div className={themeClasses.sectionEyebrow}>Recent activity</div>
+              <p className={`${themeClasses.helperText} mt-2`}>Latest recorded events for this environment.</p>
 
               {((env as any).activity?.entries || []).length > 0 ? (
                 <div className="mt-4 space-y-3">
                   {((env as any).activity.entries || []).map((activityEntry: any, index: number) => (
-                    <div key={activityEntry.RowKey || `${activityEntry.timestamp}-${index}`} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
+                    <div key={activityEntry.RowKey || `${activityEntry.timestamp}-${index}`} className={`${themeClasses.subsectionCard} rounded-2xl p-4`}>
                       <div className="flex flex-wrap items-center gap-2">
                         <div className="font-medium text-[var(--text-primary)]">
                           {(activityEntry.action || activityEntry.eventType || 'activity').replace(/-/g, ' ')}
@@ -499,22 +584,22 @@ export default function EnvironmentDetailsPage() {
                           </span>
                         ) : null}
                       </div>
-                      <div className="mt-2 text-sm text-[var(--text-secondary)]">{formatTimestamp(activityEntry.timestamp)}</div>
-                      <div className="mt-2 text-sm text-[var(--text-secondary)]">
+                      <div className={`${themeClasses.helperText} mt-2`}>{formatTimestamp(activityEntry.timestamp)}</div>
+                      <div className={`${themeClasses.helperText} mt-2`}>
                         {activityEntry.requestedBy || activityEntry.message || activityEntry.client || 'No additional details available.'}
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="mt-4 rounded-2xl border border-dashed border-[var(--border-subtle)] px-4 py-8 text-sm text-[var(--text-secondary)]">
+                <div className={`${themeClasses.emptyState} mt-4 rounded-2xl px-4 py-8 text-sm`}>
                   No recent activity.
                 </div>
               )}
             </div>
           </section>
         </div>
-      )}
+      ) : null}
 
       <ConfirmDialog
         open={confirmState.open}

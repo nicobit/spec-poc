@@ -110,16 +110,16 @@ Deletes an environment record and records an audit event for the deletion reques
 
 ### PUT `/api/environments/{environmentId}/stages/{stageId}/configuration`
 
-Creates or updates the Azure service configuration for a stage.
+Creates or updates the Azure services linked to a stage.
 
 #### Request shape
 
 - `resourceActions`
-  - array of stage resource action definitions
-- `notificationGroups`
-  - array of recipient group definitions or references
-- `postponementPolicy`
-  - rules for postponement behavior
+  - array of stage Azure service/action definitions
+
+Notes
+- This endpoint is intended to own stage service setup
+- Notification groups and postponement policy should primarily be managed as part of schedule configuration unless explicit stage-level defaults are later approved
 
 #### Supported `resourceActions[].type`
 
@@ -138,7 +138,21 @@ Executes an immediate stage stop workflow using the configured Azure resource ac
 
 ### GET `/api/environments/schedules`
 
-Returns schedules with environment, stage, action, timezone, recipient summary, and postponement metadata.
+Returns schedules with client, environment, stage, action, timezone, recipient summary, and postponement metadata.
+
+Canonical response identity fields should include:
+
+- `environmentId`
+- `stageId`
+
+Display fields may additionally include:
+
+- `environment`
+- `stage`
+
+Notes
+- `environment` and `stage` are display-oriented labels and legacy compatibility fields
+- clients should use `environmentId` and `stageId` for matching, routing, and update/delete workflows
 
 ### POST `/api/environments/schedules`
 
@@ -151,16 +165,33 @@ Creates a schedule for an environment stage.
 - `action`
   - `start` or `stop`
 - `recurrence`
-  - cron-like or structured recurrence definition
+  - structured recurrence definition for supported simple schedules
 - `timezone`
 - `enabled`
 - `notificationGroups`
 - `notifyBeforeMinutes`
 - `postponementPolicy`
 
+Notes
+- A schedule is a stage-level concept, even if the UI enters the workflow from an environment context
+- `environmentId` and `stageId` are the canonical linkage fields for schedules
+- the existing `Environment.id` and `Stage.id` values are sufficient for this purpose; no additional external-id layer is required by this feature
+- Notification recipients and postponement policy should be considered schedule-owned behavior by default
+- The default frontend contract should prefer a structured recurrence payload that can represent:
+  - every day
+  - weekdays
+  - selected day(s) of week
+  - a single execution time
+- If the backend persists cron or cron-like expressions, that representation should be treated as an internal storage concern or an advanced-mode concern, not the primary user-authored input
+- Existing schedules that cannot be mapped cleanly into the supported structured recurrence model should be returned with enough metadata for the UI to label them as advanced or unsupported
+- If existing schedules only contain legacy `environment` or `stage` labels, the backend may resolve them to canonical identifiers when the match is unique
+- If a legacy schedule cannot be resolved uniquely, the backend should reject ambiguous mutation requests and the UI should surface the schedule as legacy/unresolved rather than silently rebinding it
+
 ### PUT `/api/environments/schedules/{scheduleId}`
 
 Updates an existing schedule.
+
+The update contract shall continue to accept canonical `environmentId` and `stageId` references and shall validate that the targeted stage belongs to the targeted environment.
 
 ### DELETE `/api/environments/schedules/{scheduleId}`
 
@@ -190,9 +221,11 @@ Returns activity entries for the selected environment, including:
 
 - A stage cannot be scheduled unless required Azure service configuration is present for the selected action flow
 - Resource action definitions must contain the required metadata for their type
+- Schedule creation and update must validate supported day patterns, valid time values, and timezone identifiers
 - Notification groups must be valid references or valid app-managed group definitions
 - Postponement requests must satisfy the configured postponement policy
 - Unauthorized recipients must receive `403`
+- If stage-level notification or postponement defaults are later introduced, the override and inheritance model must be documented explicitly
 
 ## Error Cases
 
@@ -202,3 +235,20 @@ Returns activity entries for the selected environment, including:
 - `404` environment, stage, or schedule not found
 - `409` conflicting schedule state or invalid postponement timing
 - `422` incomplete resource action configuration
+- `400` ambiguous or unresolved legacy environment/stage label reference during transition
+
+## Recurrence Shape Recommendation
+
+For the supported simple schedule builder, the preferred request/response recurrence shape should be conceptually equivalent to:
+
+- `pattern`
+  - `daily`
+  - `weekdays`
+  - `selected-days`
+- `daysOfWeek`
+  - required when `pattern = selected-days`
+- `time`
+  - `HH:mm`
+- `timezone`
+
+The backend may additionally store or derive an internal cron-like expression as needed for execution, but the canonical user-facing contract should stay aligned with the business-oriented recurrence model.

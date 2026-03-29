@@ -11,7 +11,8 @@ ENVIRONMENTS: List[Dict[str, Any]] = [
         "name": "dev-1",
         "status": "stopped",
         "region": "eastus",
-        "client": "client-a",
+        "client": "Client 001",
+        "clientId": "client-001",
         "stages": [
             {
                 "id": "stage-dev-sql",
@@ -51,7 +52,8 @@ ENVIRONMENTS: List[Dict[str, Any]] = [
         "name": "qa-1",
         "status": "running",
         "region": "westeurope",
-        "client": "client-b",
+        "client": "Client 002",
+        "clientId": "client-002",
         "stages": [
             {
                 "id": "stage-qa-live",

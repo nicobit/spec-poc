@@ -41,6 +41,7 @@ Add these when needed:
 - `test-plan.md` when behavior changes materially
 - `api-spec.md` when contracts or interfaces change
 - `adr.md` when a meaningful design decision should be recorded
+- updates under `specs/architecture/` when the feature materially changes durable architecture views
 - `task-breakdown.md` when sequencing or coordination needs to be explicit
 - `research.md` when a non-trivial technology or approach decision requires investigation before committing to a plan
 - `business-approval-summary.md` when business approval must be captured explicitly
@@ -57,6 +58,8 @@ Implementation may begin once the governing artifacts are complete enough to cap
 - constitution alignment confirmed (no unresolved conflicts with `delivery/governance/constitution.md`)
 
 Solution choices should appear in the refinement or feature-spec layer before they are treated as implementation commitments.
+
+When a solution choice materially affects the system beyond a single feature, update the relevant durable architecture view under `specs/architecture/` as needed.
 
 ## Trivial Change Exemption
 
@@ -82,6 +85,7 @@ When using this exemption, the AI tool should say so explicitly.
 3. Design
    - Produce supporting artifacts as needed:
    - API spec
+   - architecture view updates under `specs/architecture/`
    - UX notes
    - ADRs
    - non-functional requirements
@@ -114,6 +118,7 @@ A feature is done only when all of the following are true:
 
 - the feature specification is complete enough to implement
 - architecture decisions are documented when needed
+- durable architecture views are updated when the feature materially changes them
 - acceptance criteria are testable
 - automated tests exist at the appropriate layers
 - implementation matches the spec or the spec was updated intentionally
@@ -125,6 +130,7 @@ A feature is done only when all of the following are true:
 - Constitution: non-negotiable governing principles all work must respect
 - Feature spec: business and functional source of truth
 - API spec: interface contract source of truth
+- Architecture views: durable system, container, component, deployment, dynamic, and data structure references
 - ADR: design rationale for significant technical choices
 - Research: technology investigation and trade-off analysis before plan commitment
 - Test plan: expected coverage and validation strategy

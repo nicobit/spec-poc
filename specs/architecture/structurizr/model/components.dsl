@@ -1,0 +1,21 @@
+environmentApi = component backendApi "Environment management API" "Environment CRUD, stage lifecycle actions, and details/activity endpoints."
+schedulingApi = component backendApi "Scheduling API" "Schedule CRUD and postponement endpoints."
+authzLayer = component backendApi "Authentication and authorization layer" "Application-level authn/authz enforcement for backend routes."
+
+environmentRepository = component sharedDomain "Environment repository" "Table-backed, Cosmos-backed, and in-memory environment persistence selection."
+scheduleStore = component sharedDomain "Schedule store" "Cosmos-backed or in-memory schedule persistence."
+auditStore = component sharedDomain "Audit store" "Azure Table Storage-backed or JSON-backed audit persistence."
+environmentModel = component sharedDomain "Environment domain model" "Environment, stage, resource action, notification, and postponement model definitions."
+
+frontend -> environmentApi "Calls for environment flows"
+frontend -> schedulingApi "Calls for schedule flows"
+environmentApi -> authzLayer "Uses"
+schedulingApi -> authzLayer "Uses"
+environmentApi -> environmentRepository "Uses"
+environmentApi -> auditStore "Writes activity to"
+schedulingApi -> scheduleStore "Uses"
+schedulingApi -> auditStore "Writes activity to"
+environmentRepository -> environmentModel "Validates against"
+scheduleStore -> cosmosDb "Reads and writes in"
+auditStore -> tableStorage "Reads and writes in"
+

@@ -17,9 +17,12 @@ class PostponementPolicy(BaseModel):
 
 class Schedule(BaseModel):
     id: str
-    environment: str  # e.g., DEV, AIT, UAT, PP, PROD
+    environment: Optional[str] = None  # display label
+    environment_id: Optional[str] = None
     client: str
-    stage: Optional[str] = None  # e.g., stage1, stage2, live
+    client_id: Optional[str] = None
+    stage: Optional[str] = None  # display label
+    stage_id: Optional[str] = None
     action: str  # 'start' or 'stop'
     cron: Optional[str] = None
     timezone: Optional[str] = 'UTC'

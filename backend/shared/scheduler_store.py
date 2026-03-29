@@ -7,8 +7,11 @@ SCHEDULES: List[Dict] = [
     {
         "id": "sched-1",
         "environment": "DEV",
-        "client": "client-a",
+        "environment_id": "env-1",
+        "client": "Client 001",
+        "client_id": "client-001",
         "stage": "stage1",
+        "stage_id": "stage-dev-sql",
         "action": "start",
         "cron": None,
         "timezone": "UTC",

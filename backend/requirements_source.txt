@@ -26,6 +26,7 @@ azure-mgmt-network
 azure-storage-blob[aio]==12.23.1
 azure-data-tables==12.6.0
 azure-servicebus==7.12.2
+tzdata>=2024.1
 
 pyodbc==5.3.0
 dsnparse

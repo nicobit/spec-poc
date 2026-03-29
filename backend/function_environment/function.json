@@ -8,7 +8,7 @@
       "name": "req",
       "methods": ["get", "post", "put", "delete", "options"],
       "authLevel": "anonymous",
-      "route": "api/environments/{*any}"
+      "route": "api/{*any}"
     },
     {
       "type": "http",

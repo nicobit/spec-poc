@@ -122,6 +122,71 @@ Hard rules:
 - keep submit and cancel behavior predictable
 - avoid firing expensive network requests on every keystroke unless the spec explicitly calls for live search
 
+### Editor Surface Pattern
+
+Use the shared editor hierarchy for form-heavy create, edit, and configuration pages that need nested structure.
+
+Default hierarchy:
+
+1. section card
+2. stage or major nested card
+3. subsection card for deeply nested editors or read-only detail groups
+
+This pattern is the default for pages that need to express:
+
+- page section to grouped editor relationship
+- parent item to child item relationship
+- editable form fields plus helper text and summary chips
+- consistent light and dark theme behavior without page-specific color tuning
+
+Use the shared semantic classes instead of inventing page-local surface styles:
+
+- `ui-form-section`
+- `ui-stage-card`
+- `ui-subsection-card`
+- `ui-section-eyebrow`
+- `ui-field-label`
+- `ui-helper-text`
+- `ui-empty-state`
+
+These classes are backed by semantic theme tokens in `frontend/src/index.css` and class mappings in `frontend/src/theme/themeClasses.ts`.
+
+Theme-safe token roles used by this pattern:
+
+- `--surface-section`
+- `--surface-stage`
+- `--surface-subsection`
+- `--text-label`
+- `--text-eyebrow`
+- `--border-subtle`
+- `--border-strong`
+
+Hard rules:
+
+- use structure and spacing first; use stronger color only as a secondary aid
+- nested editors must look visually contained inside their parent editor
+- field labels must use shared label styling instead of ad hoc muted text
+- helper text must use shared helper styling instead of page-specific gray values
+- empty nested states should use the shared empty-state pattern
+- do not introduce one-off light-only or dark-only surface colors when the same result can be expressed with semantic tokens
+
+Recommended mapping:
+
+- page-level grouped form or details section -> `ui-form-section`
+- editable stage card or equivalent nested unit -> `ui-stage-card`
+- resource block, schedule card, read-only detail cluster, or similar child unit -> `ui-subsection-card`
+- small uppercase section caption -> `ui-section-eyebrow`
+- field label -> `ui-field-label`
+- contextual hint or summary explanation -> `ui-helper-text`
+
+Current examples in the repository:
+
+- environment create/edit flow
+- environment details page
+- environment schedules list and create flow
+
+When a new page needs a similar structure, start from this pattern before introducing any new surfaces or typography rules.
+
 ## Tables and Lists
 
 - use stable column names

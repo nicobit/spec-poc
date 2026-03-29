@@ -94,7 +94,7 @@ export default function EnvironmentDashboard({ instance: msalInstance }: Props) 
     <div className="space-y-6">
       <PageHeader
         title="Environment dashboard"
-        description="Monitor stage status and recent activity here. Use the Resources and Schedules pages for configuration and scheduling."
+        description="Monitor stage status and recent activity here. Use edit environment for Azure services and schedules for recurring automation."
         actions={<button className={`${themeClasses.buttonSecondary} rounded-lg px-3 py-1.5 text-sm`} onClick={() => void refresh()}>Refresh</button>}
       />
 
@@ -116,7 +116,7 @@ export default function EnvironmentDashboard({ instance: msalInstance }: Props) 
           <div>
             <h3 className="text-lg font-medium text-[var(--text-primary)]">Live environments</h3>
             <p className="mt-1 text-sm text-[var(--text-secondary)]">
-              Start or stop stages, then drill into recent activity. Resource configuration and schedule maintenance have dedicated pages.
+              Start or stop stages, then drill into recent activity. Azure services are maintained in edit environment, while timing and notifications belong in schedules.
             </p>
           </div>
         </div>
@@ -221,7 +221,7 @@ export default function EnvironmentDashboard({ instance: msalInstance }: Props) 
                                   </span>
                                 </div>
                                 <div className="mt-1 text-sm text-[var(--text-secondary)]">
-                                  {stage.resourceActions.length} resource action(s) | {stage.notificationGroups.length} notification group(s)
+                                  {stage.resourceActions.length} Azure service action(s) | {stage.notificationGroups.length} notification group(s)
                                 </div>
                               </div>
                               <div className="flex flex-wrap gap-2">

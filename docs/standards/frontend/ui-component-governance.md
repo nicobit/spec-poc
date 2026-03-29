@@ -44,6 +44,13 @@ Shared UI components should:
 - consume semantic theme tokens or shared theme classes for visual styling
 - avoid hardcoding brand-specific colors unless they are intentionally tokenized
 
+When introducing a reusable layout pattern, document both:
+
+- the semantic tokens that define its visual roles
+- the shared classes or primitives that feature pages should consume
+
+For editor and detail pages, prefer the shared editor surface pattern documented in `docs/standards/frontend/ui-standards.md` before creating feature-local wrappers with new background, border, or label rules.
+
 ## Feature Component Expectations
 
 Feature components may:
@@ -64,6 +71,13 @@ When changing UI, verify:
 - accessibility is preserved
 - tests cover meaningful user-visible behavior
 - docs are updated if a new reusable pattern was introduced
+
+Additional checks for form-heavy editor or detail pages:
+
+- the page uses the shared editor surface pattern when the hierarchy is section -> nested card -> subsection
+- labels and helper text use shared semantic styling instead of page-local text colors
+- nested editors are distinguished primarily through semantic surfaces and spacing, not one-off brand colors
+- the result remains readable in both light and dark mode without feature-specific theme branches
 
 Additional hard checks for new pages:
 

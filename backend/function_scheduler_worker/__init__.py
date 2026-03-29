@@ -11,19 +11,63 @@ ENV_API_URL = os.environ.get("ENV_API_URL", "http://localhost:7071/api/environme
 
 def process_item(item: dict):
     environment = item.get("environment")
+    environment_id = item.get("environment_id")
     client = item.get("client")
+    client_id = item.get("client_id")
     stage = item.get("stage")
+    stage_id = item.get("stage_id")
     action = item.get("action")
     req_id = item.get("scheduleId")
     url = f"{ENV_API_URL}/control"
-    body = {"environment": environment, "client": client, "stage": stage, "action": action, "scheduleId": req_id}
+    body = {
+        "environment": environment,
+        "environment_id": environment_id,
+        "client": client,
+        "client_id": client_id,
+        "stage": stage,
+        "stage_id": stage_id,
+        "action": action,
+        "scheduleId": req_id,
+    }
     try:
         resp = requests.post(url, json=body, timeout=10)
         resp.raise_for_status()
-        append_audit({"scheduleId": req_id, "environment": environment, "client": client, "stage": stage, "action": action, "status": "success"})
-        logging.info(f"Executed {action} for {environment}/{client}/{stage}: {resp.status_code}")
+        append_audit(
+            {
+                "scheduleId": req_id,
+                "environment": environment_id or environment,
+                "client": client_id or client,
+                "stage": stage_id or stage,
+                "action": action,
+                "status": "success",
+            }
+        )
+        logging.info(
+            "Executed %s for environment=%s client=%s stage=%s: %s",
+            action,
+            environment_id or environment,
+            client_id or client,
+            stage_id or stage,
+            resp.status_code,
+        )
     except Exception as exc:
-        append_audit({"scheduleId": req_id, "environment": environment, "client": client, "stage": stage, "action": action, "status": "error", "error": str(exc)})
+        error_detail = str(exc)
+        if "resp" in locals():
+            try:
+                error_detail = f"{error_detail} | response={resp.text}"
+            except Exception:
+                pass
+        append_audit(
+            {
+                "scheduleId": req_id,
+                "environment": environment_id or environment,
+                "client": client_id or client,
+                "stage": stage_id or stage,
+                "action": action,
+                "status": "error",
+                "error": error_detail,
+            }
+        )
         logging.exception("Failed to execute scheduled action")
 
 

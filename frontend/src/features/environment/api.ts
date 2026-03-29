@@ -59,13 +59,17 @@ export type EnvInstance = {
   status: 'running' | 'stopped' | 'starting' | 'stopping';
   region?: string;
   client?: string;
+  clientId?: string;
   lifecycle?: string;
   stages: EnvironmentStage[];
 };
 
 export type Schedule = {
   id: string;
+  environment_id?: string;
   environment: string;
+  client_id?: string;
+  stage_id?: string;
   client: string;
   stage: string;
   action: string;

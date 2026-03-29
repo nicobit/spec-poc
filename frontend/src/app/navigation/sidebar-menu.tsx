@@ -1,4 +1,4 @@
-import { Bot, CalendarClock, Heart, HelpCircle, LayoutDashboard, MessageSquare, Server, Settings, SlidersHorizontal, User } from "lucide-react";
+import { Bot, Building2, CalendarClock, Heart, HelpCircle, LayoutDashboard, MessageSquare, Server, Settings, SlidersHorizontal, User } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export type MenuItem = {
@@ -40,6 +40,7 @@ export const matchesMenuItemPath = (item: MenuItem, pathname: string) => {
 
 export const getMenuItems = (isAdmin: boolean): MenuItem[] => [
   { name: "Dashboard", icon: LayoutDashboard, path: "/" },
+  { name: "Clients", icon: Building2, path: "/clients", activePatterns: ["/clients/create", "/clients/:id/edit"] },
   {
     name: "NL to SQL",
     icon: Bot,
@@ -58,10 +59,9 @@ export const getMenuItems = (isAdmin: boolean): MenuItem[] => [
       path: "/environment/manage",
       icon: SlidersHorizontal,
       activePatterns: ["/environment/create", "/environment/edit/:id", "/environment/:id"],
-      inactivePatterns: ["/environment/resources", "/environment/schedules"],
+      inactivePatterns: ["/environment/schedules"],
     },
-      { name: "Resources", path: "/environment/resources", icon: SlidersHorizontal },
-      { name: "Schedules", path: "/environment/schedules", icon: CalendarClock },
+      { name: "Schedules", path: "/environment/schedules", icon: CalendarClock, activePatterns: ["/environment/schedules/create"] },
     ],
   },
   { name: "Account", icon: User, path: "/user" },

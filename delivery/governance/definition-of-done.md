@@ -13,6 +13,7 @@ A feature is done only when all applicable items below are satisfied.
 
 - required API changes are documented
 - required architecture decisions are recorded
+- affected durable architecture views are updated when the feature materially changes them
 - UX expectations are documented when user-facing behavior changes
 
 ## Testing

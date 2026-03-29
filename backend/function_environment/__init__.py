@@ -23,6 +23,14 @@ from shared.environment_store import (
     create_environment as create_environment_inmemory,
     delete_environment as delete_environment_inmemory,
 )
+from shared.client_store import (
+    list_clients as list_client_items,
+    get_client as get_client_item,
+    create_client as create_client_inmemory,
+    update_client as update_client_inmemory,
+    retire_client as retire_client_inmemory,
+    resolve_client_reference,
+)
 from shared.environment_repository import get_environment_store
 from shared.environment_store import create_environment
 from shared.audit_store import append_audit
@@ -74,8 +82,10 @@ cosmos = get_cosmos_store() if COSMOS_ENABLED else None
 class ScheduleIn(BaseModel):
     environment: Optional[str] = None
     environment_id: Optional[str] = None
-    client: str
+    client: Optional[str] = None
+    client_id: Optional[str] = None
     stage: Optional[str] = None
+    stage_id: Optional[str] = None
     action: str
     cron: Optional[str] = None
     timezone: Optional[str] = "UTC"
@@ -109,6 +119,24 @@ class PostponeIn(BaseModel):
     reason: Optional[str] = None
 
 
+class ClientAdminAssignmentIn(BaseModel):
+    type: str = "user"
+    id: str
+    displayName: Optional[str] = None
+
+
+class ClientIn(BaseModel):
+    name: str
+    shortCode: str
+    country: str
+    timezone: str
+    clientAdmins: List[ClientAdminAssignmentIn] = Field(default_factory=list)
+
+
+class ClientRetireIn(BaseModel):
+    reason: Optional[str] = None
+
+
 def compute_next_run(cron_expr: str, tz: str) -> str:
     now = datetime.now(ZoneInfo(tz))
     it = croniter(cron_expr, now)
@@ -118,6 +146,219 @@ def compute_next_run(cron_expr: str, tz: str) -> str:
 
 
 env_store = get_environment_store()
+
+
+def _list_environment_refs() -> list[dict]:
+    try:
+        return env_store.list_environments() if env_store else list_environment_items()
+    except Exception:
+        return list_environment_items()
+
+
+def _list_client_refs(*, include_retired: bool = False) -> list[dict]:
+    try:
+        return list_client_items(include_retired=include_retired)
+    except Exception:
+        return list_client_items(include_retired=include_retired)
+
+
+def _client_response_payload(item: dict) -> dict:
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "shortCode": item.get("shortCode"),
+        "country": item.get("country"),
+        "timezone": item.get("timezone"),
+        "clientAdmins": item.get("clientAdmins") or [],
+        "retired": bool(item.get("retired")),
+        "retiredAt": item.get("retiredAt"),
+        "retiredBy": item.get("retiredBy"),
+    }
+
+
+def _decorate_environment_for_response(item: dict) -> dict:
+    decorated = dict(item)
+    client_id = decorated.get("clientId")
+    if client_id:
+        resolved_client = get_client_item(client_id)
+        if resolved_client:
+            decorated["client"] = resolved_client.get("name")
+    return decorated
+
+
+def _resolve_client_link(item: dict, *, existing: Optional[dict] = None) -> tuple[Optional[str], Optional[str], Optional[dict]]:
+    client_id = item.get("client_id") or item.get("clientId")
+    client_label = item.get("client")
+    resolved_client = None
+
+    if client_id:
+        resolved_client = get_client_item(client_id)
+        if not resolved_client:
+            raise HTTPException(status_code=400, detail="clientId not found")
+        client_label = resolved_client.get("name")
+    elif client_label:
+        try:
+            resolved_client = resolve_client_reference(client_label)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if resolved_client:
+            client_id = resolved_client.get("id")
+            client_label = resolved_client.get("name")
+    elif existing:
+        client_id = existing.get("client_id") or existing.get("clientId")
+        client_label = existing.get("client")
+        if client_id:
+            resolved_client = get_client_item(client_id)
+            if resolved_client:
+                client_label = resolved_client.get("name")
+
+    return client_id, client_label, resolved_client
+
+
+def _canonicalize_environment_record(item: dict, *, existing: Optional[dict] = None) -> dict:
+    canonical = dict(item)
+    client_id, client_label, _resolved_client = _resolve_client_link(canonical, existing=existing)
+    canonical["clientId"] = client_id
+    canonical["client"] = client_label
+    return canonical
+
+
+def _resolve_environment_reference(item: dict, environments: list[dict], *, allow_missing_label: bool, existing: Optional[dict] = None):
+    env_id = item.get("environment_id") or item.get("environmentId")
+    resolved_env = None
+
+    if env_id:
+        resolved_env = next((e for e in environments if e.get("id") == env_id), None)
+        if not resolved_env:
+            raise HTTPException(status_code=400, detail="environment_id not found")
+    elif item.get("environment"):
+        label = str(item.get("environment") or "").lower()
+        matches = [
+            e
+            for e in environments
+            if str(e.get("id") or "").lower() == label
+            or str(e.get("name") or "").lower() == label
+            or (e.get("lifecycle") and str(e.get("lifecycle")).lower() == label)
+        ]
+        if len(matches) == 1:
+            resolved_env = matches[0]
+            env_id = resolved_env.get("id")
+        elif len(matches) == 0:
+            if allow_missing_label:
+                env_id = None
+                resolved_env = None
+            else:
+                raise HTTPException(status_code=400, detail="environment not found")
+        else:
+            raise HTTPException(status_code=400, detail="environment label is ambiguous; provide environment_id")
+    elif existing:
+        env_id = existing.get("environment_id") or existing.get("environment")
+        resolved_env = next((e for e in environments if e.get("id") == env_id), None) if env_id else None
+    else:
+        raise HTTPException(status_code=400, detail="environment_id or environment label is required")
+
+    return env_id, resolved_env
+
+
+def _resolve_stage_reference(item: dict, resolved_env: Optional[dict], *, existing: Optional[dict] = None):
+    stage_id = item.get("stage_id") or item.get("stageId")
+    stage_label = item.get("stage")
+
+    if resolved_env:
+        stages = resolved_env.get("stages") or []
+        resolved_stage = None
+        if stage_id:
+            resolved_stage = next((s for s in stages if s.get("id") == stage_id), None)
+            if not resolved_stage:
+                raise HTTPException(status_code=400, detail="stage_id not found for environment")
+        elif stage_label:
+            label = str(stage_label).lower()
+            matches = [
+                s for s in stages if str(s.get("id") or "").lower() == label or str(s.get("name") or "").lower() == label
+            ]
+            if len(matches) == 1:
+                resolved_stage = matches[0]
+                stage_id = resolved_stage.get("id")
+            elif len(matches) == 0:
+                raise HTTPException(status_code=400, detail="stage not found for environment")
+            else:
+                raise HTTPException(status_code=400, detail="stage label is ambiguous; provide stage_id")
+        elif existing and existing.get("stage_id"):
+            resolved_stage = next((s for s in stages if s.get("id") == existing.get("stage_id")), None)
+            stage_id = existing.get("stage_id")
+        elif existing and existing.get("stage"):
+            matches = [s for s in stages if str(s.get("name") or "").lower() == str(existing.get("stage") or "").lower()]
+            if len(matches) == 1:
+                resolved_stage = matches[0]
+                stage_id = resolved_stage.get("id")
+
+        if not resolved_stage and stage_id:
+            raise HTTPException(status_code=400, detail="stage_id not found for environment")
+
+        if resolved_stage:
+            return resolved_stage.get("id"), resolved_stage.get("name"), resolved_stage
+        return stage_id, stage_label, None
+
+    # legacy or free-form fallback when environment is unresolved
+    return stage_id, stage_label, None
+
+
+def _canonicalize_schedule_record(item: dict, *, environments: Optional[list[dict]] = None, existing: Optional[dict] = None, allow_missing_environment_label: bool = False) -> dict:
+    canonical = dict(item)
+    envs = environments or _list_environment_refs()
+    env_id, resolved_env = _resolve_environment_reference(canonical, envs, allow_missing_label=allow_missing_environment_label, existing=existing)
+    stage_id, stage_name, _resolved_stage = _resolve_stage_reference(canonical, resolved_env, existing=existing)
+    client_id, client_label, _resolved_client = _resolve_client_link(canonical, existing=existing)
+
+    canonical["environment_id"] = env_id
+    canonical["environment"] = resolved_env.get("name") if resolved_env else canonical.get("environment")
+    canonical["stage_id"] = stage_id
+    canonical["stage"] = stage_name if stage_name is not None else canonical.get("stage")
+    if resolved_env:
+        canonical["client"] = resolved_env.get("client") or client_label
+        canonical["client_id"] = resolved_env.get("clientId") or client_id
+    else:
+        canonical["client"] = client_label
+        canonical["client_id"] = client_id
+    return canonical
+
+
+def _decorate_schedule_for_response(item: dict, environments: Optional[list[dict]] = None) -> dict:
+    decorated = dict(item)
+    envs = environments or _list_environment_refs()
+    resolved_env = None
+    env_id = decorated.get("environment_id")
+    if env_id:
+        resolved_env = next((e for e in envs if e.get("id") == env_id), None)
+    elif decorated.get("environment"):
+        matches = [e for e in envs if str(e.get("name") or "").lower() == str(decorated.get("environment") or "").lower()]
+        if len(matches) == 1:
+            resolved_env = matches[0]
+            decorated["environment_id"] = resolved_env.get("id")
+    if resolved_env:
+        decorated["environment"] = resolved_env.get("name")
+        decorated["client"] = decorated.get("client") or resolved_env.get("client")
+        decorated["client_id"] = decorated.get("client_id") or resolved_env.get("clientId")
+        stage_id = decorated.get("stage_id")
+        resolved_stage = None
+        if stage_id:
+            resolved_stage = next((s for s in resolved_env.get("stages", []) or [] if s.get("id") == stage_id), None)
+        elif decorated.get("stage"):
+            matches = [
+                s
+                for s in resolved_env.get("stages", []) or []
+                if str(s.get("name") or "").lower() == str(decorated.get("stage") or "").lower()
+            ]
+            if len(matches) == 1:
+                resolved_stage = matches[0]
+                decorated["stage_id"] = resolved_stage.get("id")
+        if resolved_stage:
+            decorated["stage"] = resolved_stage.get("name")
+    elif decorated.get("client_id"):
+        resolved_client = get_client_item(decorated.get("client_id"))
+        if resolved_client:
+            decorated["client"] = resolved_client.get("name")
+    return decorated
 
 
 def _derive_type_from_stages(details: dict) -> Optional[str]:
@@ -150,6 +391,161 @@ def _derive_type_from_stages(details: dict) -> Optional[str]:
 
 
 # `type` is removed from Environment contract; do not derive/attach it here.
+
+
+@fast_app.get("/api/clients")
+@fast_app.get("/api/clients/")
+async def list_clients(
+    req: Request,
+    search: Optional[str] = None,
+    retired: Optional[bool] = False,
+    page: int = 0,
+    per_page: int = 20,
+    sort_by: Optional[str] = "name",
+    sort_dir: Optional[str] = "asc",
+):
+    user = await _resolve_user(req)
+    if not has_any_role(user, ["admin", "environment-manager"]):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    items = _list_client_refs(include_retired=bool(retired))
+    if search:
+        needle = search.strip().lower()
+        items = [
+            item
+            for item in items
+            if needle in str(item.get("name") or "").lower()
+            or needle in str(item.get("shortCode") or "").lower()
+            or needle in str(item.get("country") or "").lower()
+            or needle in str(item.get("timezone") or "").lower()
+        ]
+
+    allowed_sort = {"name", "shortCode", "country", "timezone"}
+    sort_key = sort_by if sort_by in allowed_sort else "name"
+    reverse = str(sort_dir or "asc").lower() == "desc"
+    items.sort(key=lambda item: str(item.get(sort_key) or "").lower(), reverse=reverse)
+
+    total = len(items)
+    start = max(page, 0) * max(per_page, 1)
+    paged = items[start : start + max(per_page, 1)]
+    return {
+        "clients": [_client_response_payload(item) for item in paged],
+        "total": total,
+        "page": max(page, 0),
+        "per_page": max(per_page, 1),
+    }
+
+
+@fast_app.get("/api/clients/{client_id}")
+async def get_client(client_id: str, req: Request):
+    user = await _resolve_user(req)
+    if not has_any_role(user, ["admin", "environment-manager"]):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    item = get_client_item(client_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Client not found")
+    return _client_response_payload(item)
+
+
+@fast_app.post("/api/clients")
+async def create_client(req: Request, body: ClientIn):
+    user = await _resolve_user(req)
+    if not has_any_role(user, ["admin", "environment-manager"]):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    item = body.model_dump()
+    item["id"] = f"client-{uuid.uuid4().hex[:8]}"
+    item["retired"] = False
+    item["retiredAt"] = None
+    item["retiredBy"] = None
+
+    try:
+        created = create_client_inmemory(item)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=exc.errors()) from exc
+
+    actor = user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid")
+    append_audit(
+        {
+            "client": created.get("id"),
+            "clientName": created.get("name"),
+            "shortCode": created.get("shortCode"),
+            "action": "create",
+            "status": "success",
+            "eventType": "client-created",
+            "requestedBy": actor,
+        }
+    )
+    return {"created": _client_response_payload(created)}
+
+
+@fast_app.put("/api/clients/{client_id}")
+async def update_client(client_id: str, req: Request, body: ClientIn):
+    user = await _resolve_user(req)
+    if not has_any_role(user, ["admin", "environment-manager"]):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    existing = get_client_item(client_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    payload = body.model_dump()
+    payload["retired"] = bool(existing.get("retired"))
+    payload["retiredAt"] = existing.get("retiredAt")
+    payload["retiredBy"] = existing.get("retiredBy")
+
+    try:
+        updated = update_client_inmemory(client_id, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=exc.errors()) from exc
+
+    actor = user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid")
+    append_audit(
+        {
+            "client": client_id,
+            "clientName": updated.get("name") if updated else payload.get("name"),
+            "shortCode": updated.get("shortCode") if updated else payload.get("shortCode"),
+            "action": "update",
+            "status": "success",
+            "eventType": "client-updated",
+            "requestedBy": actor,
+        }
+    )
+    return {"updated": _client_response_payload(updated)}
+
+
+@fast_app.post("/api/clients/{client_id}/retire")
+async def retire_client(client_id: str, req: Request, body: ClientRetireIn):
+    user = await _resolve_user(req)
+    if not has_any_role(user, ["admin", "environment-manager"]):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    existing = get_client_item(client_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    actor = user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid")
+    updated = retire_client_inmemory(client_id, retired_by=actor)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    append_audit(
+        {
+            "client": client_id,
+            "clientName": updated.get("name"),
+            "shortCode": updated.get("shortCode"),
+            "action": "retire",
+            "status": "success",
+            "eventType": "client-retired",
+            "requestedBy": actor,
+            "reason": body.reason,
+        }
+    )
+    return {"updated": _client_response_payload(updated)}
 
 
 @fast_app.get("/api/environments")
@@ -204,7 +600,7 @@ async def list_environments(req: Request):
     # no-op: `type` removed from environment contract
 
     def match(item: dict) -> bool:
-        if client_q and str(item.get("client")) != str(client_q):
+        if client_q and str(item.get("client")) != str(client_q) and str(item.get("clientId")) != str(client_q):
             return False
         if stage_q:
             stages = item.get("stages") or []
@@ -217,7 +613,7 @@ async def list_environments(req: Request):
     # apply sorting if requested
     if sort_by:
         try:
-            valid_keys = {"name", "client", "region", "status"}
+            valid_keys = {"name", "client", "clientId", "region", "status"}
             if sort_by in valid_keys:
                 reverse = sort_dir == "desc"
                 filtered = sorted(filtered, key=lambda x: str((x.get(sort_by) or "")).lower(), reverse=reverse)
@@ -228,13 +624,19 @@ async def list_environments(req: Request):
     start = max(0, page) * per_page
     end = start + per_page
     page_items = filtered[start:end]
-    return {"environments": page_items, "total": total, "page": page, "per_page": per_page}
+    return {
+        "environments": [_decorate_environment_for_response(item) for item in page_items],
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+    }
 
 
 class EnvironmentIn(BaseModel):
     name: str
     region: Optional[str] = None
     client: Optional[str] = None
+    clientId: Optional[str] = None
     stages: Optional[List[dict]] = None
 
 
@@ -248,7 +650,7 @@ async def post_environment(req: Request, body: EnvironmentIn):
         logger.info("Extracted roles for user: %s", get_roles_from_claims(user))
     except Exception:
         logger.exception("Failed to log user claims for debugging")
-    item = body.model_dump()
+    item = _canonicalize_environment_record(body.model_dump())
     # validate payload against canonical model (generate temporary id if missing)
     try:
         from shared.environment_model import EnvironmentModel
@@ -261,7 +663,7 @@ async def post_environment(req: Request, body: EnvironmentIn):
         EnvironmentModel.parse_obj(tmp)
     except ValidationError as e:
         raise HTTPException(status_code=400, detail=e.errors())
-    client_val = item.get("client")
+    client_val = item.get("clientId") or item.get("client")
     # authorize: admin or environment-manager or client-admin for the target client
     if not (has_any_role(user, ["admin", "environment-manager"]) or (client_val and has_client_admin_for(user, client_val))):
         raise HTTPException(status_code=403, detail="Forbidden")
@@ -279,7 +681,8 @@ async def post_environment(req: Request, body: EnvironmentIn):
             # that start from a pre-populated in-memory store can create new items
             if e.get("seed"):
                 continue
-            if str(e.get("client")) == str(client_val) and str(e.get("name")).lower() == str(item.get("name")).lower():
+            existing_client_key = e.get("clientId") or e.get("client")
+            if str(existing_client_key) == str(client_val) and str(e.get("name")).lower() == str(item.get("name")).lower():
                 raise HTTPException(status_code=409, detail="Environment with same client and name already exists")
     except HTTPException:
         raise
@@ -322,14 +725,14 @@ async def post_environment(req: Request, body: EnvironmentIn):
     append_audit(
         {
             "environment": created.get("id"),
-            "client": created.get("client"),
+            "client": created.get("clientId") or created.get("client"),
             "action": "create",
             "status": "success",
             "eventType": "environment-created",
             "requestedBy": user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid"),
         }
     )
-    return {"created": created}
+    return {"created": _decorate_environment_for_response(created)}
 
 
 @fast_app.put("/api/environments/{env_id}")
@@ -347,14 +750,14 @@ async def put_environment(env_id: str, req: Request, body: EnvironmentIn):
     if not existing:
         raise HTTPException(status_code=404, detail="Environment not found")
 
-    client_val = existing.get("client")
+    client_val = existing.get("clientId") or existing.get("client")
     # authorize: admin or environment-manager or client-admin for the existing client
     if not (has_any_role(user, ["admin", "environment-manager"]) or (client_val and has_client_admin_for(user, client_val))):
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    update = body.model_dump()
+    update = _canonicalize_environment_record(body.model_dump(), existing=existing)
     # apply allowed updates
-    for k in ("name", "region", "stages", "client"):
+    for k in ("name", "region", "stages", "client", "clientId"):
         if k in update and update.get(k) is not None:
             existing[k] = update.get(k)
 
@@ -398,7 +801,7 @@ async def put_environment(env_id: str, req: Request, body: EnvironmentIn):
     append_audit(
         {
             "environment": env_id,
-            "client": existing.get("client"),
+            "client": existing.get("clientId") or existing.get("client"),
             "action": "update",
             "status": "success",
             "eventType": "environment-updated",
@@ -406,20 +809,10 @@ async def put_environment(env_id: str, req: Request, body: EnvironmentIn):
         }
     )
 
-    return {"updated": updated}
+    return {"updated": _decorate_environment_for_response(updated)}
 
 
-@fast_app.get("/api/environments/schedules")
-async def list_schedules():
-    if cosmos:
-        items = cosmos.list_schedules()
-        return {"schedules": items}
-    else:
-        return {"schedules": mem_store.SCHEDULES}
-
-
-@fast_app.post("/api/environments/schedules")
-async def create_schedule(req: Request, body: ScheduleIn):
+async def _legacy_duplicate_create_schedule(req: Request, body: ScheduleIn):
     # If request has no Authorization header, treat as test-run and allow a system admin
     auth_header = req.headers.get("Authorization") or req.headers.get("authorization")
     if not auth_header:
@@ -466,6 +859,7 @@ async def create_schedule(req: Request, body: ScheduleIn):
     # ensure client matches environment
     if not item.get("client") and resolved_env:
         item["client"] = resolved_env.get("client")
+    item = _canonicalize_schedule_record(item, environments=envs, allow_missing_environment_label=True)
 
     # authorize: admin or environment-manager or client-admin for the target client
     target_client = item.get("client")
@@ -473,7 +867,6 @@ async def create_schedule(req: Request, body: ScheduleIn):
         raise HTTPException(status_code=403, detail="Forbidden")
 
     sid = f"sched-{uuid.uuid4().hex[:8]}"
-    item = body.model_dump()
     item["id"] = sid
     item["owner"] = user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid")
     item["notify_before_minutes"] = body.notify_before_minutes
@@ -505,7 +898,7 @@ async def create_schedule(req: Request, body: ScheduleIn):
     # target environment id; when we don't have a resolved environment, fall
     # back to a test-friendly placeholder to preserve existing test assumptions.
     if not item.get("target"):
-        item["target"] = resolved_env.get("id") if resolved_env else "env-test"
+        item["target"] = item.get("environment_id") or "env-test"
 
     append_audit(
         {
@@ -520,11 +913,10 @@ async def create_schedule(req: Request, body: ScheduleIn):
             "requestedBy": item.get("owner"),
         }
     )
-    return {"created": item}
+    return {"created": _decorate_schedule_for_response(item, envs)}
 
 
-@fast_app.put("/api/environments/schedules/{schedule_id}")
-async def update_schedule(req: Request, schedule_id: str, body: ScheduleIn):
+async def _legacy_duplicate_update_schedule(req: Request, schedule_id: str, body: ScheduleIn):
     user = await _resolve_user(req)
     # load existing schedule to check client scope
     existing = cosmos.get_schedule(schedule_id) if cosmos else next((s for s in mem_store.SCHEDULES if s.get("id") == schedule_id), None)
@@ -533,7 +925,12 @@ async def update_schedule(req: Request, schedule_id: str, body: ScheduleIn):
     sched_client = existing.get("client")
     if not (has_any_role(user, ["admin", "environment-manager"]) or (sched_client and has_client_admin_for(user, sched_client))):
         raise HTTPException(status_code=403, detail="Forbidden")
-    item = body.model_dump()
+    item = _canonicalize_schedule_record(
+        body.model_dump(),
+        environments=_list_environment_refs(),
+        existing=existing,
+        allow_missing_environment_label=False,
+    )
     item["id"] = schedule_id
     item["owner"] = existing.get("owner")
     item["postponement_count"] = existing.get("postponement_count", 0)
@@ -566,11 +963,10 @@ async def update_schedule(req: Request, schedule_id: str, body: ScheduleIn):
             "requestedBy": user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid"),
         }
     )
-    return {"updated": item}
+    return {"updated": _decorate_schedule_for_response(item)}
 
 
-@fast_app.delete("/api/environments/schedules/{schedule_id}")
-async def delete_schedule(req: Request, schedule_id: str):
+async def _legacy_duplicate_delete_schedule(req: Request, schedule_id: str):
     user = await _resolve_user(req)
     # require admin/environment-manager or client-admin for schedule.client
     existing = cosmos.get_schedule(schedule_id) if cosmos else next((s for s in mem_store.SCHEDULES if s.get("id") == schedule_id), None)
@@ -601,7 +997,7 @@ async def delete_schedule(req: Request, schedule_id: str):
     return {"deleted": schedule_id}
 
 
-def _user_identifiers(user: dict) -> set[str]:
+def _legacy_duplicate_user_identifiers(user: dict) -> set[str]:
     identifiers = set()
     for key in ("preferred_username", "upn", "email", "oid"):
         value = user.get(key)
@@ -610,10 +1006,10 @@ def _user_identifiers(user: dict) -> set[str]:
     return identifiers
 
 
-def _can_postpone(user: dict, schedule: dict) -> bool:
+def _legacy_duplicate_can_postpone(user: dict, schedule: dict) -> bool:
     if has_any_role(user, ["admin", "environment-manager"]):
         return True
-    identifiers = _user_identifiers(user)
+    identifiers = _legacy_duplicate_user_identifiers(user)
     for group in schedule.get("notification_groups", []):
         for recipient in group.get("recipients", []):
             if str(recipient).lower() in identifiers:
@@ -621,13 +1017,12 @@ def _can_postpone(user: dict, schedule: dict) -> bool:
     return False
 
 
-@fast_app.post("/api/environments/schedules/{schedule_id}/postpone")
-async def postpone_schedule(req: Request, schedule_id: str, body: PostponeIn):
+async def _legacy_duplicate_postpone_schedule(req: Request, schedule_id: str, body: PostponeIn):
     user = await _resolve_user(req)
     schedule = cosmos.get_schedule(schedule_id) if cosmos else next((s for s in mem_store.SCHEDULES if s.get("id") == schedule_id), None)
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
-    if not _can_postpone(user, schedule):
+    if not _legacy_duplicate_can_postpone(user, schedule):
         raise HTTPException(status_code=403, detail="Forbidden")
 
     policy = schedule.get("postponement_policy") or {}
@@ -723,59 +1118,6 @@ async def delete_environment(env_id: str, req: Request):
         }
     )
     return {"deleted": env_id}
-
-
-@fast_app.get("/api/environments/{env_id}")
-async def get_environment_by_id(env_id: str):
-    environment = None
-    # Prefer the configured persistent store when available
-    if env_store:
-        try:
-            environment = env_store.get_environment(env_id)
-        except Exception:
-            environment = None
-    # Fallback to in-memory store
-    if not environment:
-        environment = get_environment_item(env_id)
-    if not environment:
-        raise HTTPException(status_code=404, detail="Environment not found")
-    # Enrich details with schedules summary and recent activity when available
-    details = dict(environment)
-    # attach schedules related to this environment (by id or name)
-    try:
-        schedules = []
-        if cosmos:
-            # cosmos.list_schedules returns schedule items
-            all_sched = cosmos.list_schedules(limit=200)
-            for s in all_sched:
-                if str(s.get("environment_id") or s.get("environment") or "").lower() in (str(env_id).lower(), str(environment.get("name") or "").lower()):
-                    schedules.append(s)
-        else:
-            for s in mem_store.SCHEDULES:
-                if str(s.get("environment_id") or s.get("environment") or "").lower() in (str(env_id).lower(), str(environment.get("name") or "").lower()):
-                    schedules.append(s)
-        details["schedules"] = schedules
-    except Exception:
-        details["schedules"] = []
-
-    # attach recent activity (audit) -- best-effort
-    try:
-        from shared.audit_store import read_audit
-
-        entries, total = read_audit(environment=env_id, page=0, per_page=10)
-        details["activity"] = {"entries": entries, "total": total}
-    except Exception:
-        details["activity"] = {"entries": [], "total": 0}
-
-    # Derive `type` from stages/resourceActions when available (deprecation behavior)
-    try:
-        dt = _derive_type_from_stages(details)
-        if dt:
-            details["type"] = dt
-    except Exception:
-        pass
-
-    return details
 
 
 @fast_app.post("/api/environments/{env_id}/start")
@@ -990,11 +1332,12 @@ async def stop_stage(env_id: str, stage_id: str, req: Request):
 
 @fast_app.get("/api/environments/schedules")
 async def list_schedules():
+    environments = _list_environment_refs()
     if cosmos:
         items = cosmos.list_schedules()
-        return {"schedules": items}
+        return {"schedules": [_decorate_schedule_for_response(item, environments) for item in items]}
     else:
-        return {"schedules": mem_store.SCHEDULES}
+        return {"schedules": [_decorate_schedule_for_response(item, environments) for item in mem_store.SCHEDULES]}
 
 
 @fast_app.post("/api/environments/schedules")
@@ -1005,7 +1348,11 @@ async def create_schedule(req: Request, body: ScheduleIn):
         raise HTTPException(status_code=403, detail="Forbidden")
 
     sid = f"sched-{uuid.uuid4().hex[:8]}"
-    item = body.model_dump()
+    item = _canonicalize_schedule_record(
+        body.model_dump(),
+        environments=_list_environment_refs(),
+        allow_missing_environment_label=False,
+    )
     item["id"] = sid
     item["owner"] = user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid")
     item["notify_before_minutes"] = body.notify_before_minutes
@@ -1043,7 +1390,7 @@ async def create_schedule(req: Request, body: ScheduleIn):
             "requestedBy": item.get("owner"),
         }
     )
-    return {"created": item}
+    return {"created": _decorate_schedule_for_response(item)}
 
 
 @fast_app.put("/api/environments/schedules/{schedule_id}")
@@ -1088,6 +1435,7 @@ async def update_schedule(req: Request, schedule_id: str, body: ScheduleIn):
         item["environment"] = resolved_env.get("name")
         if not item.get("client"):
             item["client"] = resolved_env.get("client")
+    item = _canonicalize_schedule_record(item, environments=envs, existing=existing, allow_missing_environment_label=False)
 
     # authorize: allow admin/environment-manager or client-admin for target client
     target_client = item.get("client") or existing.get("client")
@@ -1128,7 +1476,7 @@ async def update_schedule(req: Request, schedule_id: str, body: ScheduleIn):
             "requestedBy": user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid"),
         }
     )
-    return {"updated": item}
+    return {"updated": _decorate_schedule_for_response(item, envs)}
 
 
 @fast_app.delete("/api/environments/schedules/{schedule_id}")
@@ -1239,28 +1587,163 @@ async def postpone_schedule(req: Request, schedule_id: str, body: PostponeIn):
     return {"updated": updated}
 
 
+@fast_app.get("/api/environments/{env_id}")
+async def get_environment_by_id(env_id: str):
+    environment = None
+    # Prefer the configured persistent store when available
+    if env_store:
+        try:
+            environment = env_store.get_environment(env_id)
+        except Exception:
+            environment = None
+    # Fallback to in-memory store
+    if not environment:
+        environment = get_environment_item(env_id)
+    if not environment:
+        raise HTTPException(status_code=404, detail="Environment not found")
+    # Enrich details with schedules summary and recent activity when available
+    details = _decorate_environment_for_response(environment)
+    # attach schedules related to this environment (by id or name)
+    try:
+        schedules = []
+        environment_refs = _list_environment_refs()
+        if cosmos:
+            # cosmos.list_schedules returns schedule items
+            all_sched = cosmos.list_schedules(limit=200)
+            for s in all_sched:
+                decorated = _decorate_schedule_for_response(s, environment_refs)
+                if str(decorated.get("environment_id") or decorated.get("environment") or "").lower() in (
+                    str(env_id).lower(),
+                    str(environment.get("name") or "").lower(),
+                ):
+                    schedules.append(decorated)
+        else:
+            for s in mem_store.SCHEDULES:
+                decorated = _decorate_schedule_for_response(s, environment_refs)
+                if str(decorated.get("environment_id") or decorated.get("environment") or "").lower() in (
+                    str(env_id).lower(),
+                    str(environment.get("name") or "").lower(),
+                ):
+                    schedules.append(decorated)
+        details["schedules"] = schedules
+    except Exception:
+        details["schedules"] = []
+
+    # attach recent activity (audit) -- best-effort
+    try:
+        from shared.audit_store import read_audit
+
+        entries, total = read_audit(environment=env_id, page=0, per_page=10)
+        details["activity"] = {"entries": entries, "total": total}
+    except Exception:
+        details["activity"] = {"entries": [], "total": 0}
+
+    # Derive `type` from stages/resourceActions when available (deprecation behavior)
+    try:
+        dt = _derive_type_from_stages(details)
+        if dt:
+            details["type"] = dt
+    except Exception:
+        pass
+
+    return details
+
+
 async def main(req: func.HttpRequest, context: func.Context) -> func.HttpResponse:
     return await func.AsgiMiddleware(fast_app).handle_async(req, context)
 
 
 @fast_app.post("/api/environments/control")
 async def control_environment(req: Request):
-    """Control endpoint used by scheduler worker. Accepts JSON body with `environment`, `client`, `stage`, and `action`."""
-    data = await req.json()
-    env = data.get("environment")
-    client = data.get("client")
-    stage = data.get("stage")
-    action = data.get("action")
-    if not env or not client or not action:
-        raise HTTPException(status_code=400, detail="Missing required fields: environment, client, action")
+    """Control endpoint used by scheduler worker.
 
-    # Mock behavior: record an audit entry via audit_store if available
+    Accepts either canonical ids or legacy labels and records the requested lifecycle action.
+    """
     try:
-        append_audit({"environment": env, "client": client, "stage": stage, "action": action, "status": "requested"})
+        data = await req.json()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid control payload: {exc}") from exc
+
+    environment_id = data.get("environment_id")
+    environment_label = data.get("environment")
+    client_id = data.get("client_id")
+    client_label = data.get("client")
+    stage_id = data.get("stage_id")
+    stage_label = data.get("stage")
+    action = data.get("action")
+
+    if not action:
+        raise HTTPException(status_code=400, detail="Missing required field: action")
+
+    resolved_env = None
+    environment_refs = _list_environment_refs()
+    if environment_id:
+        resolved_env = next((item for item in environment_refs if item.get("id") == environment_id), None)
+    elif environment_label:
+        matches = [
+            item
+            for item in environment_refs
+            if str(item.get("id") or "").lower() == str(environment_label).lower()
+            or str(item.get("name") or "").lower() == str(environment_label).lower()
+            or str(item.get("lifecycle") or "").lower() == str(environment_label).lower()
+        ]
+        if len(matches) == 1:
+            resolved_env = matches[0]
+
+    if resolved_env:
+        environment_id = resolved_env.get("id")
+        environment_label = resolved_env.get("name")
+        client_id = resolved_env.get("clientId") or client_id
+        client_label = resolved_env.get("client") or client_label
+        if stage_id:
+            matched_stage = next((item for item in resolved_env.get("stages", []) if item.get("id") == stage_id), None)
+            if matched_stage:
+                stage_label = matched_stage.get("name")
+        elif stage_label:
+            matched_stage = next(
+                (
+                    item
+                    for item in resolved_env.get("stages", [])
+                    if str(item.get("id") or "").lower() == str(stage_label).lower()
+                    or str(item.get("name") or "").lower() == str(stage_label).lower()
+                ),
+                None,
+            )
+            if matched_stage:
+                stage_id = matched_stage.get("id")
+                stage_label = matched_stage.get("name")
+
+    if not environment_id and not environment_label:
+        raise HTTPException(status_code=400, detail="Missing required environment reference")
+
+    try:
+        append_audit(
+            {
+                "environment": environment_id or environment_label,
+                "environmentLabel": environment_label,
+                "client": client_id or client_label,
+                "clientLabel": client_label,
+                "stage": stage_id or stage_label,
+                "stageLabel": stage_label,
+                "action": action,
+                "status": "requested",
+                "eventType": "scheduled-lifecycle",
+                "scheduleId": data.get("scheduleId"),
+            }
+        )
     except Exception:
         pass
 
-    return {"environment": env, "client": client, "stage": stage, "action": action, "status": "requested (mock)"}
+    return {
+        "environment": environment_label or environment_id,
+        "environment_id": environment_id,
+        "client": client_label or client_id,
+        "client_id": client_id,
+        "stage": stage_label or stage_id,
+        "stage_id": stage_id,
+        "action": action,
+        "status": "requested (mock)",
+    }
 
 
 @fast_app.get("/api/environments/{env_id}/activity")
