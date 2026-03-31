@@ -1,5 +1,5 @@
 import { useMsal } from '@azure/msal-react';
-import { Bell, LogOut, Menu, Moon, Search, Sun, User } from 'lucide-react';
+import { Bell, LogOut, Menu, MessageSquare, Moon, Search, Sun, User } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
 import { useAuthZ } from '@/auth/useAuthZ';
@@ -10,7 +10,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSidebar } from '@/contexts/SidebarContext';
 import { getMenuItems } from '../navigation/sidebar-menu';
 
-export default function Topbar() {
+type TopbarProps = {
+  assistantOpen?: boolean;
+  onToggleAssistant?: () => void;
+};
+
+export default function Topbar({ assistantOpen = false, onToggleAssistant }: TopbarProps) {
   const { instance } = useMsal();
   const { user } = useAuth();
   const { isAdmin } = useAuthZ(instance);
@@ -104,6 +109,14 @@ export default function Topbar() {
           </button>
 
           <button
+            onClick={onToggleAssistant}
+            className={`cyber-topbar-icon ${assistantOpen ? 'bg-[color-mix(in_srgb,var(--accent-primary)_18%,transparent)] text-[var(--accent-primary)]' : ''}`}
+            aria-label={assistantOpen ? 'Close AI assistant' : 'Open AI assistant'}
+          >
+            <MessageSquare size={18} />
+          </button>
+
+          <button
             onClick={toggleMode}
             className="cyber-topbar-icon"
             aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -154,6 +167,14 @@ export default function Topbar() {
 
         <div className="flex items-center space-x-4">
           <button
+            onClick={onToggleAssistant}
+            className={`${themeClasses.iconButton} ${assistantOpen ? 'bg-[color-mix(in_srgb,var(--accent-primary)_12%,transparent)] text-[var(--accent-primary)]' : ''} rounded-full p-2`}
+            aria-label={assistantOpen ? 'Close AI assistant' : 'Open AI assistant'}
+          >
+            <MessageSquare size={20} />
+          </button>
+
+          <button
             onClick={toggleMode}
             className={`${themeClasses.iconButton} rounded-full p-2`}
             aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -201,6 +222,14 @@ export default function Topbar() {
       </nav>
 
       <div className="flex items-center space-x-4">
+        <button
+          onClick={onToggleAssistant}
+          className={`${themeClasses.iconButton} ${assistantOpen ? 'bg-[color-mix(in_srgb,var(--accent-primary)_12%,transparent)] text-[var(--accent-primary)]' : ''} rounded-full p-2`}
+          aria-label={assistantOpen ? 'Close AI assistant' : 'Open AI assistant'}
+        >
+          <MessageSquare size={20} />
+        </button>
+
         <button
           onClick={toggleMode}
           className={`${themeClasses.iconButton} rounded-full p-2`}

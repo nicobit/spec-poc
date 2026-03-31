@@ -359,5 +359,16 @@
     "action": "stop",
     "status": "partially_failed",
     "timestamp": "2026-03-29T17:38:49.627247Z"
+  },
+  {
+    "scheduleId": "sched-1",
+    "executionId": "exec-f6d2d606c9c3",
+    "environment": "env-1",
+    "client": "client-001",
+    "stage": "stage-dev-sql",
+    "action": "start",
+    "status": "error",
+    "error": "Missing required fields: region; Missing required fields: namespace, entityType, subscriptionId, resourceGroup, region",
+    "timestamp": "2026-03-30T05:56:09.519688Z"
   }
 ]

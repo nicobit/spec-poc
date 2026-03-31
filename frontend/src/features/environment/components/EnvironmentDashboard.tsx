@@ -1,401 +1,345 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { IPublicClientApplication } from '@azure/msal-browser';
+import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, Clock3, ExternalLink, RefreshCw, Server, Settings2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
-import { ActivityEntry, EnvInstance, Schedule, getActivity, listEnvironments, listSchedules, startStage, stopStage } from '../api';
-import { useNavigate } from 'react-router-dom';
-import ActivityModal from './ActivityModal';
+import { useAuthZ } from '@/auth/useAuthZ';
 import { PageHeader, PageStatCard } from '@/shared/ui/PageHeader';
 import { themeClasses } from '@/theme/themeClasses';
-import { useAuthZ } from '@/auth/useAuthZ';
+
+import { type EnvInstance, type ResourceAction, type Schedule, type StageExecution, getEnvironment, listEnvironments, listSchedules } from '../api';
 
 type Props = { instance: IPublicClientApplication };
-type Filters = { client?: string; stage?: string; action?: string };
+
+type DashboardEnvironment = EnvInstance;
+
+const STAGE_ACTION_PROPERTY_MAP: Record<string, string[]> = {
+  'sql-vm': ['subscriptionId', 'resourceGroup', 'region', 'properties.vmName'],
+  'sql-managed-instance': ['subscriptionId', 'resourceGroup', 'region', 'properties.managedInstanceName'],
+  'synapse-sql-pool': ['subscriptionId', 'resourceGroup', 'region', 'properties.workspaceName', 'properties.sqlPoolName'],
+  'service-bus-message': ['subscriptionId', 'resourceGroup', 'region', 'properties.namespace', 'properties.entityType', 'properties.entityName', 'properties.messageTemplate'],
+};
+
+function getValueAtPath(action: ResourceAction, path: string) {
+  return path.split('.').reduce<any>((current, segment) => (current && typeof current === 'object' ? current[segment as keyof typeof current] : undefined), action as any);
+}
+
+function isResourceActionIncomplete(action: ResourceAction) {
+  const requiredPaths = STAGE_ACTION_PROPERTY_MAP[action.type] ?? [];
+  return requiredPaths.some((path) => {
+    const value = getValueAtPath(action, path);
+    return value === undefined || value === null || String(value).trim() === '';
+  });
+}
+
+function getStageIncompleteCount(environment: DashboardEnvironment) {
+  return environment.stages.reduce((count, stage) => count + stage.resourceActions.filter(isResourceActionIncomplete).length, 0);
+}
+
+function flattenExecutions(environments: DashboardEnvironment[]) {
+  return environments.flatMap((environment) =>
+    environment.stages.flatMap((stage) =>
+      (stage.executions ?? []).map((execution) => ({
+        environment,
+        stage,
+        execution,
+      })),
+    ),
+  );
+}
+
+function sortByRequestedAtDescending<T extends { execution?: StageExecution; next_run?: string | null }>(items: T[]) {
+  return items.slice().sort((left, right) => {
+    const leftValue = new Date((left as any).execution?.requestedAt ?? (left as any).next_run ?? 0).getTime();
+    const rightValue = new Date((right as any).execution?.requestedAt ?? (right as any).next_run ?? 0).getTime();
+    return rightValue - leftValue;
+  });
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return 'Not scheduled';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
 
 export default function EnvironmentDashboard({ instance: msalInstance }: Props) {
   const { ready: authReady, isAdmin, roles } = useAuthZ(msalInstance);
-  const canEditEnvironments = authReady && (isAdmin || roles.includes('EnvironmentAdmin') || roles.includes('EnvironmentEditor') || roles.includes('Editor'));
+  const canManage = authReady && (isAdmin || roles.includes('EnvironmentAdmin') || roles.includes('EnvironmentEditor') || roles.includes('environment-manager'));
 
-  const [instances, setInstances] = useState<EnvInstance[]>([]);
-  const [page, setPage] = useState(0);
-  const [perPage, setPerPage] = useState(10);
-  const [totalEnvs, setTotalEnvs] = useState(0);
+  const [environments, setEnvironments] = useState<DashboardEnvironment[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [selectedActivityEnvId, setSelectedActivityEnvId] = useState<string | null>(null);
-  const [activityMap, setActivityMap] = useState<Record<string, ActivityEntry[]>>({});
-  const [activityTotal, setActivityTotal] = useState<Record<string, number>>({});
-  const [activityPage, setActivityPage] = useState<Record<string, number>>({});
-  const [activityLoading, setActivityLoading] = useState<Record<string, boolean>>({});
-  const [activityFilters, setActivityFilters] = useState<Record<string, Filters>>({});
-  const [selectedEntry, setSelectedEntry] = useState<ActivityEntry | null>(null);
-  
-
-  // useNavigate throws when rendered outside a Router (unit tests). Provide a noop fallback so tests can render.
-  let navigate = (() => {
-    try {
-      return useNavigate();
-    } catch (e) {
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      return () => {};
-    }
-  })();
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const [envResp, scheds] = await Promise.all([listEnvironments(msalInstance, { page, perPage }), listSchedules(msalInstance)]);
-      setInstances(envResp.environments);
-      setTotalEnvs(envResp.total);
+      const envList = await listEnvironments(msalInstance, { page: 0, perPage: 10, sortBy: 'name', sortDir: 'asc' });
+      const detailed = await Promise.all(envList.environments.map((environment) => getEnvironment(msalInstance, environment.id)));
+      const scheds = await listSchedules(msalInstance);
+      setEnvironments(detailed);
       setSchedules(scheds);
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : 'Failed to load environments and schedules.');
+      setLoadError(error instanceof Error ? error.message : 'Failed to load environment dashboard data.');
     } finally {
       setLoading(false);
     }
-  }, [msalInstance, page, perPage]);
+  }, [msalInstance]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
-  const totalPages = Math.max(1, Math.ceil(totalEnvs / perPage));
-  const stageCount = instances.reduce((acc, e) => acc + (e.stages?.length || 0), 0);
-  const selectedActivityEnv = instances.find((i) => i.id === selectedActivityEnvId) ?? null;
-  const activityEntries = selectedActivityEnvId ? activityMap[selectedActivityEnvId] || [] : [];
-  const activityCount = selectedActivityEnvId ? activityTotal[selectedActivityEnvId] || 0 : 0;
-  const activityCurrentPage = selectedActivityEnvId ? activityPage[selectedActivityEnvId] ?? 0 : 0;
-  const activityPages = Math.max(1, Math.ceil((activityCount || 0) / 10));
+  const metrics = useMemo(() => {
+    const totalStages = environments.reduce((sum, environment) => sum + environment.stages.length, 0);
+    const runningStages = environments.reduce(
+      (sum, environment) => sum + environment.stages.filter((stage) => stage.status === 'running').length,
+      0,
+    );
+    const incompleteEnvironments = environments.filter((environment) => getStageIncompleteCount(environment) > 0).length;
 
-  const loadActivityPage = useCallback(async (envId: string, pageNum: number, filters?: Filters) => {
-    setActivityLoading((state) => ({ ...state, [envId]: true }));
-    try {
-      const effective = filters ?? activityFilters[envId] ?? {};
-      const response = await getActivity(msalInstance, envId, {
-        page: pageNum,
-        perPage: 10,
-        client: effective.client,
-        stage: effective.stage,
-        action: effective.action,
-      });
+    return {
+      totalEnvironments: environments.length,
+      totalStages,
+      runningStages,
+      scheduledActions: schedules.filter((schedule) => schedule.enabled).length,
+      incompleteEnvironments,
+    };
+  }, [environments, schedules]);
 
-      setActivityMap((state) => ({ ...state, [envId]: response.activity || [] }));
-      setActivityTotal((state) => ({ ...state, [envId]: response.total || 0 }));
-      setActivityPage((state) => ({ ...state, [envId]: response.page || pageNum }));
-    } catch (error) {
-      // noop - errors are surfaced via UI elsewhere
-    } finally {
-      setActivityLoading((state) => ({ ...state, [envId]: false }));
-    }
-  }, [msalInstance, activityFilters]);
+  const upcomingSchedules = useMemo(() => {
+    return schedules
+      .filter((schedule) => schedule.enabled && schedule.next_run)
+      .sort((left, right) => new Date(left.next_run || 0).getTime() - new Date(right.next_run || 0).getTime())
+      .slice(0, 6);
+  }, [schedules]);
+
+  const recentExecutionSignal = useMemo(() => {
+    const allExecutions = flattenExecutions(environments);
+    const failures = sortByRequestedAtDescending(
+      allExecutions.filter(({ execution }) => execution.status === 'failed' || execution.status === 'partially_failed'),
+    ).slice(0, 5);
+    const recent = sortByRequestedAtDescending(allExecutions).slice(0, 6);
+    return { failures, recent };
+  }, [environments]);
+
+  const attentionItems = useMemo(() => {
+    const incomplete = environments
+      .map((environment) => ({
+        environment,
+        incompleteCount: getStageIncompleteCount(environment),
+      }))
+      .filter((item) => item.incompleteCount > 0)
+      .slice(0, 5);
+
+    const withoutSchedules = environments
+      .filter((environment) => !(environment.schedules ?? []).some((schedule) => schedule.enabled))
+      .slice(0, 5);
+
+    return { incomplete, withoutSchedules };
+  }, [environments]);
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Environment dashboard"
-        description="Monitor stage status and recent activity here. Use edit environment for Azure services and schedules for recurring automation."
-        actions={<button className={`${themeClasses.buttonSecondary} rounded-lg px-3 py-1.5 text-sm`} onClick={() => void refresh()}>Refresh</button>}
+        title="Environments dashboard"
+        description="Track what is running, what needs attention, and what is scheduled next across managed environments."
+        actions={
+          <>
+            <button className={`${themeClasses.buttonSecondary} rounded-lg px-3 py-1.5 text-sm`} onClick={() => void refresh()}>
+              <RefreshCw className="mr-2 inline h-4 w-4" />
+              Refresh
+            </button>
+            {canManage ? (
+              <Link to="/environment/manage" className={`${themeClasses.buttonPrimary} rounded-lg px-3 py-1.5 text-sm`}>
+                Open Environments management
+              </Link>
+            ) : null}
+          </>
+        }
       />
 
       {loadError ? (
         <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-          Failed to load environments or schedules. {loadError}
+          Failed to load environment dashboard data. {loadError}
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-        <PageStatCard label="Environments" value={instances.length} />
-        <PageStatCard label="Stages" value={stageCount} />
-        <PageStatCard label="Schedules" value={schedules.length} />
-        <PageStatCard label="Selected activity" value={selectedActivityEnv?.name ?? 'None selected'} />
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <PageStatCard label="Environments" value={metrics.totalEnvironments} detail="Managed environment records" />
+        <PageStatCard label="Stages" value={metrics.totalStages} detail="Configured operating stages" />
+        <PageStatCard label="Running stages" value={metrics.runningStages} detail="Currently marked running" />
+        <PageStatCard label="Scheduled actions" value={metrics.scheduledActions} detail="Enabled recurring stage actions" />
+        <PageStatCard label="Need attention" value={metrics.incompleteEnvironments + recentExecutionSignal.failures.length} detail="Failures or incomplete configuration" />
       </div>
 
-      <section className="ui-panel rounded-2xl p-4">
-        <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h3 className="text-lg font-medium text-[var(--text-primary)]">Live environments</h3>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">
-              Start or stop stages, then drill into recent activity. Azure services are maintained in edit environment, while timing and notifications belong in schedules.
-            </p>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="ui-panel-muted rounded-xl p-3 text-sm">Loading environments...</div>
-        ) : (
-          <div className="space-y-4">
-            {/* Partition persisted vs draft environments. Draft detection: explicit draft flag or id prefix 'draft-' */}
-            {(() => {
-              const isDraft = (e: EnvInstance) => {
-                return Boolean((e as any).draft === true || !e.id || e.id.startsWith?.('draft-'));
-              };
-
-              const drafts = instances.filter(isDraft);
-              const persisted = instances.filter((i) => !isDraft(i));
-
-              const statusOrder = (s: string) => {
-                switch (s) {
-                  case 'running':
-                    return 0;
-                  case 'starting':
-                    return 1;
-                  case 'stopped':
-                    return 2;
-                  case 'stopping':
-                    return 3;
-                  default:
-                    return 10;
-                }
-              };
-
-              const persistedSorted = persisted.slice().sort((a, b) => {
-                const diff = statusOrder(a.status) - statusOrder(b.status);
-                return diff !== 0 ? diff : a.name.localeCompare(b.name);
-              });
-
-              const createDraft = () => {
-                const draft: EnvInstance & { draft?: true } = {
-                  id: `draft-${Date.now()}`,
-                  name: 'New environment',
-                  status: 'stopped',
-                  stages: [],
-                  draft: true,
-                };
-                setInstances((s) => [draft as EnvInstance, ...s]);
-                setSelectedActivityEnvId(draft.id);
-              };
-
-              return (
-                <>
-                      <div className="mb-2 flex items-center justify-between">
-                        <h4 className="text-md font-semibold">Live environments</h4>
-                        <div className="flex items-center gap-2">
-                          {canEditEnvironments ? (
-                            <button
-                              onClick={() => navigate('/environment/create')}
-                              className={`${themeClasses.buttonPrimary} rounded-lg px-3 py-1.5 text-sm`}
-                            >
-                              New environment
-                            </button>
-                          ) : null}
-                          <div className="flex items-center gap-2">
-                            <button
-                              disabled={page <= 0}
-                              onClick={() => { setPage((p) => Math.max(0, p - 1)); void refresh(); }}
-                              className={`${themeClasses.buttonSecondary} rounded px-2 py-1 text-sm disabled:opacity-50`}
-                            >
-                              Prev
-                            </button>
-                            <div className="text-sm ui-text-muted">Page {page + 1} / {totalPages}</div>
-                            <button
-                              disabled={page >= totalPages - 1}
-                              onClick={() => { setPage((p) => p + 1); void refresh(); }}
-                              className={`${themeClasses.buttonSecondary} rounded px-2 py-1 text-sm disabled:opacity-50`}
-                            >
-                              Next
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                  {persistedSorted.map((environment) => (
-                    <div key={environment.id} className="rounded-2xl border border-[var(--border-subtle)] p-4">
-                      <div className="mb-3">
-                        <h4 className="font-medium text-[var(--text-primary)]">
-                          <button className="hover:underline" onClick={() => navigate(`/environment/${environment.id}`)}>{environment.name}</button>
-                        </h4>
-                        <div className="mt-1 text-sm text-[var(--text-secondary)]">
-                          {[environment.region, environment.client].filter(Boolean).join(' | ')}
-                        </div>
-                      </div>
-                      <div className="space-y-3">
-                        {environment.stages.map((stage) => (
-                          <div key={stage.id} className="rounded-2xl border border-[var(--border-subtle)] p-4">
-                            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <h5 className="font-medium text-[var(--text-primary)]">{stage.name}</h5>
-                                  <span className="rounded bg-[var(--surface-panel-muted)] px-2 py-0.5 text-xs font-medium text-[var(--text-secondary)]">
-                                    {stage.status}
-                                  </span>
-                                </div>
-                                <div className="mt-1 text-sm text-[var(--text-secondary)]">
-                                  {stage.resourceActions.length} Azure service action(s) | {stage.notificationGroups.length} notification group(s)
-                                </div>
-                              </div>
-                              <div className="flex flex-wrap gap-2">
-                                {stage.status === 'running' ? (
-                                  <button
-                                    onClick={() => void stopStage(msalInstance, environment.id, stage.id).then(refresh)}
-                                    aria-label={`Stop ${environment.name} ${stage.name}`}
-                                    className={`${themeClasses.buttonSecondary} rounded-lg px-3 py-1.5 text-sm`}
-                                  >
-                                    Stop
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={() => void startStage(msalInstance, environment.id, stage.id).then(refresh)}
-                                    aria-label={`Start ${environment.name} ${stage.name}`}
-                                    className={`${themeClasses.buttonPrimary} rounded-lg px-3 py-1.5 text-sm`}
-                                  >
-                                    Start
-                                  </button>
-                                )}
-                                {canEditEnvironments ? (
-                                  <button
-                                    onClick={() => navigate(`/environment/edit/${environment.id}`)}
-                                    aria-label={`Edit ${environment.name}`}
-                                    className={`${themeClasses.buttonSecondary} rounded-lg px-3 py-1.5 text-sm`}
-                                  >
-                                    Edit
-                                  </button>
-                                ) : null}
-                                <button
-                                  onClick={() => void loadActivityPage(environment.id, 0, {
-                                    ...activityFilters[environment.id],
-                                    stage: stage.name,
-                                  })}
-                                  aria-label={`View activity ${environment.name}`}
-                                  className={`${themeClasses.buttonSecondary} rounded-lg px-3 py-1.5 text-sm`}
-                                >
-                                  View activity
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Draft creation has been removed from the dashboard. Use the dedicated Create page for environment authoring. */}
-                </>
-              );
-            })()}
-          </div>
-        )}
-      </section>
-
-      <section className="ui-panel rounded-2xl p-4">
-        <div className="ui-divider flex flex-col gap-3 border-b pb-4">
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+        <section className="ui-panel rounded-2xl p-5">
+          <div className="flex items-start justify-between gap-3">
             <div>
-              <h3 className="text-lg font-medium text-[var(--text-primary)]">Activity</h3>
-              <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                {selectedActivityEnvId
-                  ? `Review recent activity for ${selectedActivityEnv?.name ?? selectedActivityEnvId}.`
-                  : 'Select a stage and choose View activity to load recent events.'}
-              </p>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Needs attention</h2>
+              <p className="mt-1 text-sm text-[var(--text-secondary)]">Focus first on failed runs, incomplete setup, and environments without schedules.</p>
             </div>
-            {selectedActivityEnvId ? <div className="text-xs ui-text-muted">{activityCount} total entries</div> : null}
+            <AlertTriangle className="mt-1 h-5 w-5 text-[var(--status-warning-text)]" />
           </div>
 
-          {selectedActivityEnvId ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                aria-label="Client filter"
-                placeholder="Client"
-                value={activityFilters[selectedActivityEnvId]?.client || ''}
-                onChange={(event) => setActivityFilters((state) => ({
-                  ...state,
-                  [selectedActivityEnvId]: { ...state[selectedActivityEnvId], client: event.target.value || undefined },
-                }))}
-                className={`${themeClasses.field} rounded px-2 py-1 text-sm`}
-              />
-              <input
-                aria-label="Stage filter"
-                placeholder="Stage"
-                value={activityFilters[selectedActivityEnvId]?.stage || ''}
-                onChange={(event) => setActivityFilters((state) => ({
-                  ...state,
-                  [selectedActivityEnvId]: { ...state[selectedActivityEnvId], stage: event.target.value || undefined },
-                }))}
-                className={`${themeClasses.field} rounded px-2 py-1 text-sm`}
-              />
-              <input
-                aria-label="Action filter"
-                placeholder="Action"
-                value={activityFilters[selectedActivityEnvId]?.action || ''}
-                onChange={(event) => setActivityFilters((state) => ({
-                  ...state,
-                  [selectedActivityEnvId]: { ...state[selectedActivityEnvId], action: event.target.value || undefined },
-                }))}
-                className={`${themeClasses.field} rounded px-2 py-1 text-sm`}
-              />
-              <button
-                onClick={() => void loadActivityPage(selectedActivityEnvId, 0)}
-                className={`${themeClasses.buttonPrimary} rounded px-3 py-1.5 text-sm`}
-              >
-                Apply
-              </button>
+          <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <div className="rounded-2xl border border-[var(--border-subtle)] p-4">
+              <div className="ui-section-eyebrow">Failed executions</div>
+              <div className="mt-3 space-y-3">
+                {recentExecutionSignal.failures.length === 0 ? (
+                  <div className="text-sm ui-text-muted">No recent failed executions.</div>
+                ) : (
+                  recentExecutionSignal.failures.map(({ environment, stage, execution }) => (
+                    <Link key={execution.executionId} to={`/environment/${environment.id}/executions`} className="block rounded-xl border border-[var(--border-subtle)] px-3 py-3 transition hover:bg-[var(--surface-hover)]">
+                      <div className="text-sm font-semibold text-[var(--text-primary)]">{environment.name}</div>
+                      <div className="mt-1 text-sm text-[var(--text-secondary)]">{stage.name} - {execution.status.replace('_', ' ')}</div>
+                      <div className="mt-1 text-xs ui-text-muted">{formatDateTime(execution.requestedAt)}</div>
+                    </Link>
+                  ))
+                )}
+              </div>
             </div>
-          ) : null}
-        </div>
 
-        <div className="mt-4">
-          {!selectedActivityEnvId ? (
-            <div className="rounded-lg border border-dashed border-[var(--border-subtle)] px-4 py-8 text-sm ui-text-muted">
-              Choose an environment stage and select View activity to load recent events.
+            <div className="rounded-2xl border border-[var(--border-subtle)] p-4">
+              <div className="ui-section-eyebrow">Incomplete setup</div>
+              <div className="mt-3 space-y-3">
+                {attentionItems.incomplete.length === 0 ? (
+                  <div className="text-sm ui-text-muted">No incomplete environment configuration.</div>
+                ) : (
+                  attentionItems.incomplete.map(({ environment, incompleteCount }) => (
+                    <Link key={environment.id} to={`/environment/edit/${environment.id}`} className="block rounded-xl border border-[var(--border-subtle)] px-3 py-3 transition hover:bg-[var(--surface-hover)]">
+                      <div className="text-sm font-semibold text-[var(--text-primary)]">{environment.name}</div>
+                      <div className="mt-1 text-sm text-[var(--text-secondary)]">{incompleteCount} incomplete Azure service field{incompleteCount === 1 ? '' : 's'}</div>
+                    </Link>
+                  ))
+                )}
+              </div>
             </div>
-          ) : activityLoading[selectedActivityEnvId] ? (
-            <div className="ui-panel-muted rounded-xl p-3 text-sm">Loading activity...</div>
-          ) : activityEntries.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-[var(--border-subtle)] px-4 py-8 text-sm ui-text-muted">
-              No activity found for the current filters.
-            </div>
-          ) : (
-            <>
-              <ul className="divide-y divide-[var(--border-subtle)]">
-                {activityEntries.map((entry) => (
-                  <li key={entry.RowKey || `${entry.timestamp}-${entry.action}-${entry.status}`} className="flex items-start justify-between gap-4 py-3">
-                    <div>
-                      <div className="font-medium text-[var(--text-primary)]">
-                        {entry.eventType || entry.action || entry.status || 'Activity'}
-                      </div>
-                      <div className="mt-1 text-xs ui-text-muted">
-                        {new Date(entry.timestamp || entry.Timestamp || '').toLocaleString()}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setSelectedEntry(entry)}
-                      className={`${themeClasses.buttonSecondary} rounded px-2 py-1 text-xs`}
-                    >
-                      Details
-                    </button>
-                  </li>
-                ))}
-              </ul>
 
-              {activityCount > 10 ? (
-                <div className="mt-4 flex items-center justify-between">
-                  <div className="text-sm text-[var(--text-secondary)]">
-                    Page {activityCurrentPage + 1} / {activityPages}
+            <div className="rounded-2xl border border-[var(--border-subtle)] p-4">
+              <div className="ui-section-eyebrow">No schedules</div>
+              <div className="mt-3 space-y-3">
+                {attentionItems.withoutSchedules.length === 0 ? (
+                  <div className="text-sm ui-text-muted">Every environment has at least one enabled schedule.</div>
+                ) : (
+                  attentionItems.withoutSchedules.map((environment) => (
+                    <Link key={environment.id} to="/environment/schedules" className="block rounded-xl border border-[var(--border-subtle)] px-3 py-3 transition hover:bg-[var(--surface-hover)]">
+                      <div className="text-sm font-semibold text-[var(--text-primary)]">{environment.name}</div>
+                      <div className="mt-1 text-sm text-[var(--text-secondary)]">No enabled schedule is configured yet.</div>
+                    </Link>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="ui-panel rounded-2xl p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Upcoming scheduled actions</h2>
+              <p className="mt-1 text-sm text-[var(--text-secondary)]">The next stage actions due to run across the estate.</p>
+            </div>
+            <CalendarClock className="mt-1 h-5 w-5 text-[var(--accent-primary)]" />
+          </div>
+
+          <div className="mt-5 space-y-3">
+            {loading ? (
+              <div className="ui-panel-muted rounded-xl p-3 text-sm">Loading dashboard data...</div>
+            ) : upcomingSchedules.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-[var(--border-subtle)] px-4 py-8 text-sm ui-text-muted">
+                No upcoming enabled schedules found.
+              </div>
+            ) : (
+              upcomingSchedules.map((schedule) => (
+                <Link key={schedule.id} to="/environment/schedules" className="flex items-start justify-between gap-3 rounded-xl border border-[var(--border-subtle)] px-4 py-3 transition hover:bg-[var(--surface-hover)]">
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-[var(--text-primary)]">{schedule.environment}</div>
+                    <div className="mt-1 text-sm text-[var(--text-secondary)]">{schedule.stage} · {schedule.action}</div>
+                    <div className="mt-1 text-xs ui-text-muted">{schedule.timezone || 'No timezone'} - {formatDateTime(schedule.next_run)}</div>
                   </div>
-                  <div className="space-x-2">
-                    <button
-                      disabled={activityCurrentPage === 0}
-                      onClick={() => void loadActivityPage(selectedActivityEnvId, Math.max(0, activityCurrentPage - 1))}
-                      className={`${themeClasses.buttonSecondary} rounded px-2 py-1 text-sm disabled:opacity-50`}
-                    >
-                      Prev
-                    </button>
-                    <button
-                      disabled={activityCurrentPage >= activityPages - 1}
-                      onClick={() => void loadActivityPage(selectedActivityEnvId, Math.min(activityPages - 1, activityCurrentPage + 1))}
-                      className={`${themeClasses.buttonSecondary} rounded px-2 py-1 text-sm disabled:opacity-50`}
-                    >
-                      Next
-                    </button>
+                  <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+                </Link>
+              ))
+            )}
+          </div>
+        </section>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+        <section className="ui-panel rounded-2xl p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Recent execution outcomes</h2>
+              <p className="mt-1 text-sm text-[var(--text-secondary)]">The latest start and stop activity across all stages.</p>
+            </div>
+            <Clock3 className="mt-1 h-5 w-5 text-[var(--text-muted)]" />
+          </div>
+
+          <div className="mt-5 space-y-3">
+            {loading ? (
+              <div className="ui-panel-muted rounded-xl p-3 text-sm">Loading dashboard data...</div>
+            ) : recentExecutionSignal.recent.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-[var(--border-subtle)] px-4 py-8 text-sm ui-text-muted">
+                No recent executions found yet.
+              </div>
+            ) : (
+              recentExecutionSignal.recent.map(({ environment, stage, execution }) => (
+                <Link key={execution.executionId} to={`/environment/${environment.id}/executions`} className="flex items-start justify-between gap-3 rounded-xl border border-[var(--border-subtle)] px-4 py-3 transition hover:bg-[var(--surface-hover)]">
+                  <div>
+                    <div className="text-sm font-semibold text-[var(--text-primary)]">{environment.name}</div>
+                    <div className="mt-1 text-sm text-[var(--text-secondary)]">{stage.name} - {execution.action} - {execution.status.replace('_', ' ')}</div>
+                    <div className="mt-1 text-xs ui-text-muted">{formatDateTime(execution.requestedAt)}</div>
                   </div>
+                  {execution.status === 'failed' || execution.status === 'partially_failed' ? (
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--status-warning-text)]" />
+                  ) : (
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+                  )}
+                </Link>
+              ))
+            )}
+          </div>
+        </section>
+
+        <section className="ui-panel rounded-2xl p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Quick links</h2>
+              <p className="mt-1 text-sm text-[var(--text-secondary)]">Jump to the environment workflows you need most often.</p>
+            </div>
+            <Settings2 className="mt-1 h-5 w-5 text-[var(--text-muted)]" />
+          </div>
+
+          <div className="mt-5 grid grid-cols-1 gap-3">
+            <Link to="/environment/manage" className="flex items-center justify-between rounded-xl border border-[var(--border-subtle)] px-4 py-3 transition hover:bg-[var(--surface-hover)]">
+              <div>
+                <div className="text-sm font-semibold text-[var(--text-primary)]">Manage environments</div>
+                <div className="mt-1 text-sm text-[var(--text-secondary)]">Create, edit, and organize environment setup.</div>
+              </div>
+              <ExternalLink className="h-4 w-4 text-[var(--text-muted)]" />
+            </Link>
+            <Link to="/environment/schedules" className="flex items-center justify-between rounded-xl border border-[var(--border-subtle)] px-4 py-3 transition hover:bg-[var(--surface-hover)]">
+              <div>
+                <div className="text-sm font-semibold text-[var(--text-primary)]">Schedules</div>
+                <div className="mt-1 text-sm text-[var(--text-secondary)]">Review recurrence, timing, and notifications.</div>
+              </div>
+              <ExternalLink className="h-4 w-4 text-[var(--text-muted)]" />
+            </Link>
+            {environments.slice(0, 2).map((environment) => (
+              <Link key={environment.id} to={`/environment/${environment.id}`} className="flex items-center justify-between rounded-xl border border-[var(--border-subtle)] px-4 py-3 transition hover:bg-[var(--surface-hover)]">
+                <div>
+                  <div className="text-sm font-semibold text-[var(--text-primary)]">{environment.name}</div>
+                  <div className="mt-1 text-sm text-[var(--text-secondary)]">{environment.client || 'No client'} - {environment.stages.length} stage{environment.stages.length === 1 ? '' : 's'}</div>
                 </div>
-              ) : null}
-            </>
-          )}
-        </div>
-      </section>
-
-      <ActivityModal open={!!selectedEntry} onClose={() => setSelectedEntry(null)} entry={selectedEntry} />
+                <Server className="h-4 w-4 text-[var(--text-muted)]" />
+              </Link>
+            ))}
+          </div>
+        </section>
+      </div>
     </div>
   );
 }
