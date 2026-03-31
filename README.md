@@ -35,13 +35,9 @@ If you are new to this repository, use this order:
 
 1. Read [Spec-Driven Delivery](delivery/workflows/spec-driven-delivery.md).
 2. If the request starts as a business or high-level request, read [Business To Spec Workflow](delivery/workflows/business-to-spec-workflow.md).
-3. Create or update the feature package under `specs/features/<feature-id>-<short-name>/`.
-4. Start with the minimum artifact set:
-   - `business-request.md`
-   - `spec-refinement.md`
-   - `feature-spec.md`
-   - `validation-report.md` at closure
-5. Add `test-plan.md`, `api-spec.md`, `adr.md`, and `task-breakdown.md` only when needed.
+3. Read [AI Working Contract](delivery/governance/ai-working-contract.md) for the shared minimum rules used by Copilot, Codex, and Claude.
+4. Create or update the feature package under `specs/features/FEAT-<area>-<id>-<short-name>/`.
+5. Start with the minimum artifact set and implementation-transition rules defined in [AI Working Contract](delivery/governance/ai-working-contract.md).
 6. Only then implement code.
 
 Quick entrypoints:

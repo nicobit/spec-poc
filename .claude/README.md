@@ -9,6 +9,7 @@ Read these first:
 - `delivery/workflows/business-to-spec-workflow.md`
 - `delivery/workflows/spec-driven-delivery.md`
 - `delivery/workflows/agent-orchestration.md`
+- `delivery/governance/ai-working-contract.md`
 - `delivery/governance/traceability.md`
 - `delivery/governance/definition-of-done.md`
 - `delivery/governance/ai-collaboration.md`
@@ -17,6 +18,7 @@ Read these first:
 
 ## Claude Expectations
 
+- use `delivery/governance/ai-working-contract.md` as the shared minimum behavior layer across Copilot, Codex, and Claude
 - treat a short high-level request as valid input for orchestration
 - start feature-like work with `agents/feature-orchestrator.md`, not with implementation
 - classify the request as feature, UI standardization, backend or platform change, bug fix, docs-only, or trivial change
@@ -27,14 +29,10 @@ Read these first:
 - derive tests from acceptance criteria
 - do not implement feature code from a raw request when the governing feature package is missing or stale
 - create or update the governing feature package under `specs/features/...` before implementation
-- use the minimum artifact set by default: `business-request.md`, `spec-refinement.md`, `feature-spec.md`, and `validation-report.md` at closure
-- add `test-plan.md`, `api-spec.md`, `adr.md`, `task-breakdown.md`, and `business-approval-summary.md` only when they are needed
-- implementation can begin once scope, assumptions, constraints, affected surfaces, and acceptance criteria are explicit enough to implement safely
 - treat `delivery/workflows/agent-orchestration.md` as the default role sequence instead of inventing a new flow locally
 - treat `delivery/governance/definition-of-done.md` as the closure gate before considering the work complete
 - implement only after understanding scope and constraints
 - update docs and validation evidence along with code
-- use the trivial-change exemption only for clearly low-risk work and say explicitly when using it
 
 ## Backend Expectations
 

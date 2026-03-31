@@ -7,6 +7,7 @@ Codex should use this repository as a spec-driven delivery workspace rather than
 - `delivery/workflows/business-to-spec-workflow.md`
 - `delivery/workflows/spec-driven-delivery.md`
 - `delivery/workflows/agent-orchestration.md`
+- `delivery/governance/ai-working-contract.md`
 - `delivery/governance/traceability.md`
 - `delivery/governance/definition-of-done.md`
 - `delivery/governance/ai-collaboration.md`
@@ -15,6 +16,7 @@ Codex should use this repository as a spec-driven delivery workspace rather than
 
 ## Codex Expectations
 
+- use `delivery/governance/ai-working-contract.md` as the shared minimum behavior layer across Copilot, Codex, and Claude
 - treat a short high-level request as valid input for orchestration
 - start feature-like work with `agents/feature-orchestrator.md`, not with implementation
 - classify the request as feature, UI standardization, backend or platform change, bug fix, docs-only, or trivial change
@@ -23,15 +25,11 @@ Codex should use this repository as a spec-driven delivery workspace rather than
 - understand the feature intent before changing code
 - do not implement feature code from a raw request when the governing feature package is missing or stale
 - create or update the governing feature package under `specs/features/...` before implementation
-- use the minimum artifact set by default: `business-request.md`, `spec-refinement.md`, `feature-spec.md`, and `validation-report.md` at closure
-- add `test-plan.md`, `api-spec.md`, `adr.md`, `task-breakdown.md`, and `business-approval-summary.md` only when they are needed
-- implementation can begin once scope, assumptions, constraints, affected surfaces, and acceptance criteria are explicit enough to implement safely
 - align implementation to explicit requirements and acceptance criteria
 - keep frontend and backend changes traceable to specs
 - include tests and docs in the same delivery flow
 - treat `delivery/workflows/agent-orchestration.md` as the shared role sequence and `delivery/governance/definition-of-done.md` as the completion gate
 - call out assumptions, residual risk, and validation status
-- use the trivial-change exemption only for clearly low-risk work and say explicitly when using it
 
 ## Backend Expectations
 

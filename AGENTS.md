@@ -13,6 +13,7 @@ Read these first when relevant:
 - `README.md`
 - `delivery/workflows/spec-driven-delivery.md`
 - `delivery/workflows/business-to-spec-workflow.md`
+- `delivery/governance/ai-working-contract.md`
 - `delivery/governance/traceability.md`
 - `delivery/governance/definition-of-done.md`
 - `delivery/roles/agent-role-catalog.md`
@@ -24,17 +25,18 @@ Read these first when relevant:
 
 ## Working Contract
 
+Use [AI Working Contract](delivery/governance/ai-working-contract.md) as the shared cross-agent behavior layer.
+
 When handling a feature:
 
 1. Classify the request.
 2. If the request is feature-like, create or update the governing feature package under `specs/features/...`.
-3. Start with the minimum artifact set: `business-request.md`, `spec-refinement.md`, `feature-spec.md`, and `validation-report.md` at closure.
-4. Add `test-plan.md`, `api-spec.md`, `adr.md`, `task-breakdown.md`, and `business-approval-summary.md` only when they are needed.
-5. Identify the active role or roles.
-6. Make assumptions and open questions explicit.
-7. Derive acceptance criteria and tests before implementation.
-8. Implement the smallest correct solution.
-9. Update documentation and validation evidence.
+3. Follow the minimum package and implementation-transition rules from [AI Working Contract](delivery/governance/ai-working-contract.md).
+4. Identify the active role or roles.
+5. Make assumptions and open questions explicit.
+6. Derive acceptance criteria and tests before implementation.
+7. Implement the smallest correct solution.
+8. Update documentation and validation evidence.
 
 See [README.md](README.md) for the main repository map and [Spec-Driven Delivery](delivery/workflows/spec-driven-delivery.md) for the canonical workflow.
 
@@ -42,7 +44,7 @@ See [README.md](README.md) for the main repository map and [Spec-Driven Delivery
 
 Feature artifacts should normally live under:
 
-`specs/features/<feature-id>-<short-name>/`
+`specs/features/FEAT-<area>-<id>-<short-name>/`
 
 Typical contents:
 

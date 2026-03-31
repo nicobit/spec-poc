@@ -2,7 +2,7 @@
 
 This repository demonstrates spec-driven development. Copilot should treat repository specifications and standards as the primary source of truth.
 
-Use [README.md](../README.md) as the main repository map and [Spec-Driven Delivery](../delivery/workflows/spec-driven-delivery.md) as the canonical workflow.
+Use [README.md](../README.md) as the main repository map, [Spec-Driven Delivery](../delivery/workflows/spec-driven-delivery.md) as the canonical workflow, and [AI Working Contract](../delivery/governance/ai-working-contract.md) as the shared minimum behavior layer across Copilot, Codex, and Claude.
 
 ## Read Before Editing
 
@@ -10,6 +10,7 @@ Review these files first when relevant:
 
 - `delivery/workflows/business-to-spec-workflow.md`
 - `delivery/workflows/spec-driven-delivery.md`
+- `delivery/governance/ai-working-contract.md`
 - `delivery/workflows/copilot-agent-routing.md`
 - `delivery/governance/traceability.md`
 - `docs/standards/engineering/engineering-standards.md`
@@ -69,6 +70,9 @@ When you want one sequential entrypoint from an existing feature package, start 
 
 ## Delivery Rules
 
+The shared contract in [AI Working Contract](../delivery/governance/ai-working-contract.md) is canonical. The bullets below intentionally restate the highest-signal workflow rules locally so Copilot can follow them reliably without depending only on cross-file resolution.
+
+- Follow [AI Working Contract](../delivery/governance/ai-working-contract.md) for the minimum feature package, implementation-transition checkpoint, clarifying-question threshold, and trivial-change exemption.
 - Treat a short high-level request as valid input for orchestration.
 - Start feature-like work with `Feature Orchestrator` or the feature-orchestration prompt, not with implementation.
 - Classify the request as feature, UI standardization, backend or platform change, bug fix, docs-only, or trivial change.
@@ -76,9 +80,6 @@ When you want one sequential entrypoint from an existing feature package, start 
 - If the request comes from a business user, start by refining it with the business request and spec refinement templates.
 - Do not jump directly from a raw request to code when a governing feature package is missing or stale.
 - For feature-like work, stop and create or update the feature package under `specs/features/...` before writing code.
-- Use the minimum artifact set by default: `business-request.md`, `spec-refinement.md`, `feature-spec.md`, and `validation-report.md` at closure.
-- Add `test-plan.md`, `api-spec.md`, `adr.md`, `task-breakdown.md`, and `business-approval-summary.md` only when they are needed.
-- Implementation can begin when scope, assumptions, constraints, affected surfaces, and acceptance criteria are explicit enough to implement safely.
 - Any implementation response should name the exact `feature-spec.md` and `test-plan.md` it is following.
 - Preserve links between requirements, acceptance criteria, tests, and implementation.
 - Update automated tests when behavior changes.
@@ -113,5 +114,5 @@ When helping with a feature, Copilot should aim to produce:
 
 ## Ambiguity Handling
 
-If requirements are incomplete, explicitly list assumptions and open questions instead of silently inventing behavior.
+If requirements are incomplete, explicitly list assumptions and open questions instead of silently inventing behavior. Ask a clarifying question only when [AI Working Contract](../delivery/governance/ai-working-contract.md) says the ambiguity is material enough to require one.
 

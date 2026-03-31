@@ -6,6 +6,8 @@ This repository uses a spec-driven workflow so that human contributors and AI to
 
 Every meaningful implementation change should be traceable back to an approved specification and forward to tests and validation evidence.
 
+Use [AI Working Contract](../governance/ai-working-contract.md) as the shared cross-agent minimum behavior layer for Copilot, Codex, and Claude.
+
 ## High-Level Request Policy
 
 A short high-level request is valid input for this workflow.
@@ -27,24 +29,14 @@ Requests in the first four categories should normally follow the spec-first flow
 
 ## Minimum Artifact Policy
 
-When a request is feature-like and no adequate governing feature package exists, create or update a feature package under `specs/features/<feature-id>-<short-name>/`.
+When a request is feature-like and no adequate governing feature package exists, create or update a feature package under `specs/features/FEAT-<area>-<id>-<short-name>/`.
 
-Use the minimum artifact set by default:
+Use the minimum artifact set and "add only when needed" rules from [AI Working Contract](../governance/ai-working-contract.md).
 
-- `business-request.md`
-- `spec-refinement.md`
-- `feature-spec.md`
-- `validation-report.md` at closure
+Still add these supporting artifacts when they are warranted:
 
-Add these when needed:
-
-- `test-plan.md` when behavior changes materially
-- `api-spec.md` when contracts or interfaces change
-- `adr.md` when a meaningful design decision should be recorded
 - updates under `specs/architecture/` when the feature materially changes durable architecture views
-- `task-breakdown.md` when sequencing or coordination needs to be explicit
 - `research.md` when a non-trivial technology or approach decision requires investigation before committing to a plan
-- `business-approval-summary.md` when business approval must be captured explicitly
 
 ## Good Enough To Implement
 
@@ -58,6 +50,10 @@ Implementation may begin once the governing artifacts are complete enough to cap
 - constitution alignment confirmed (no unresolved conflicts with `delivery/governance/constitution.md`)
 
 Solution choices should appear in the refinement or feature-spec layer before they are treated as implementation commitments.
+
+After creating or materially refining a new feature package, follow the implementation-transition rule from [AI Working Contract](../governance/ai-working-contract.md).
+
+After creating or materially refining a new feature package, implementation should normally pause unless the user has already asked to proceed or the request clearly implies implementation now.
 
 When a solution choice materially affects the system beyond a single feature, update the relevant durable architecture view under `specs/architecture/` as needed.
 
