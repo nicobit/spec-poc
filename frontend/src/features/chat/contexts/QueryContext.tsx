@@ -77,7 +77,15 @@ export function QueryProvider({ children }: QueryProviderProps) {
       // If user explicitly prefixes with `ai:` use AI chat endpoint
       if (queryText.trim().toLowerCase().startsWith('ai:')) {
         const message = queryText.trim().slice(3).trim();
-        const aiResp = await submitAiChat(instance, message);
+        // include environment filter from URL if present
+        const params = new URLSearchParams(window.location.search);
+        const environmentId = params.get('environmentId');
+        const environmentName = params.get('environmentName');
+        const filters: Record<string, any> = {};
+        if (environmentId) filters.environmentId = environmentId;
+        else if (environmentName) filters.environmentName = environmentName;
+
+        const aiResp = await submitAiChat(instance, message, filters);
         // Map AI response into Query shape
         const entry = {
           query: queryText,
