@@ -41,3 +41,10 @@ test-results/
 .playwright/
 tmp-screenshots/
 frontend/tmp-screenshots/
+
+# Local environment files
+.env
+*.log
+
+# Editor workspace settings (optional)
+.vscode/

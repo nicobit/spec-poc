@@ -1,0 +1,41 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AZURE_OPENAI_KEY": "<REDACTED_OPENAI_KEY>",
+    "EMDEDDING_MODEL": "text-embedding-ada-002",
+    "COMPLETION_MODEL": "gpt-35-turbo",
+    "AZURE_OPENAI_ENDPOINT": "https://my-openai-resource.openai.azure.com",
+    "AZURE_OPENAI_VERSION": "2025-01-01-preview",
+    "AZURE_TENANT_ID": "<REDACTED_TENANT_ID>",
+    "AZURE_CLIENT_ID": "<REDACTED_CLIENT_ID>",
+    "AZURE_CLIENT_SECRET": "<REDACTED_CLIENT_SECRET>",
+    "USE_KEY_VAULT_TO_GET_CONNECTION_STRING": "false",
+    "KEY_VAULT_URI": "https://my-vault.vault.azure.net",
+    "KEY_VAULT_CORE_URI": "https://my-vault.vault.azure.net",
+    "AZURE_OPENAI_KEY_SECRET_NAME": "azure-openai-key",
+    "AZURE_OPENAI_ENDPOINT_SECRET_NAME": "azure-openai-endpoint",
+    "AZURE_OPENAI_VERSION_SECRET_NAME": "azure-openai-version",
+    "VSCODE": "true",
+    "SQL_CONNECTION_STRING_SECRET_NAME": "",
+    "SQL_CONNECTION_STRING": "",
+    "ROWS_LIMIT": "100",
+    "BLOB_STORAGE_CONNECTION_STRING": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=<REDACTED>;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;",
+    "CORS_ALLOWED_ORIGINS": "http://localhost:3000,http://localhost:5173,http://localhost:5174,http://example.com",
+    "APPLICATIONINSIGHTS_CONNECTION_STRING": "",
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "languageWorkers:python:defaultExecutablePath": ".venv\\Scripts\\python.exe",
+    "AzureWebJobsFeatureFlags": "EnableWorkerIndexing",
+    "PYTHON_ENABLE_INIT_INDEXING": "1",
+    "PYTHON_ISOLATE_WORKER_DEPENDENCIES": "1",
+    "PYTHON_ENABLE_WORKER_EXTENSIONS": "1",
+    "SCM_DO_BUILD_DURING_DEPLOYMENT": 1
+  },
+  "ConnectionStrings": {},
+  "Host": {
+    "CORS": "http://localhost:3000,http://localhost:5173,http://localhost:5174,http://example.com",
+    "CORSCredentials": true
+  }
+}
+
+// NOTE: copy this file to `backend/local.settings.json` and replace <REDACTED_*> values with real secrets
