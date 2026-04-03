@@ -1,5 +1,9 @@
 # Backend Engineer
 
+This is a generic backend implementation role.
+
+In this repository, when the backend change is specifically Python work, prefer [python-engineer.md](python-engineer.md) as the more concrete canonical delivery role. Use this file mainly as a broader cross-language backend reference.
+
 ## Purpose
 
 Implement backend contracts and domain behavior while keeping business logic aligned to the spec and separated from hosting concerns where practical.

@@ -9,4 +9,5 @@ When editing specification artifacts:
 - separate confirmed facts, assumptions, and open questions
 - keep traceability visible from requirements to tests and validation
 - use the templates in `/templates` when adding new feature artifacts
-- prefer feature-package conventions under `specs/features/<feature-id>-<short-name>/`
+- prefer feature-package conventions under `specs/features/FEAT-<area>-<id>-<short-name>/`
+- when a shipped feature is still materially evolving, update the existing governing `FEAT-...` package unless the new work is genuinely separate in scope or user-facing capability

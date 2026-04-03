@@ -32,6 +32,7 @@ Requests in the first four categories should normally follow the spec-first flow
 When a request is feature-like and no adequate governing feature package exists, create or update a feature package under `specs/features/FEAT-<area>-<id>-<short-name>/`.
 
 Use the minimum artifact set and "add only when needed" rules from [AI Working Contract](../governance/ai-working-contract.md).
+When later work materially evolves an existing shipped feature, keep the governing `FEAT-...` package current rather than creating a disconnected replacement unless the work is genuinely separate. Use the spec-maintenance rule in [AI Working Contract](../governance/ai-working-contract.md).
 
 Still add these supporting artifacts when they are warranted:
 
@@ -52,8 +53,6 @@ Implementation may begin once the governing artifacts are complete enough to cap
 Solution choices should appear in the refinement or feature-spec layer before they are treated as implementation commitments.
 
 After creating or materially refining a new feature package, follow the implementation-transition rule from [AI Working Contract](../governance/ai-working-contract.md).
-
-After creating or materially refining a new feature package, implementation should normally pause unless the user has already asked to proceed or the request clearly implies implementation now.
 
 When a solution choice materially affects the system beyond a single feature, update the relevant durable architecture view under `specs/architecture/` as needed.
 
@@ -102,6 +101,7 @@ When using this exemption, the AI tool should say so explicitly.
    - Verify traceability, standards compliance, and documentation completeness.
 9. Feedback Integration
    - After a feature is live, route production signals back into the governing specification.
+   - When later changes materially affect the same feature, update the existing governing `FEAT-...` package so the spec remains anchored to the delivered behavior.
    - Performance bottlenecks observed in production become non-functional requirements on the feature spec.
    - Security vulnerabilities or incidents become constraints on future work and must update the relevant spec or ADR.
    - Recurring user-reported issues become open questions or requirement amendments on the feature spec.

@@ -27,7 +27,14 @@ Treat these as secondary layers that should justify their complexity through act
 - `workflows/copilot-agent-routing.md`
 - `workflows/repo-structure-target.md`
 - `workflows/delivery-lifecycle.md`
+- `roles/role-checklists.md`
 - `agents/`
+
+Treat these as convenience summaries or generic references rather than the primary execution path:
+
+- `workflows/delivery-lifecycle.md`
+- `roles/role-checklists.md`
+- `roles/backend-engineer.md`
 
 If the framework starts to feel heavy, simplify the secondary layers before changing the core.
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class NotificationGroup(BaseModel):
@@ -59,5 +59,4 @@ class EnvironmentModel(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
     stages: List[StageModel] = Field(default_factory=list)
 
-    class Config:
-        extra = "allow"
+    model_config = ConfigDict(extra="allow")

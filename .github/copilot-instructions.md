@@ -79,13 +79,23 @@ The shared contract in [AI Working Contract](../delivery/governance/ai-working-c
 - Treat UI standardization, shared component adoption, and layout harmonization as feature-like work.
 - If the request comes from a business user, start by refining it with the business request and spec refinement templates.
 - Do not jump directly from a raw request to code when a governing feature package is missing or stale.
-- For feature-like work, stop and create or update the feature package under `specs/features/...` before writing code.
+- For feature-like work, stop and create or update the feature package under `specs/features/FEAT-<area>-<id>-<short-name>/` before writing code.
+- If the user says "create a feature" or uses similar language without explicitly asking for implementation now, treat that as a spec-first request, not a coding request.
+- If the user says "add a feature" or "add a new feature" without explicitly asking for implementation now, treat that as a spec-first request, not a coding request.
+- When a raw feature request creates tension between "implement immediately" and "create or update the governing feature package first", the spec-first workflow wins.
+- If the request extends an existing page, module, workflow, or shipped capability, update the existing governing `FEAT-...` package by default unless the new work is clearly separate.
+- After creating or materially refining a new feature package, pause unless the user has asked to proceed or the request clearly implies implementation now.
 - Any implementation response should name the exact `feature-spec.md` and `test-plan.md` it is following.
 - Preserve links between requirements, acceptance criteria, tests, and implementation.
 - Update automated tests when behavior changes.
 - Update documentation when the delivered behavior changes.
 - If a change affects roles, route protection, or authorization behavior, update the access-control docs in `docs/standards/security/access-control-matrix.md` and `docs/standards/security/module-authorization.md`.
 - Use the trivial-change exemption only for clearly low-risk edits such as typos, copy-only changes, isolated non-behavioral refactors, mechanical config edits, or narrow test-only changes, and say explicitly when you are using it.
+
+Example:
+
+- "Create a feature for adding bulk retire actions to the clients page." -> create or update the governing `FEAT-...` package, start with `business-request.md`, `spec-refinement.md`, and `feature-spec.md`, and do not write implementation code yet unless the user explicitly asks to proceed.
+- "Add a feature for showing postponed schedules on the environments dashboard." -> update the existing governing environments/dashboard `FEAT-...` package, refine the spec first, and do not write implementation code yet unless the user explicitly asks to proceed.
 
 ## Implementation Rules
 

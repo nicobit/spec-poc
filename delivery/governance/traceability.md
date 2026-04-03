@@ -42,6 +42,8 @@ Identifiers should be referenced in:
 - test names where practical
 - pull requests
 - validation reports
+- commit messages (e.g. `feat(FEAT-ENVIRONMENTS-001): implement environment start/stop`)
+- code comments where the logic is non-obvious without the spec context
 
 ## Minimum Traceability Rules
 
@@ -59,6 +61,16 @@ At a minimum, each feature should include a small matrix:
 | --- | --- | --- | --- |
 | `REQ-...` | `AC-...` | `TC-...` | optional |
 
+## Spec Completion Rule
+
+A feature spec may only be marked `Status: Completed` when:
+
+- the validation report is signed off with no unowned open items
+- at least one commit message or code comment references the feature ID
+- the traceability matrix in the spec reflects the delivered state, not the planned state
+
+If these conditions are not met, the spec status must remain `In Progress` or `Validation`.
+
 ## Review Rule
 
 Reviewers should reject a change if:
@@ -66,3 +78,4 @@ Reviewers should reject a change if:
 - the implementation cannot be traced back to a requirement
 - acceptance criteria are not testable
 - tests exist but are not linked to the changed behavior
+- the commit message contains no feature ID for a feature-level change

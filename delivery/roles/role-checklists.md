@@ -1,6 +1,8 @@
 # Role Checklists
 
-Use these checklists to make role handoffs explicit.
+Use these checklists as a lightweight summary to make role handoffs explicit.
+
+The canonical role definitions remain the individual role files under `delivery/roles/`.
 
 ## Business Analyst
 
@@ -91,6 +93,8 @@ Checklist:
 - maintain accessibility expectations
 
 ## Backend Engineer And Python Engineer
+
+This combined checklist is a convenience summary. When the implementation is specifically Python backend work, prefer [python-engineer.md](python-engineer.md) as the more concrete canonical role.
 
 Inputs:
 - approved feature spec

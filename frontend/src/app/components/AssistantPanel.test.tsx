@@ -48,7 +48,7 @@ describe('AssistantPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Send assistant message' }));
 
     await waitFor(() => {
-      expect(runQuery).toHaveBeenCalledWith('How many environments are running?');
+      expect(runQuery).toHaveBeenCalledWith('ai: How many environments are running?');
     });
   });
 

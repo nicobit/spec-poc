@@ -13,21 +13,21 @@ body:
     id: feature_id
     attributes:
       label: Feature ID
-      placeholder: FEAT-ADMIN-003-example-feature
+      placeholder: FEAT-CLIENTS-001-example-feature
     validations:
       required: true
   - type: input
     id: spec_path
     attributes:
       label: Feature Spec Path
-      placeholder: specs/features/FEAT-ADMIN-003-example-feature/feature-spec.md
+      placeholder: specs/features/FEAT-CLIENTS-001-example-feature/feature-spec.md
     validations:
       required: true
   - type: input
     id: test_plan_path
     attributes:
       label: Test Plan Path
-      placeholder: specs/features/FEAT-ADMIN-003-example-feature/test-plan.md
+      placeholder: specs/features/FEAT-CLIENTS-001-example-feature/test-plan.md
     validations:
       required: true
   - type: textarea

@@ -32,12 +32,18 @@ def validate_changed_files(changed_files: list[str]) -> list[str]:
         path.startswith("specs/features/") and path.endswith("/test-plan.md")
         for path in changed_files
     )
+    has_validation_report = any(
+        path.startswith("specs/features/") and path.endswith("/validation-report.md")
+        for path in changed_files
+    )
 
     errors: list[str] = []
     if not has_feature_spec:
         errors.append("Code changes detected but no feature-spec.md was updated.")
     if not has_test_plan:
         errors.append("Code changes detected but no test-plan.md was updated.")
+    if not has_validation_report:
+        errors.append("Code changes detected but no validation-report.md was updated.")
     return errors
 
 

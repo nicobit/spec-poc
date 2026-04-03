@@ -1,6 +1,6 @@
 import { useContext, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { ArrowUp, Loader2, Maximize2, MessageSquare, Minimize2, Sparkles, X } from 'lucide-react';
+import { ArrowUp, Database, Loader2, Maximize2, MessageSquare, Minimize2, Sparkles, X } from 'lucide-react';
 
 import { QueryContext } from '@/features/chat/contexts/QueryContext';
 import { themeClasses } from '@/theme/themeClasses';
@@ -36,6 +36,7 @@ export default function AssistantPanel({
   const resizeStateRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<'ai' | 'nl_sql'>('ai');
 
   const queries = queryContext?.queries ?? [];
 
@@ -84,7 +85,12 @@ export default function AssistantPanel({
     setInput('');
     setLoading(true);
     try {
-      await queryContext.runQuery(prompt);
+      // If AI mode, prefix so QueryContext routes to AI endpoint
+      if (mode === 'ai') {
+        await queryContext.runQuery(`ai: ${prompt}`);
+      } else {
+        await queryContext.runQuery(prompt);
+      }
     } finally {
       setLoading(false);
     }
@@ -198,7 +204,7 @@ export default function AssistantPanel({
               <textarea
                 ref={textareaRef}
                 rows={1}
-                placeholder="Ask anything about the portal..."
+                placeholder={mode === 'ai' ? 'Ask anything about the portal...' : 'Describe the data you want to query...'}
                 className="max-h-[240px] min-h-[2.5rem] flex-1 resize-none bg-transparent px-0 py-1 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
@@ -216,6 +222,34 @@ export default function AssistantPanel({
                 disabled={!canSubmit}
               >
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
+              </button>
+            </div>
+            <div className="mt-2 flex items-center gap-1 border-t border-[var(--border-subtle)] pt-2">
+              <button
+                type="button"
+                onClick={() => setMode('ai')}
+                aria-pressed={mode === 'ai'}
+                className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                  mode === 'ai'
+                    ? 'bg-[color-mix(in_srgb,var(--accent-primary)_14%,transparent)] text-[var(--accent-primary)]'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                <Sparkles className="h-3 w-3" />
+                AI
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('nl_sql')}
+                aria-pressed={mode === 'nl_sql'}
+                className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                  mode === 'nl_sql'
+                    ? 'bg-[color-mix(in_srgb,var(--accent-primary)_14%,transparent)] text-[var(--accent-primary)]'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                <Database className="h-3 w-3" />
+                NL→SQL
               </button>
             </div>
           </form>

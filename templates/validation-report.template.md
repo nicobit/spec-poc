@@ -26,13 +26,23 @@
 
 ## Issues Found
 
-- Issue 1:
+| Issue | Severity | Owner | Due Date | Status |
+| --- | --- | --- | --- | --- |
+| | critical / high / low | @name | YYYY-MM-DD | open / resolved |
 
 ## Known Gaps
 
-- Gap 1:
+| Gap | Impact | Owner | Due Date | Accepted By |
+| --- | --- | --- | --- | --- |
+| | | @name | YYYY-MM-DD | @name |
+
+## Spec Status
+
+- Current spec status: `Draft` / `In Progress` / `Validation` / `Completed`
+- Spec may be marked Completed only when: all issues are resolved or accepted, all gaps have owners and due dates, and at least one commit or code comment references the feature ID.
 
 ## Sign-Off
 
 - Reviewed by:
 - Decision:
+- Date:

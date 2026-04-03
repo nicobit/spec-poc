@@ -24,7 +24,7 @@ Use:
 When handling a request:
 
 1. Classify the request as feature, UI standardization, backend or platform change, bug fix, docs-only, or trivial change.
-2. If the request is feature-like and no adequate feature package exists, create or update the governing folder under `specs/features/...`.
+2. If the request is feature-like, create or update the governing folder under `specs/features/FEAT-<area>-<id>-<short-name>/`.
 3. Start from the governing feature package and identify which phases are already complete and which are missing or stale.
 4. Create the minimum artifact set by default:
    - `business-request.md`
@@ -40,8 +40,11 @@ When handling a request:
    - test-plan updates
    - traceability review
    - validation updates
-10. Keep the work scoped to the governing feature package unless a new feature package is clearly required.
+10. Keep the work scoped to the existing governing feature package when the same shipped feature is still materially evolving, and create a new package only when the new work is genuinely separate in scope, ownership, or user-facing capability.
 11. Use the trivial-change exemption only for clearly low-risk work and say explicitly when you are using it.
+12. Treat small bug fixes as eligible for the lighter path unless they materially change user-visible behavior, contracts, authorization, or durable architecture.
+13. For a raw feature request, producing implementation code before the minimum governing feature package exists is a workflow failure unless the user explicitly asked to proceed with implementation now.
+14. If a request extends an existing page, module, workflow, or shipped capability, treat updating the existing governing `FEAT-...` package as the default path and require a clear reason before creating a new package.
 
 ## Default Sequence
 

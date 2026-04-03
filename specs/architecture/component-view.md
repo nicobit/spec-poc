@@ -20,11 +20,11 @@ Current repository focus:
 
 The current intended split is:
 
-- `FEAT-ADMIN-002 Environments Management`
+- `FEAT-ENVIRONMENTS-001 Environments Management`
   - owns client/environment/stage authoring
   - owns stage `resourceActions` configuration
   - owns schedule authoring and operational UX
-- `FEAT-ADMIN-004 Start/Stop Services`
+- `FEAT-EXECUTION-001 Start/Stop Services`
   - owns execution semantics for stage start/stop requests
   - owns how configured stage `resourceActions` are executed at runtime
   - owns durable execution result handling
@@ -198,4 +198,3 @@ These may remain implementation-local at first, but they are already distinct ar
 - add a dynamic view for scheduled stage execution
 - add a persistence-oriented execution-result view when the execution store is finalized
 - add a domain-specific component view for orchestration if executor types grow substantially
-

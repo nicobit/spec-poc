@@ -37,7 +37,7 @@ If you are new to this repository, use this order:
 2. If the request starts as a business or high-level request, read [Business To Spec Workflow](delivery/workflows/business-to-spec-workflow.md).
 3. Read [AI Working Contract](delivery/governance/ai-working-contract.md) for the shared minimum rules used by Copilot, Codex, and Claude.
 4. Create or update the feature package under `specs/features/FEAT-<area>-<id>-<short-name>/`.
-5. Start with the minimum artifact set and implementation-transition rules defined in [AI Working Contract](delivery/governance/ai-working-contract.md).
+5. Start with the minimum artifact set and implementation-transition rules defined in [AI Working Contract](delivery/governance/ai-working-contract.md), including the artifact decision table.
 6. Only then implement code.
 
 Quick entrypoints:
@@ -47,6 +47,14 @@ Quick entrypoints:
 - GitHub Copilot: start with [GitHub Copilot Guidance](.github/copilot-instructions.md)
 - Claude: start with [Claude Workspace Guidance](.claude/README.md)
 - Codex: start with [Codex Workspace Guidance](.codex/README.md)
+
+Instruction priority for AI tools:
+
+1. [AGENTS.md](AGENTS.md)
+2. [AI Working Contract](delivery/governance/ai-working-contract.md)
+3. core workflow docs under [delivery/workflows](delivery/workflows/)
+4. tool-specific adapter docs under `.github/`, `.claude/`, and `.codex/`
+5. secondary summaries and reference docs
 
 ## Key Folders
 
@@ -138,6 +146,8 @@ For any significant feature request, the intended default is autonomous package 
 
 1. start with a high-level request or an existing feature package
 2. let the orchestrator classify the request and create or update the governing folder under `specs/features/FEAT-<area>-<id>-<short-name>/`
+   - when the work evolves an existing feature, update that feature's governing package instead of creating a new disconnected one
+   - create a new package only when the work is genuinely separate in user-facing capability or scope
 3. start with the minimum artifact set:
    - `business-request.md`
    - `spec-refinement.md`
@@ -180,8 +190,8 @@ See [FEAT-ADMIN-001 User Directory](specs/features/FEAT-ADMIN-001-user-directory
 
 This repository now includes an Environments Management feature to view, control and schedule start/stop lifecycle operations for managed environments.
 
-- Feature package: [FEAT-ADMIN-002 Environments Management](specs/features/FEAT-ADMIN-002-environments-management/README.md)
-- Feature spec: [feature-spec.md](specs/features/FEAT-ADMIN-002-environments-management/feature-spec.md)
+- Feature package: [FEAT-ENVIRONMENTS-001 Environments Management](specs/features/FEAT-ENVIRONMENTS-001-management/README.md)
+- Feature spec: [feature-spec.md](specs/features/FEAT-ENVIRONMENTS-001-management/feature-spec.md)
 - Developer docs: [docs/environments/README.md](docs/environments/README.md)
 - Function READMEs: `backend/function_environment/README.md`, `backend/function_scheduler_timer/README.md`, `backend/function_scheduler_worker/README.md`
 

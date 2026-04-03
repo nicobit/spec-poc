@@ -40,6 +40,33 @@ For feature-like work:
 
 Do not stop at only `business-request.md` and `feature-spec.md` by default unless the user explicitly asks for a lighter draft.
 
+## Spec Maintenance Over Time
+
+Treat an existing `specs/features/FEAT-<area>-<id>-<short-name>/` package as the governing specification while that feature is still materially evolving.
+
+- Update the existing package when later work materially extends, alters, or constrains the same shipped feature.
+- Create a new `FEAT-...` package only when the new work is meaningfully separate in scope, ownership, or user-facing capability.
+- Small bug fixes may stay on the lighter path unless they materially change user-visible behavior, contracts, authorization, or durable architecture.
+
+Examples:
+
+- Add a new scheduling rule to an existing environments feature -> update the existing `FEAT-...` package.
+- Fix a typo in a page title -> use the trivial-change exemption.
+- Fix an authorization bug in an existing API -> update the existing `FEAT-...` package and add `api-spec.md` if the contract or auth behavior changes materially.
+- Add a new dashboard capability unrelated to existing features -> create a new `FEAT-...` package.
+
+## Artifact Decision Table
+
+| Situation | Add |
+|---|---|
+| New feature-like request | `business-request.md`, `spec-refinement.md`, `feature-spec.md` |
+| Implementation or validation begins | `validation-report.md` |
+| Request/response shape, validation rules, compatibility, or authorization changes materially | `api-spec.md` |
+| Behavior is materially non-trivial, integration-heavy, role-sensitive, or edge-case-heavy | `test-plan.md` |
+| Sequencing or coordination needs to be explicit | `task-breakdown.md` |
+| A meaningful cross-cutting design decision should be recorded | `adr.md` |
+| Explicit business approval must be captured | `business-approval-summary.md` |
+
 ## Transition To Implementation
 
 After creating or materially refining a new feature package, implementation should normally pause unless one of these is true:
@@ -49,6 +76,8 @@ After creating or materially refining a new feature package, implementation shou
 - the work is a trivial-change exemption
 
 Implementation may begin once scope, assumptions, constraints, affected surfaces, and acceptance criteria are explicit enough to implement safely.
+
+Acceptance criteria do not need to use BDD/Gherkin by default. Use concise plain acceptance criteria unless scenario-style `Given / When / Then` wording improves clarity for user-visible, role-sensitive, or stateful behavior.
 
 ## Clarifying Questions
 

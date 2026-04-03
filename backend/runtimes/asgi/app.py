@@ -54,10 +54,16 @@ def _texttosql_app() -> FastAPI:
     return module.fast_app
 
 
+def _ai_chat_app() -> FastAPI:
+    module = import_module("function_ai_chat.__init__")
+    return module.fast_app
+
+
 DEFAULT_SUBAPPS: tuple[tuple[str, SubAppFactory], ...] = (
     ("health", _health_app),
     ("costs", _costs_app),
     ("llm-proxy", _llm_proxy_app),
+    ("ai-chat", _ai_chat_app),
     ("dashboard", _dashboard_app),
     ("diagrams", _diagrams_app),
     ("queryexamples", _queryexamples_app),

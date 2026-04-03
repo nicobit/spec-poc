@@ -447,8 +447,16 @@ export default function EnvironmentDetailsPage() {
             </div>
 
             <div className="mt-5 space-y-4">
-              {env.stages.map((stage) => (
-                <article key={stage.id} className={`${themeClasses.stageCard} rounded-3xl p-5`}>
+              {env.stages.map((stage) => {
+                  const stageFailed =
+                    stage.latestExecution && ['failed', 'partially_failed'].includes(stage.latestExecution.status as string);
+                  return (
+                    <article
+                      key={stage.id}
+                      className={`${themeClasses.stageCard} rounded-3xl p-5 ${
+                        stageFailed ? 'ring-2 ring-red-300/20 bg-red-50' : ''
+                      }`}
+                    >
                   <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-3">
@@ -609,8 +617,9 @@ export default function EnvironmentDetailsPage() {
                       </div>
                     </div>
                   )}
-                </article>
-              ))}
+                    </article>
+                );
+              })}
             </div>
           </section>
 
@@ -632,47 +641,56 @@ export default function EnvironmentDetailsPage() {
 
               {Array.isArray((env as any).schedules) && (env as any).schedules.length > 0 ? (
                 <div className="mt-4 space-y-3">
-                  {(env as any).schedules.map((schedule: any) => (
-                    <div key={schedule.id || schedule.stage || schedule.action} className={`${themeClasses.subsectionCard} rounded-2xl p-4`}>
-                      {(() => {
-                        const scheduleStageLabel = resolveScheduleStageLabel(schedule, env.stages || []);
-                        return (
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="font-medium text-[var(--text-primary)]">
-                          {schedule.action} {scheduleStageLabel ? `- ${scheduleStageLabel}` : ''}
+                  {(env as any).schedules.map((schedule: any) => {
+                    const scheduleFailed =
+                      schedule.latestExecution && ['failed', 'partially_failed'].includes(schedule.latestExecution.status);
+                    return (
+                      <div
+                        key={schedule.id || schedule.stage || schedule.action}
+                        className={`${themeClasses.subsectionCard} rounded-2xl p-4 ${
+                          scheduleFailed ? 'ring-2 ring-red-300/20 bg-red-50' : ''
+                        }`}
+                      >
+                        {(() => {
+                          const scheduleStageLabel = resolveScheduleStageLabel(schedule, env.stages || []);
+                          return (
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div className="font-medium text-[var(--text-primary)]">
+                                {schedule.action} {scheduleStageLabel ? `- ${scheduleStageLabel}` : ''}
+                              </div>
+                              <span className="rounded-full bg-[var(--surface-panel-muted)] px-2.5 py-1 text-xs text-[var(--text-secondary)]">
+                                {schedule.enabled === false ? 'Disabled' : 'Enabled'}
+                              </span>
+                            </div>
+                          );
+                        })()}
+                        <div className={`${themeClasses.helperText} mt-2`}>
+                          {describeSchedule(schedule.action, schedule.cron, schedule.timezone)}
                         </div>
-                        <span className="rounded-full bg-[var(--surface-panel-muted)] px-2.5 py-1 text-xs text-[var(--text-secondary)]">
-                          {schedule.enabled === false ? 'Disabled' : 'Enabled'}
-                        </span>
-                      </div>
-                        );
-                      })()}
-                      <div className={`${themeClasses.helperText} mt-2`}>
-                        {describeSchedule(schedule.action, schedule.cron, schedule.timezone)}
-                      </div>
-                      <div className={`${themeClasses.helperText} mt-1`}>
-                        Next run: {formatTimestamp(schedule.next_run)}
-                      </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${getExecutionStatusTone(
-                            schedule.latestExecution?.status,
-                          )}`}
-                        >
-                          {getExecutionStatusIcon(schedule.latestExecution?.status)}
-                          {schedule.latestExecution ? schedule.latestExecution.status.replace(/_/g, ' ') : 'No execution yet'}
-                        </span>
-                        {schedule.executionCount ? (
-                          <span className="rounded-full bg-[var(--surface-panel-muted)] px-2.5 py-1 text-xs text-[var(--text-secondary)]">
-                            {schedule.executionCount} execution{schedule.executionCount === 1 ? '' : 's'}
+                        <div className={`${themeClasses.helperText} mt-1`}>
+                          Next run: {formatTimestamp(schedule.next_run)}
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${getExecutionStatusTone(
+                              schedule.latestExecution?.status,
+                            )}`}
+                          >
+                            {getExecutionStatusIcon(schedule.latestExecution?.status)}
+                            {schedule.latestExecution ? schedule.latestExecution.status.replace(/_/g, ' ') : 'No execution yet'}
                           </span>
+                          {schedule.executionCount ? (
+                            <span className="rounded-full bg-[var(--surface-panel-muted)] px-2.5 py-1 text-xs text-[var(--text-secondary)]">
+                              {schedule.executionCount} execution{schedule.executionCount === 1 ? '' : 's'}
+                            </span>
+                          ) : null}
+                        </div>
+                        {schedule.latestExecution?.message ? (
+                          <div className={`${themeClasses.helperText} mt-2`}>{schedule.latestExecution.message}</div>
                         ) : null}
                       </div>
-                      {schedule.latestExecution?.message ? (
-                        <div className={`${themeClasses.helperText} mt-2`}>{schedule.latestExecution.message}</div>
-                      ) : null}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className={`${themeClasses.emptyState} mt-4 rounded-2xl px-4 py-8 text-sm`}>

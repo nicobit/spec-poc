@@ -1,5 +1,9 @@
 # Delivery Lifecycle
 
+This document is a lightweight summary of the delivery stages.
+
+Use [spec-driven-delivery.md](spec-driven-delivery.md) as the canonical workflow and [business-to-spec-workflow.md](business-to-spec-workflow.md) as the canonical business-request entry path.
+
 Use this lifecycle for any feature, enhancement, or significant bug fix.
 
 ## Stage 1: Request Intake

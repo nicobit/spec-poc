@@ -9,7 +9,7 @@ import ConfirmDialog from '@/components/ConfirmDialog';
 import { useAuthZ } from '@/auth/useAuthZ';
 import { themeClasses } from '@/theme/themeClasses';
 
-import { listClients, retireClient, type ClientRecord } from '../api';
+import { listClients, retireClient, retireClients, type ClientRecord } from '../api';
 import ClientsPageLayout from '../components/ClientsPageLayout';
 
 function ClientInventoryActionButton({
@@ -59,6 +59,8 @@ export default function ClientsPage() {
   const [includeRetired, setIncludeRetired] = useState(false);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [confirm, setConfirm] = useState<ClientRecord | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [confirmBulk, setConfirmBulk] = useState(false);
 
   useEffect(() => {
     if (!canView) {
@@ -100,9 +102,36 @@ export default function ClientsPage() {
       await retireClient(instance, confirm.id);
       enqueueSnackbar('Client retired', { variant: 'success' });
       setConfirm(null);
+      setSelectedIds((ids) => ids.filter((id) => id !== confirm.id));
       setRefreshNonce((value) => value + 1);
     } catch (err) {
       enqueueSnackbar(err instanceof Error ? err.message : 'Failed to retire client', { variant: 'error' });
+    }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function selectAllActive(checked: boolean) {
+    if (!checked) {
+      setSelectedIds([]);
+      return;
+    }
+    const activeIds = clients.filter((c) => !c.retired).map((c) => c.id);
+    setSelectedIds(activeIds);
+  }
+
+  async function handleBulkRetire() {
+    if (selectedIds.length === 0) return;
+    try {
+      await retireClients(instance, selectedIds);
+      enqueueSnackbar(`Retired ${selectedIds.length} clients`, { variant: 'success' });
+      setConfirmBulk(false);
+      setSelectedIds([]);
+      setRefreshNonce((v) => v + 1);
+    } catch (err) {
+      enqueueSnackbar(err instanceof Error ? err.message : 'Failed to retire selected clients', { variant: 'error' });
     }
   }
 
@@ -120,6 +149,16 @@ export default function ClientsPage() {
           >
             <RefreshCcw className="h-4 w-4" />
             Refresh
+          </button>
+          <button
+            type="button"
+            className={`${themeClasses.buttonSecondary} inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm`}
+            onClick={() => setConfirmBulk(true)}
+            disabled={selectedIds.length === 0}
+            title={selectedIds.length === 0 ? 'Select clients to retire' : `Retire ${selectedIds.length} selected clients`}
+          >
+            <Trash2 className="h-4 w-4" />
+            Retire selected
           </button>
           {canEdit ? (
             <button
@@ -147,6 +186,14 @@ export default function ClientsPage() {
               <input checked={includeRetired} onChange={(event) => setIncludeRetired(event.target.checked)} type="checkbox" />
               Include retired
             </label>
+            <label className={`${themeClasses.helperText} inline-flex items-center gap-2`}>
+              <input
+                type="checkbox"
+                checked={clients.length > 0 && selectedIds.length > 0 && clients.filter((c) => !c.retired).every((c) => selectedIds.includes(c.id))}
+                onChange={(event) => selectAllActive(event.target.checked)}
+              />
+              Select all active
+            </label>
           </div>
           <div className={`${themeClasses.helperText} flex items-center gap-4 text-sm`}>
             <span>{summary.active} active</span>
@@ -171,6 +218,16 @@ export default function ClientsPage() {
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-start gap-3">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(client.id)}
+                        disabled={client.retired || !canEdit}
+                        onChange={() => toggleSelect(client.id)}
+                        aria-label={`Select ${client.name}`}
+                        className="mr-2 h-4 w-4"
+                      />
+                    </div>
                     <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[var(--surface-hover)]">
                       <Building2 className="h-5 w-5" />
                     </div>
@@ -252,6 +309,16 @@ export default function ClientsPage() {
         cancelLabel="Cancel"
         onCancel={() => setConfirm(null)}
         onConfirm={() => void handleRetire()}
+      />
+
+      <ConfirmDialog
+        open={confirmBulk}
+        title={selectedIds.length > 0 ? `Retire ${selectedIds.length} clients?` : 'Retire selected clients?'}
+        message={selectedIds.length > 0 ? `This will logically retire the selected ${selectedIds.length} clients.` : 'No clients selected.'}
+        confirmLabel="Retire selected"
+        cancelLabel="Cancel"
+        onCancel={() => setConfirmBulk(false)}
+        onConfirm={() => void handleBulkRetire()}
       />
     </ClientsPageLayout>
   );

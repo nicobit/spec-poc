@@ -41,6 +41,7 @@ class RepositoryRulesTest(unittest.TestCase):
             "frontend/src/App.tsx",
             "specs/features/FEAT-ADMIN-001-user-directory/feature-spec.md",
             "specs/features/FEAT-ADMIN-001-user-directory/test-plan.md",
+            "specs/features/FEAT-ADMIN-001-user-directory/validation-report.md",
         ]
         self.assertEqual(verify_spec_changes.validate_changed_files(changed_files), [])
 
@@ -49,6 +50,16 @@ class RepositoryRulesTest(unittest.TestCase):
         errors = verify_spec_changes.validate_changed_files(changed_files)
         self.assertIn("Code changes detected but no feature-spec.md was updated.", errors)
         self.assertIn("Code changes detected but no test-plan.md was updated.", errors)
+        self.assertIn("Code changes detected but no validation-report.md was updated.", errors)
+
+    def test_verify_spec_changes_fails_without_validation_report(self) -> None:
+        changed_files = [
+            "backend/function_ai_chat/__init__.py",
+            "specs/features/FEAT-ASSISTANT-002-ai-chat-schedules/feature-spec.md",
+            "specs/features/FEAT-ASSISTANT-002-ai-chat-schedules/test-plan.md",
+        ]
+        errors = verify_spec_changes.validate_changed_files(changed_files)
+        self.assertIn("Code changes detected but no validation-report.md was updated.", errors)
 
 
 if __name__ == "__main__":

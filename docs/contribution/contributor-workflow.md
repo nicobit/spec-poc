@@ -61,16 +61,33 @@ Examples:
 - `specs/features/FEAT-ADMIN-001-user-directory/`
 - `specs/features/FEAT-OPS-003-health-dashboard/`
 
+## Commit Message Convention
+
+Every feature-level commit should include the feature ID:
+
+```
+<type>(<FEAT-ID>): <short description>
+```
+
+Examples:
+- `feat(FEAT-EXECUTION-001): implement environment stop endpoint`
+- `fix(FEAT-CLIENTS-001): handle missing client id on update`
+- `test(FEAT-ENVIRONMENTS-001): add integration coverage for AC-ENV-003`
+
+A `.gitmessage` template is configured in this repo. It will appear automatically when you run `git commit` without `-m`.
+
+Commits with no spec context (chore, ci, docs) may omit the FEAT-ID.
+
 ## Pull Request Expectations
 
 A pull request should summarize:
 
-- the source request or feature id
+- the source request or feature ID
 - the affected specs
 - the affected code areas
 - the tests added or updated
 - the validation status
-- open risks or gaps
+- open risks or gaps with owners and due dates
 
 ## Review Reminder
 
@@ -79,5 +96,4 @@ Review the change against:
 - `delivery/governance/traceability.md`
 - `docs/standards/engineering/engineering-standards.md`
 - `delivery/governance/definition-of-done.md`
-
 
