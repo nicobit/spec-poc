@@ -1,6 +1,7 @@
 import { useContext, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import ReactMarkdown from 'react-markdown';
-import { ArrowUp, Database, Loader2, Maximize2, MessageSquare, Minimize2, Sparkles, X } from 'lucide-react';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
+import { ArrowUp, Database, Loader2, Maximize2, MessageSquare, Minimize2, Sparkles, X, ChevronDown } from 'lucide-react';
 
 import { QueryContext } from '@/features/chat/contexts/QueryContext';
 import { themeClasses } from '@/theme/themeClasses';
@@ -31,6 +32,8 @@ export default function AssistantPanel({
   onClose,
 }: AssistantPanelProps) {
   const queryContext = useContext(QueryContext);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [previewSessions, setPreviewSessions] = useState<any[]>([]);
   const listEndRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const resizeStateRef = useRef<{ startX: number; startWidth: number } | null>(null);
@@ -39,6 +42,7 @@ export default function AssistantPanel({
   const [mode, setMode] = useState<'ai' | 'nl_sql'>('ai');
 
   const queries = queryContext?.queries ?? [];
+  const hasPendingEntry = queries.some((entry) => entry.isPending);
 
   useEffect(() => {
     if (typeof listEndRef.current?.scrollIntoView === 'function') {
@@ -135,6 +139,56 @@ export default function AssistantPanel({
           </div>
         </div>
         <div className="absolute right-2 top-2 flex items-center gap-1">
+          {/* Recent sessions dropdown placed in assistant header */}
+          <div className="relative">
+            <button
+              type="button"
+              className={`${themeClasses.iconButton} rounded-full p-1`}
+              aria-label="Recent chats"
+              onClick={async () => {
+                setMenuOpen((v) => !v);
+                try {
+                  await queryContext?.loadSessions();
+                  setPreviewSessions(queryContext?.sessions?.slice(0, 3) ?? []);
+                } catch {}
+              }}
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 z-50 mt-2 w-64 rounded-md border bg-white p-2 shadow-lg dark:bg-gray-900">
+                {previewSessions.length === 0 ? (
+                  <div className="px-2 py-2 text-sm text-gray-500">No recent chats</div>
+                ) : (
+                  previewSessions.map((s) => (
+                    <button
+                      key={s.id}
+                      className="block w-full truncate px-2 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
+                      onClick={async () => {
+                        try {
+                          await queryContext?.loadSession(s.id);
+                          setMenuOpen(false);
+                        } catch {}
+                      }}
+                    >
+                      {s.name}
+                    </button>
+                  ))
+                )}
+                <div className="mt-1 border-t pt-1">
+                  <button
+                    className="w-full rounded px-2 py-1 text-left text-xs text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    onClick={async () => {
+                      setMenuOpen(false);
+                      await queryContext?.loadSessions();
+                    }}
+                  >
+                    Open all sessions
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
           <button
             type="button"
             className={`${themeClasses.iconButton} rounded-full p-1`}
@@ -174,9 +228,16 @@ export default function AssistantPanel({
                   <div className="max-w-[92%] rounded-3xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-4 py-3 text-sm text-[var(--text-primary)] shadow-sm">
                     {entry.error ? (
                       <div className="text-[var(--status-error-text)]">{entry.error}</div>
+                    ) : entry.isPending ? (
+                      <div className="flex items-center gap-2 text-[var(--text-muted)]">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Thinking...
+                      </div>
                     ) : entry.answer ? (
                       <div className="prose prose-sm max-w-none dark:prose-invert">
-                        <ReactMarkdown>{entry.answer}</ReactMarkdown>
+                        <div
+                          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(entry.answer || '')) }}
+                        />
                       </div>
                     ) : (
                       <div className={themeClasses.helperText}>No answer returned.</div>
@@ -184,7 +245,7 @@ export default function AssistantPanel({
                   </div>
                 </article>
               ))}
-              {loading ? (
+              {loading && !hasPendingEntry ? (
                 <div className="flex items-center gap-2 rounded-3xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-4 py-3 text-sm text-[var(--text-muted)] shadow-sm">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Thinking...

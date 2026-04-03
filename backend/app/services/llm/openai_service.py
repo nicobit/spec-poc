@@ -51,3 +51,16 @@ class OpenAIService:
         )
         retval = response.choices[0].message.content.strip()
         return retval
+
+    @classmethod
+    def chat_with_tools(cls, messages: list, tools: list, model=COMPLETION_MODEL, max_tokens: int = 800, temperature: float = 0):
+        """Send a chat request with tool definitions. Returns the raw response message object."""
+        response = cls.client().chat.completions.create(
+            model=model,
+            messages=messages,
+            tools=tools,
+            tool_choice="auto",
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+        return response.choices[0].message

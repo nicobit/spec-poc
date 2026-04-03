@@ -7,7 +7,7 @@
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
-      "route": "texttosql/{*any}",
+      "route": "api/texttosql/{*any}",
       "methods": ["get", "post", "put", "delete"]
     },
     {

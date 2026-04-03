@@ -46,10 +46,22 @@ The App Service managed identity should normally have:
 - `Key Vault Secrets User` on the backend Key Vault
 - `Storage Blob Data Contributor` on the backend Storage Account
 - `Storage Table Data Contributor` on the backend Storage Account
+- `Cosmos DB Built-in Data Contributor` on the Cosmos DB account (required if chat sessions or execution history use Cosmos)
 
 Those assignments are created by:
 
 - [backend/deployment/access/main.bicep](../../backend/deployment/access/main.bicep)
+
+## Cosmos DB Container Provisioning
+
+The backend creates Cosmos containers on first use via `create_container_if_not_exists`. No manual container setup is required, but the following containers are expected in the `adminportal` database:
+
+| Container | Partition key | TTL | Feature |
+|-----------|--------------|-----|---------|
+| `stageexecutions` | `/clientId` | Not enabled | Scheduler execution history |
+| `chatsessions` | `/userId` | Per-document (default 7 days) | AI chat session history (FEAT-ASSISTANT-003) |
+
+If you provision containers manually (e.g. via IaC), ensure the `chatsessions` container has `defaultTtl` set to `-1` (rely on per-document `ttl` field).
 
 ## Key Vault Secret Population
 

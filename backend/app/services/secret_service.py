@@ -1,8 +1,7 @@
-from azure.identity import ManagedIdentityCredential
-from azure.identity import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
 from app.utils.nb_logger import NBLogger
 from app.settings import  TENANT_ID as TENANT
+from shared.execution_identity import build_execution_credential
 import os
 
 
@@ -19,20 +18,11 @@ class SecretService:
         if VSCODE:
             print("Using DefaultAzureCredential for local development")
             logger.info("Using DefaultAzureCredential for local development")
-            return DefaultAzureCredential(
-                # keep local chain simple
-                exclude_managed_identity_credential=True,
-                exclude_shared_token_cache_credential=True,
-                # let dev creds issue tokens for your tenant
-                additionally_allowed_tenants=[TENANT],   # or ["*"] to allow any
-                # (optional) be explicit about VS Code/broker tenant
-                visual_studio_code_tenant_id=TENANT,
-                broker_tenant_id=TENANT,
-            )
+            return build_execution_credential(preferred_tenant=TENANT)
         else:
             print("Using ManagedIdentityCredential for production")
             logger.info("Using ManagedIdentityCredential for production")
-            return ManagedIdentityCredential()
+            return build_execution_credential()
        
 
     @staticmethod

@@ -3,194 +3,183 @@ from fastapi import FastAPI, Request, HTTPException
 from pydantic import BaseModel
 from shared.context import get_current_user
 from shared.utils.nb_logger import NBLogger
-from shared.client_store import get_client
-from shared.environment_store import get_environment, list_environments
+from shared.client_store import list_clients, get_client
+from shared.environment_store import list_environments
 from shared.scheduler_store import SCHEDULES
-from shared.execution_store import list_stage_executions_for_schedule, get_stage_execution_store
+from shared.execution_store import (
+    list_stage_executions_for_schedule,
+    get_failure_summary,
+    list_failed_executions,
+    get_stage_execution_store,
+)
 from app.services.llm.openai_service import OpenAIService
-from app.services.llm.prompt_manager import PromptManager
 from app.services.llm.schemas import AiAnswerModel
 from .redaction import redact_text
+from shared.chat_session_store import (
+    new_session,
+    append_turn,
+    needs_summarization,
+    build_history_messages,
+    get_session_inmemory,
+    put_session_inmemory,
+    get_chat_session_store,
+)
 import json
 import re
-import os
-from pathlib import Path
+
+SESSION_NAME_MAX = 120
 
 logger = NBLogger().Log()
 fast_app = FastAPI()
+
+# ---------------------------------------------------------------------------
+# Tool definitions exposed to the LLM via function-calling
+# ---------------------------------------------------------------------------
+_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_recent_executions",
+            "description": "Get the most recent stage executions for a specific schedule.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "schedule_id": {"type": "string", "description": "The schedule ID"},
+                    "limit": {"type": "integer", "description": "Max executions to return (default 10)"},
+                },
+                "required": ["schedule_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_failure_summary",
+            "description": "Get aggregated failure counts per schedule over the last N days.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "since_days": {"type": "integer", "description": "Number of past days to consider (default 7)"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_failed_executions",
+            "description": "List recent failed executions, optionally filtered by schedule.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "schedule_id": {"type": "string", "description": "Optional schedule ID filter"},
+                    "since_days": {"type": "integer", "description": "Number of past days to consider (default 7)"},
+                    "limit": {"type": "integer", "description": "Max results (default 20)"},
+                },
+                "required": [],
+            },
+        },
+    },
+]
+
 
 
 class ChatRequest(BaseModel):
     message: str
     filters: dict | None = None
     includeRemediation: bool = True
+    session_id: str | None = None
+    name: str | None = None  # optional name when creating a new session
 
 
-def _find_schedule(schedule_id: str):
-    for s in SCHEDULES:
-        if s.get("id") == schedule_id or s.get("stage_id") == schedule_id:
-            return s
-    return None
+# ---------------------------------------------------------------------------
+# Tier 1 — compact catalog always injected into every prompt
+# ---------------------------------------------------------------------------
 
-
-def _sanitize_client(client: dict | None):
+def _sanitize_client(client: dict | None) -> dict | None:
     if not client:
         return None
     sanitized = dict(client)
-    # redact client admin emails/ids
     admins = sanitized.get("clientAdmins") or []
-    sanitized_admins = []
-    for a in admins:
-        safe = dict(a)
-        if safe.get("id") and "@" in safe.get("id"):
-            safe["id"] = "<redacted>"
-        sanitized_admins.append(safe)
-    sanitized["clientAdmins"] = sanitized_admins
+    sanitized["clientAdmins"] = [
+        {**a, "id": "<redacted>"} if a.get("id") and "@" in str(a.get("id")) else a
+        for a in admins
+    ]
     return sanitized
 
 
-def _build_result_data(question: str, filters: dict | None):
-    pieces = []
-    # include filters echo
-    pieces.append(f"Question: {question}")
-    if filters:
-        pieces.append(f"Filters: {json.dumps(filters)}")
+def _build_catalog() -> str:
+    clients = [
+        {"id": c.get("id"), "name": c.get("name"), "shortCode": c.get("shortCode"), "retired": c.get("retired")}
+        for c in list_clients(include_retired=True)
+    ]
+    environments = [
+        {"id": e.get("id"), "name": e.get("name"), "status": e.get("status")}
+        for e in list_environments()
+    ]
+    schedules = [
+        {
+            "id": s.get("id"),
+            "clientId": s.get("client_id"),
+            "environment": s.get("environment"),
+            "environmentId": s.get("environment_id"),
+            "enabled": s.get("enabled"),
+            "next_run": s.get("next_run"),
+        }
+        for s in SCHEDULES
+    ]
+    return json.dumps({"clients": clients, "environments": environments, "schedules": schedules}, indent=2)
 
-    schedule = None
-    skip_executions = False
 
-    # environment filter resolution
-    env_filter_id = filters.get("environmentId") if filters else None
-    env_filter_name = filters.get("environmentName") if filters else None
-    matched_env = None
-    if env_filter_id:
-        matched_env = get_environment(env_filter_id)
-    elif env_filter_name:
-        for e in list_environments():
-            if e.get("name") and e.get("name").lower() == env_filter_name.lower():
-                matched_env = e
-                break
-    if matched_env:
-        pieces.append("Environment filter applied:")
-        pieces.append(json.dumps({"id": matched_env.get("id"), "name": matched_env.get("name"), "status": matched_env.get("status")}, indent=2))
-    if filters and filters.get("scheduleId"):
-        schedule = _find_schedule(filters.get("scheduleId"))
-        if schedule:
-            # if environment filter present, enforce match or note mismatch
-            if matched_env:
-                sched_env_id = schedule.get("environment_id") or schedule.get("environment")
-                name_matches = env_filter_name and ((schedule.get("environment") or "").lower() == env_filter_name.lower())
-                id_matches = env_filter_id and schedule.get("environment_id") == env_filter_id
-                if (env_filter_id and not id_matches) or (env_filter_name and not name_matches and not id_matches):
-                    pieces.append("Note: requested schedule exists in a different environment than requested filter.")
-                    pieces.append(f"Requested schedule {schedule.get('id')} is in environment {schedule.get('environment')} which does not match requested environment {env_filter_id or env_filter_name}.")
-                    pieces.append("Schedule summary:")
-                    pieces.append(json.dumps({
-                        "id": schedule.get("id"),
-                        "clientId": schedule.get("client_id"),
-                        "environment": schedule.get("environment"),
-                        "next_run": schedule.get("next_run"),
-                        "enabled": schedule.get("enabled")
-                    }, indent=2))
-                    # avoid including executions from other environments
-                    skip_executions = True
-                else:
-                    pieces.append("Schedule summary:")
-                    pieces.append(json.dumps({
-                        "id": schedule.get("id"),
-                        "clientId": schedule.get("client_id"),
-                        "environment": schedule.get("environment"),
-                        "next_run": schedule.get("next_run"),
-                        "enabled": schedule.get("enabled")
-                    }, indent=2))
+# ---------------------------------------------------------------------------
+# Tier 2 — tool dispatcher called when LLM emits a tool_call
+# ---------------------------------------------------------------------------
+
+def _execute_tool(name: str, args: dict) -> str:
+    store = get_stage_execution_store()
+    try:
+        if name == "get_recent_executions":
+            schedule_id = args.get("schedule_id", "")
+            limit = int(args.get("limit", 10))
+            if store:
+                result = store.list_stage_executions_for_schedule(schedule_id, limit=limit)
             else:
-                pieces.append("Schedule summary:")
-                pieces.append(json.dumps({
-                    "id": schedule.get("id"),
-                    "clientId": schedule.get("client_id"),
-                    "environment": schedule.get("environment"),
-                    "next_run": schedule.get("next_run"),
-                    "enabled": schedule.get("enabled")
-                }, indent=2))
+                result = list_stage_executions_for_schedule(schedule_id, limit=limit)
+            short = [
+                {"executionId": e.get("executionId") or e.get("id"), "requestedAt": e.get("requestedAt"), "status": e.get("status"), "error": e.get("error")}
+                for e in result
+            ]
+            return json.dumps(short)
 
-    # client
-    client = None
-    if filters and filters.get("clientId"):
-        client = get_client(filters.get("clientId"))
-        pieces.append("Client summary:")
-        pieces.append(json.dumps(_sanitize_client(client), indent=2))
-    elif schedule and schedule.get("client_id"):
-        client = get_client(schedule.get("client_id"))
-        pieces.append("Client inferred from schedule:")
-        pieces.append(json.dumps(_sanitize_client(client), indent=2))
+        if name == "get_failure_summary":
+            since_days = int(args.get("since_days", 7))
+            if store:
+                result = store.get_failure_summary(since_days=since_days)
+            else:
+                result = get_failure_summary(since_days=since_days)
+            return json.dumps(result)
 
-    # environment
-    if schedule and schedule.get("environment_id"):
-        env = get_environment(schedule.get("environment_id"))
-        if env:
-            pieces.append("Environment summary:")
-            pieces.append(json.dumps({"id": env.get("id"), "name": env.get("name"), "status": env.get("status")}, indent=2))
-    elif matched_env:
-        # include environment summary when filter used and no specific schedule
-        pieces.append("Environment summary:")
-        pieces.append(json.dumps({"id": matched_env.get("id"), "name": matched_env.get("name"), "status": matched_env.get("status")}, indent=2))
+        if name == "list_failed_executions":
+            since_days = int(args.get("since_days", 7))
+            schedule_id = args.get("schedule_id") or None
+            limit = int(args.get("limit", 20))
+            if store:
+                result = store.list_failed_executions(since_days=since_days, schedule_id=schedule_id, limit=limit)
+            else:
+                result = list_failed_executions(since_days=since_days, schedule_id=schedule_id, limit=limit)
+            short = [
+                {"executionId": e.get("executionId") or e.get("id"), "scheduleId": e.get("scheduleId"), "requestedAt": e.get("requestedAt"), "status": e.get("status"), "error": e.get("error")}
+                for e in result
+            ]
+            return json.dumps(short)
 
-    # recent executions / failures
-    if schedule and not skip_executions:
-        # try in-memory first
-        try:
-            executions = list_stage_executions_for_schedule(schedule.get("id"), limit=10)
-        except Exception:
-            store = get_stage_execution_store()
-            executions = store.list_stage_executions_for_schedule(schedule.get("id"), limit=10) if store else []
-        pieces.append("Recent executions (truncated):")
-        # include only timestamp and status and error messages
-        short = []
-        for e in executions:
-            short.append({
-                "executionId": e.get("executionId") or e.get("id"),
-                "requestedAt": e.get("requestedAt"),
-                "status": e.get("status"),
-                "error": e.get("error")
-            })
-        pieces.append(json.dumps(short, indent=2))
+    except Exception as exc:
+        logger.exception("Tool %s failed: %s", name, exc)
+        return json.dumps({"error": str(exc)})
 
-    # if no specific schedule but an environment filter exists, include schedules and aggregated executions for that environment
-    if not schedule and matched_env:
-        env_id = matched_env.get("id")
-        # find schedules in environment
-        schedules_in_env = [s for s in SCHEDULES if (s.get("environment_id") == env_id) or ((s.get("environment") or "").lower() == (env_filter_name or "").lower())]
-        if schedules_in_env:
-            pieces.append("Schedules in requested environment:")
-            brief = []
-            for s in schedules_in_env:
-                brief.append({"id": s.get("id"), "clientId": s.get("client_id"), "stageId": s.get("stage_id"), "next_run": s.get("next_run"), "enabled": s.get("enabled")})
-            pieces.append(json.dumps(brief, indent=2))
+    return json.dumps({"error": f"Unknown tool: {name}"})
 
-            # aggregate recent executions across these schedules (limit 10)
-            pieces.append("Recent executions (truncated):")
-            short = []
-            for s in schedules_in_env:
-                try:
-                    executions = list_stage_executions_for_schedule(s.get("id"), limit=10)
-                except Exception:
-                    store = get_stage_execution_store()
-                    executions = store.list_stage_executions_for_schedule(s.get("id"), limit=10) if store else []
-                for e in executions:
-                    if len(short) >= 10:
-                        break
-                    short.append({
-                        "executionId": e.get("executionId") or e.get("id"),
-                        "requestedAt": e.get("requestedAt"),
-                        "status": e.get("status"),
-                        "error": e.get("error"),
-                        "scheduleId": s.get("id"),
-                    })
-                if len(short) >= 10:
-                    break
-            pieces.append(json.dumps(short, indent=2))
-
-    return "\n\n".join(pieces)
 
 
 @fast_app.post("/api/ai/chat")
@@ -204,45 +193,100 @@ async def ai_chat(req: Request, body: ChatRequest):
         logger.error("Auth error: %s", e)
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    # build context
-    filters = body.filters or {}
-    result_data = _build_result_data(body.message, filters)
-    # redact potential PII before including in prompt (allowlist via env AI_REDACTION_ALLOWLIST)
-    result_data = redact_text(result_data)
+    # Resolve stable user identifier from JWT claims
+    user_id: str = (
+        (user or {}).get("oid")
+        or (user or {}).get("sub")
+        or (user or {}).get("preferred_username")
+        or "anonymous"
+    )
 
-    # Build prompt using template from prompts/answer_prompt.tpl
+    # Load or create session
+    session_store = get_chat_session_store()
+    session = None
+    if body.session_id:
+        if session_store:
+            session = session_store.get_session(body.session_id, user_id)
+        else:
+            session = get_session_inmemory(body.session_id, user_id)
+    if session is None:
+        name = (body.name or "")[:SESSION_NAME_MAX] or None
+        session = new_session(user_id, name=name)
+
+    # Tier 1: build compact catalog and redact PII
+    catalog = redact_text(_build_catalog())
+
+    system_msg = (
+        "You are a concise, factual assistant for an admin portal. "
+        "Use only the provided CATALOG data and tool results to answer. "
+        "Do not invent data. Respond with JSON: {\"answer\": str, \"remediation\": [str], \"references\": [str]}. "
+        "The value of the \"answer\" field MUST be a Markdown-formatted string — use headings, lists, and fenced code blocks (```)... when appropriate. "
+        "Do not return HTML. Keep the JSON valid and return ONLY the JSON object in your final message."
+    )
+    user_msg = (
+        f"CATALOG:\n{catalog}\n\n"
+        f"QUESTION: {body.message}"
+    )
+
+    # Inject token-budget-windowed history between system prompt and current user turn
+    history_messages = [
+        {"role": m["role"], "content": redact_text(m["content"])}
+        for m in build_history_messages(session)
+        if m.get("content")
+    ]
+    messages = [
+        {"role": "system", "content": system_msg},
+        *history_messages,
+        {"role": "user", "content": user_msg},
+    ]
+
+    # Tool-calling loop: max 2 rounds to bound cost
+    resp_text = None
     try:
-        # Resolve prompts directory relative to backend package
-        base_dir = Path(__file__).resolve().parents[1]
-        prompts_dir = str(base_dir / "prompts")
-        if not os.path.exists(prompts_dir):
-            # fallback to repository-level prompts
-            prompts_dir = os.path.join(os.getcwd(), "backend", "prompts")
-        pm = PromptManager(templates_path=prompts_dir)
-        template = pm.load_template("answer_prompt")
-        # format with variables expected in template
-        user_prompt_text = template.replace("{user_question}", body.message).replace("{result_data}", result_data)
+        for _ in range(2):
+            msg = OpenAIService.chat_with_tools(messages=messages, tools=_TOOLS, max_tokens=800)
 
-        messages = [
-            {"role": "system", "content": "You are a concise, factual data interpreter. Respond using only provided RESULT data."},
-            {"role": "user", "content": user_prompt_text},
-        ]
+            # No tool call — we have the final answer
+            if not msg.tool_calls:
+                resp_text = msg.content or ""
+                break
 
-        resp_text = OpenAIService.chat(messages=messages, temperature=0, max_tokens=800)
+            # Append assistant turn with tool calls
+            messages.append({"role": "assistant", "content": msg.content, "tool_calls": [
+                {"id": tc.id, "type": "function", "function": {"name": tc.function.name, "arguments": tc.function.arguments}}
+                for tc in msg.tool_calls
+            ]})
+
+            # Execute each tool and append results
+            for tc in msg.tool_calls:
+                args = {}
+                try:
+                    args = json.loads(tc.function.arguments or "{}")
+                except Exception:
+                    pass
+                tool_result = redact_text(_execute_tool(tc.function.name, args))
+                messages.append({"role": "tool", "tool_call_id": tc.id, "content": tool_result})
+
+        if resp_text is None:
+            # Ran out of rounds — do a final call without tools
+            msg = OpenAIService.chat_with_tools(messages=messages, tools=[], max_tokens=800)
+            resp_text = msg.content or ""
+
     except Exception as e:
-        logger.exception("OpenAI call or prompt building failed: %s", e)
+        logger.exception("OpenAI call failed: %s", e)
         raise HTTPException(status_code=503, detail="AI service unavailable")
 
-    # try parse JSON
-    # Try to parse a JSON object from the model output and validate with schema
+    # Append user turn to session
+    append_turn(session, "user", body.message)
+
+    # Parse and validate JSON response to extract the Markdown answer
     ans = None
-    remediation = []
-    references = []
+    remediation: list = []
+    references: list = []
     try:
         m = re.search(r"\{[\s\S]*\}", resp_text)
         if m:
             j = json.loads(m.group(0))
-            # validate/normalize using pydantic schema
             model = AiAnswerModel.model_validate(j)
             ans = model.answer
             remediation = model.remediation or []
@@ -250,10 +294,50 @@ async def ai_chat(req: Request, body: ChatRequest):
         else:
             ans = resp_text
     except Exception as e:
-        logger.debug("LLM response schema validation failed, returning raw text: %s", e)
+        logger.debug("LLM response schema validation failed, storing raw text: %s", e)
         ans = resp_text
 
-    return {"answer": ans, "remediation": remediation, "references": references}
+    # Append assistant turn using the parsed answer (prefer Markdown answer when available)
+    append_turn(session, "assistant", ans or "")
+
+    # Rolling summarization — triggered when unsummarized turns reach threshold
+    if needs_summarization(session):
+        unsummarized_turns = session["turns"][session["summarizedUpTo"]:]
+        summary_prompt = (
+            "Summarize the following conversation turns concisely for system context. "
+            "Focus on key facts, questions asked, and answers given.\n\n"
+            + "\n".join(f'{t["role"].upper()}: {t["content"]}' for t in unsummarized_turns)
+        )
+        try:
+            sm = OpenAIService.chat_with_tools(
+                messages=[{"role": "user", "content": summary_prompt}],
+                tools=[],
+                max_tokens=400,
+            )
+            new_summary = sm.content or ""
+            if session.get("summary"):
+                new_summary = session["summary"] + "\n" + new_summary
+            session["summary"] = new_summary
+            session["summarizedUpTo"] = len(session["turns"])
+        except Exception as e:
+            logger.warning("Summarization failed (non-blocking): %s", e)
+
+    # Persist session
+    if session_store:
+        try:
+            session_store.put_session(session)
+        except Exception as e:
+            logger.warning("Session save failed (non-blocking): %s", e)
+    else:
+        put_session_inmemory(session)
+
+    return {
+        "answer": ans,
+        "remediation": remediation,
+        "references": references,
+        "session_id": session["id"],
+        "history": [{"role": t["role"], "content": t["content"]} for t in session["turns"]],
+    }
 
 
 async def main(req: func.HttpRequest, context: func.Context) -> func.HttpResponse:

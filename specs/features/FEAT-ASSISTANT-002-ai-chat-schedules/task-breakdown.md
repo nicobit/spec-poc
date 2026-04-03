@@ -2,22 +2,30 @@
 
 1. Specification
    - Create/approve `feature-spec.md`, `api-spec.md`, `test-plan.md`. (done)
+   - Update `feature-spec.md` for two-tier context + tool-calling architecture. (done)
 
-2. Backend
-   - Implement `POST /api/ai/chat` handler and register ASGI subapp. (done)
-   - Implement context builder reading schedules, clients, environment, executions. (in-progress)
-   - Implement/redact `redaction.py` and Pydantic `AiAnswerModel`. (done)
-   - Add unit and integration tests (done).
+2. Backend — Tier 1 catalog
+   - Replace `_build_result_data` (ID-filtered) with `_build_catalog` that always injects all clients, environments, schedules (key fields). (done)
 
-3. Frontend
-   - Wire `submitAiChat` client and `QueryContext` routing (done).
-   - Assistant panel UI adjustments and mode toggle. (done)
-   - Add integration tests for `QueryContext` (done).
+3. Backend — Tier 2 aggregation tools
+   - Add `get_failure_summary(since_days)` and `list_failed_executions(since_days, schedule_id, limit)` to `execution_store.py` (in-memory + `CosmosStageExecutionStore`). (done)
 
-4. Validation & Release
-   - Run full CI, fix failing tests (one existing `AssistantPanel` test needs update to expect `ai:` prefix).
+4. Backend — Tool-calling loop
+   - Add `OpenAIService.chat_with_tools()` supporting OpenAI `tools` / `tool_choice` API. (done)
+   - Replace single LLM call in `function_ai_chat/__init__.py` with a loop (max 2 rounds). (done)
+   - Implement `_execute_tool` dispatcher routing tool calls to the live store. (done)
+
+5. Tests
+   - Update existing unit tests to cover catalog builder, tool dispatcher, and loop behavior.
+   - Add tests for new aggregation methods (in-memory and Cosmos store).
+
+6. Frontend
+   - Assistant panel and `QueryContext` routing unchanged; filters are now optional. (no change needed)
+
+7. Validation & Release
+   - Run full CI, fix failing tests.
    - Open PR with changelist and link to feature spec.
-   - Manual acceptance testing and stakeholder review.
+   - Manual acceptance testing: freeform questions without IDs.
 
 Owners
 - Backend: `@backend-owner` (replace as appropriate)

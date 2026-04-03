@@ -64,6 +64,7 @@ describe('AssistantPanel', () => {
               answer: 'DEV is currently stopped.',
               chartType: '',
               error: null,
+              isPending: false,
             },
           ],
           runQuery: vi.fn(),
@@ -92,5 +93,24 @@ describe('AssistantPanel', () => {
     fireEvent.mouseUp(window);
 
     expect(onWidthChange).toHaveBeenCalledWith(460);
+  });
+
+  it('shows a loading state for pending entries instead of a no-answer fallback', () => {
+    renderPanel({
+      queries: [
+        {
+          query: 'ai: why did sched fail',
+          result: null,
+          answer: '',
+          chartType: '',
+          error: null,
+          isPending: true,
+        },
+      ],
+    });
+
+    expect(screen.getByText('ai: why did sched fail')).toBeTruthy();
+    expect(screen.getByText('Thinking...')).toBeTruthy();
+    expect(screen.queryByText('No answer returned.')).toBeNull();
   });
 });

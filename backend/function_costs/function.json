@@ -7,7 +7,7 @@
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
-      "route": "costs/{*any}",
+      "route": "api/costs/{*any}",
       "methods": ["get", "post", "put", "delete"]
     },
     {

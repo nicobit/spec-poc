@@ -7,7 +7,7 @@
         "type": "httpTrigger",
         "direction": "in",
         "name": "req",
-        "route": "llm/{*any}",
+        "route": "api/llm/{*any}",
         "methods": ["get", "post", "put", "delete"]
       },
       {

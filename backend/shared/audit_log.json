@@ -4,72 +4,72 @@
     "client": "client-x",
     "action": "run",
     "seq": 0,
-    "timestamp": "2026-04-03T09:30:47.409406Z"
+    "timestamp": "2026-04-03T19:27:22.930776Z"
   },
   {
     "environment": "env-test",
     "client": "client-x",
     "action": "run",
     "seq": 1,
-    "timestamp": "2026-04-03T09:30:47.410663Z"
+    "timestamp": "2026-04-03T19:27:22.931754Z"
   },
   {
     "environment": "env-test",
     "client": "client-x",
     "action": "run",
     "seq": 2,
-    "timestamp": "2026-04-03T09:30:47.412091Z"
+    "timestamp": "2026-04-03T19:27:22.932715Z"
   },
   {
     "environment": "env-test",
     "client": "client-x",
     "action": "run",
     "seq": 3,
-    "timestamp": "2026-04-03T09:30:47.413542Z"
+    "timestamp": "2026-04-03T19:27:22.933590Z"
   },
   {
     "environment": "env-test",
     "client": "client-x",
     "action": "run",
     "seq": 4,
-    "timestamp": "2026-04-03T09:30:47.416085Z"
+    "timestamp": "2026-04-03T19:27:22.934788Z"
   },
   {
     "environment": "env-test",
     "client": "client-x",
     "action": "run",
     "seq": 5,
-    "timestamp": "2026-04-03T09:30:47.418586Z"
+    "timestamp": "2026-04-03T19:27:22.935760Z"
   },
   {
     "environment": "env-test",
     "client": "client-x",
     "action": "run",
     "seq": 6,
-    "timestamp": "2026-04-03T09:30:47.419823Z"
+    "timestamp": "2026-04-03T19:27:22.936517Z"
   },
   {
-    "client": "client-62fdc33c",
+    "client": "client-b696f77f",
     "clientName": "Contoso Switzerland",
     "shortCode": "CONTOSO-CH",
     "action": "create",
     "status": "success",
     "eventType": "client-created",
     "requestedBy": "test-admin@example.com",
-    "timestamp": "2026-04-03T09:30:47.499326Z"
+    "timestamp": "2026-04-03T19:27:23.501294Z"
   },
   {
-    "client": "client-62fdc33c",
+    "client": "client-b696f77f",
     "clientName": "Contoso Switzerland Updated",
     "shortCode": "CONTOSO-CH",
     "action": "update",
     "status": "success",
     "eventType": "client-updated",
     "requestedBy": "test-admin@example.com",
-    "timestamp": "2026-04-03T09:30:47.507404Z"
+    "timestamp": "2026-04-03T19:27:23.517429Z"
   },
   {
-    "client": "client-62fdc33c",
+    "client": "client-b696f77f",
     "clientName": "Contoso Switzerland Updated",
     "shortCode": "CONTOSO-CH",
     "action": "retire",
@@ -77,30 +77,30 @@
     "eventType": "client-retired",
     "requestedBy": "test-admin@example.com",
     "reason": "No longer active",
-    "timestamp": "2026-04-03T09:30:47.516360Z"
+    "timestamp": "2026-04-03T19:27:23.527376Z"
   },
   {
-    "client": "client-6291e57a",
+    "client": "client-72e79984",
     "clientName": "Environment Managed Client",
     "shortCode": "ENV-MGR-001",
     "action": "create",
     "status": "success",
     "eventType": "client-created",
     "requestedBy": "test-admin@example.com",
-    "timestamp": "2026-04-03T09:30:47.529364Z"
+    "timestamp": "2026-04-03T19:27:23.540628Z"
   },
   {
-    "client": "client-6291e57a",
+    "client": "client-72e79984",
     "clientName": "Environment Managed Client Updated",
     "shortCode": "ENV-MGR-001",
     "action": "update",
     "status": "success",
     "eventType": "client-updated",
     "requestedBy": "test-admin@example.com",
-    "timestamp": "2026-04-03T09:30:47.540545Z"
+    "timestamp": "2026-04-03T19:27:23.569989Z"
   },
   {
-    "client": "client-6291e57a",
+    "client": "client-72e79984",
     "clientName": "Environment Managed Client Updated",
     "shortCode": "ENV-MGR-001",
     "action": "retire",
@@ -108,63 +108,63 @@
     "eventType": "client-retired",
     "requestedBy": "test-admin@example.com",
     "reason": "No longer active",
-    "timestamp": "2026-04-03T09:30:47.548504Z"
+    "timestamp": "2026-04-03T19:27:23.593161Z"
   },
   {
-    "environment": "env-a90c466d",
+    "environment": "env-19735e00",
     "client": "test-client",
     "action": "create",
     "status": "success",
     "eventType": "environment-created",
     "requestedBy": "test-admin",
-    "timestamp": "2026-04-03T09:30:47.738542Z"
+    "timestamp": "2026-04-03T19:27:24.501613Z"
   },
   {
-    "environment": "env-a90c466d",
+    "environment": "env-19735e00",
     "client": "test-client",
     "stage": "default",
     "action": "start",
     "status": "requested",
     "eventType": "manual-lifecycle",
     "requestedBy": "test-admin",
-    "timestamp": "2026-04-03T09:30:47.751180Z"
+    "timestamp": "2026-04-03T19:27:24.516902Z"
   },
   {
-    "environment": "env-a90c466d",
+    "environment": "env-19735e00",
     "client": "test-client",
     "stage": "default",
     "action": "stop",
     "status": "requested",
     "eventType": "manual-lifecycle",
     "requestedBy": "test-admin",
-    "timestamp": "2026-04-03T09:30:47.766375Z"
+    "timestamp": "2026-04-03T19:27:24.530098Z"
   },
   {
-    "environment": "env-3cf47c51",
+    "environment": "env-3312d390",
     "client": "test-client",
     "action": "create",
     "status": "success",
     "eventType": "environment-created",
     "requestedBy": "test-admin",
-    "timestamp": "2026-04-03T09:30:47.779540Z"
+    "timestamp": "2026-04-03T19:27:24.540535Z"
   },
   {
-    "environment": "env-3cf47c51",
+    "environment": "env-3312d390",
     "client": "test-client",
     "action": "delete",
     "status": "success",
     "eventType": "environment-deleted",
     "requestedBy": "test-admin",
-    "timestamp": "2026-04-03T09:30:47.789288Z"
+    "timestamp": "2026-04-03T19:27:24.559956Z"
   },
   {
-    "environment": "env-6cca809e",
+    "environment": "env-4da9a5b1",
     "client": "client-a",
     "action": "create",
     "status": "success",
     "eventType": "environment-created",
     "requestedBy": "test",
-    "timestamp": "2026-04-03T09:30:47.828272Z"
+    "timestamp": "2026-04-03T19:27:24.638876Z"
   },
   {
     "environment": "env-1",
@@ -173,7 +173,7 @@
     "status": "success",
     "eventType": "environment-updated",
     "requestedBy": "ca@example.com",
-    "timestamp": "2026-04-03T09:30:47.847282Z"
+    "timestamp": "2026-04-03T19:27:24.660220Z"
   },
   {
     "environment": "dev-1",
@@ -182,10 +182,10 @@
     "action": "start",
     "status": "success",
     "eventType": "schedule-created",
-    "scheduleId": "sched-a3a8fe8f",
+    "scheduleId": "sched-71b7aefd",
     "notificationGroupCount": 0,
     "requestedBy": "system",
-    "timestamp": "2026-04-03T09:30:48.276576Z"
+    "timestamp": "2026-04-03T19:27:25.317252Z"
   },
   {
     "environment": "DEV-RENAMED",
@@ -194,10 +194,10 @@
     "action": "start",
     "status": "success",
     "eventType": "schedule-created",
-    "scheduleId": "sched-e8254321",
+    "scheduleId": "sched-ad8a62d1",
     "notificationGroupCount": 0,
     "requestedBy": "system",
-    "timestamp": "2026-04-03T09:30:48.304119Z"
+    "timestamp": "2026-04-03T19:27:25.366370Z"
   },
   {
     "environment": "dev-1",
@@ -206,10 +206,10 @@
     "action": "stop",
     "status": "success",
     "eventType": "schedule-created",
-    "scheduleId": "sched-823513e3",
+    "scheduleId": "sched-f98bf198",
     "notificationGroupCount": 1,
     "requestedBy": "system",
-    "timestamp": "2026-04-03T09:30:48.325607Z"
+    "timestamp": "2026-04-03T19:27:25.414463Z"
   },
   {
     "environment": "dev-1",
@@ -218,11 +218,11 @@
     "action": "stop",
     "status": "success",
     "eventType": "schedule-postponed",
-    "scheduleId": "sched-823513e3",
-    "postponedUntil": "2026-04-03T10:00:48.339559+00:00",
+    "scheduleId": "sched-f98bf198",
+    "postponedUntil": "2026-04-03T19:57:25.440606+00:00",
     "reason": "Maintenance window",
     "requestedBy": "ops@example.com",
-    "timestamp": "2026-04-03T09:30:48.339595Z"
+    "timestamp": "2026-04-03T19:27:25.440637Z"
   },
   {
     "environment": "dev-1",
@@ -231,10 +231,10 @@
     "action": "stop",
     "status": "success",
     "eventType": "schedule-created",
-    "scheduleId": "sched-f0dc510f",
+    "scheduleId": "sched-a479b1cb",
     "notificationGroupCount": 1,
     "requestedBy": "system",
-    "timestamp": "2026-04-03T09:30:48.353054Z"
+    "timestamp": "2026-04-03T19:27:25.459111Z"
   },
   {
     "environment": "dev-1",
@@ -243,10 +243,10 @@
     "action": "stop",
     "status": "success",
     "eventType": "schedule-created",
-    "scheduleId": "sched-0d18a6f6",
+    "scheduleId": "sched-15a3a8db",
     "notificationGroupCount": 1,
     "requestedBy": "system",
-    "timestamp": "2026-04-03T09:30:48.372411Z"
+    "timestamp": "2026-04-03T19:27:25.500913Z"
   },
   {
     "environment": "env-1",
@@ -260,7 +260,7 @@
       "service-bus-message"
     ],
     "requestedBy": "env-manager@example.com",
-    "timestamp": "2026-04-03T09:30:48.550617Z"
+    "timestamp": "2026-04-03T19:27:25.825727Z"
   },
   {
     "environment": "env-1",
@@ -274,7 +274,7 @@
       "service-bus-message"
     ],
     "requestedBy": "client-admin@example.com",
-    "timestamp": "2026-04-03T09:30:48.560273Z"
+    "timestamp": "2026-04-03T19:27:25.840104Z"
   },
   {
     "environment": "env-1",
@@ -288,7 +288,7 @@
     "eventType": "scheduled-lifecycle",
     "scheduleId": null,
     "executionId": "exec-control-1",
-    "timestamp": "2026-04-03T09:30:48.590714Z"
+    "timestamp": "2026-04-03T19:27:25.891200Z"
   },
   {
     "scheduleId": "sched-stage-start",
@@ -298,27 +298,27 @@
     "stage": "stage-dev-sql",
     "action": "start",
     "status": "succeeded",
-    "timestamp": "2026-04-03T09:30:48.608139Z"
+    "timestamp": "2026-04-03T19:27:25.914514Z"
   },
   {
     "scheduleId": "sched-int-1",
-    "executionId": "exec-a832833b0f65",
+    "executionId": "exec-e072328712e1",
     "environment": "env-1",
     "client": "client-001",
     "stage": "stage-dev-sql",
     "action": "start",
     "status": "succeeded",
-    "timestamp": "2026-04-03T09:30:48.617108Z"
+    "timestamp": "2026-04-03T19:27:25.919542Z"
   },
   {
     "scheduleId": "sched-int-2",
-    "executionId": "exec-dcdff36a8503",
+    "executionId": "exec-0af2758ca40f",
     "environment": "env-1",
     "client": "client-001",
     "stage": "stage-dev-sql",
     "action": "stop",
     "status": "partially_failed",
-    "timestamp": "2026-04-03T09:30:48.637988Z"
+    "timestamp": "2026-04-03T19:27:25.947379Z"
   },
   {
     "scheduleId": "sched-stage-start",
@@ -328,7 +328,7 @@
     "stage": "stage-dev-sql",
     "action": "start",
     "status": "succeeded",
-    "timestamp": "2026-04-03T09:30:48.648778Z"
+    "timestamp": "2026-04-03T19:27:25.955926Z"
   },
   {
     "scheduleId": "sched-stage-start",
@@ -338,7 +338,7 @@
     "stage": "stage-qa-live",
     "action": "start",
     "status": "succeeded",
-    "timestamp": "2026-04-03T09:30:48.654840Z"
+    "timestamp": "2026-04-03T19:27:25.959623Z"
   },
   {
     "scheduleId": "sched-stage-start",
@@ -348,7 +348,7 @@
     "stage": "stage-qa-live",
     "action": "start",
     "status": "succeeded",
-    "timestamp": "2026-04-03T09:30:48.659054Z"
+    "timestamp": "2026-04-03T19:27:25.968685Z"
   },
   {
     "scheduleId": "sched-stage-stop",
@@ -358,6 +358,6 @@
     "stage": "stage-dev-sql",
     "action": "stop",
     "status": "partially_failed",
-    "timestamp": "2026-04-03T09:30:48.663474Z"
+    "timestamp": "2026-04-03T19:27:25.974201Z"
   }
 ]

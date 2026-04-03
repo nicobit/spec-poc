@@ -14,7 +14,7 @@ fast_app = FastAPI()
 CORSHelper.set_CORS(fast_app)
 
 
-@fast_app.get("/queryexamples/databases")
+@fast_app.get("/api/queryexamples/databases")
 async def get_databases(req: Request):
     user = await get_current_user(req)
     try:
@@ -29,7 +29,7 @@ class ExampleRequest(BaseModel):
     sql: str
     database: str = "default"
 
-@fast_app.post("/queryexamples/add_example")
+@fast_app.post("/api/queryexamples/add_example")
 async def add_example(req: Request,body: ExampleRequest):
     user = await get_current_user(req)
     try:
@@ -45,7 +45,7 @@ async def add_example(req: Request,body: ExampleRequest):
         logger.error(f"Error adding example: {str(e)}")
         return Response(content="Failed to add example", status_code=500)
 
-@fast_app.get("/queryexamples/examples")
+@fast_app.get("/api/queryexamples/examples")
 async def list_examples(req: Request,database: str = "default"):
     user = await get_current_user(req)
     try:
@@ -57,7 +57,7 @@ async def list_examples(req: Request,database: str = "default"):
         return Response(content="Failed to list examples", status_code=500)
 
 
-@fast_app.delete("/queryexamples/delete_example")
+@fast_app.delete("/api/queryexamples/delete_example")
 async def delete_example(req: Request,doc_id: str, database: str = "default"):
     user = await get_current_user(req)
     try:
@@ -75,7 +75,7 @@ class ExampleRequest(BaseModel):
     sql: str
     database: str = "default"
 
-@fast_app.put("/queryexamples/update_example")
+@fast_app.put("/api/queryexamples/update_example")
 async def update_example(req: Request, body: ExampleRequest):
     user = await get_current_user(req)
     try:

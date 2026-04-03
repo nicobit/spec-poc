@@ -7,7 +7,7 @@
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
-      "route": "queryexamples/{*any}",
+      "route": "api/queryexamples/{*any}",
       "methods": ["get", "post", "put", "delete"]
     },
     {

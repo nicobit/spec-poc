@@ -12,7 +12,7 @@ logger = NBLogger().Log()
 fast_app = FastAPI() 
 CORSHelper.set_CORS(fast_app)
 
-@fast_app.get("/texttosql/") 
+@fast_app.get("/api/texttosql/") 
 async def return_http_no_body(req: Request): 
     await get_current_user(req)
     
@@ -35,7 +35,7 @@ class QueryResponse(BaseModel):
 
 
 
-@fast_app.post("/texttosql/query")
+@fast_app.post("/api/texttosql/query")
 async def query(req: Request, body: QueryRequest):
     user = await get_current_user(req)
     query = body.query
@@ -57,7 +57,7 @@ async def query(req: Request, body: QueryRequest):
         "reasoning": result["reasoning"]
     }
 
-@fast_app.get("/texttosql/graph.png")
+@fast_app.get("/api/texttosql/graph.png")
 async def get_graph_image(req: Request):
     await get_current_user(req)
     # Generate the image as PNG bytes using Mermaid rendering

@@ -2,9 +2,9 @@
 import json
 from typing import Dict, Any, Optional, AsyncIterator
 import httpx
-from azure.identity import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
 from function_llm_proxy.appl.config import get_settings
+from shared.execution_identity import build_execution_credential
 
 class OpenAIClient:
     def __init__(self):
@@ -16,7 +16,7 @@ class OpenAIClient:
             return self._cached_key
 
         if self.s.AZURE_OPENAI_KEY_VIA_KV and self.s.KEY_VAULT_URI:
-            cred = DefaultAzureCredential()
+            cred = build_execution_credential()
             sc = SecretClient(self.s.KEY_VAULT_URI, cred)
             sec = sc.get_secret(self.s.KEY_VAULT_SECRET_NAME)
             self._cached_key = sec.value

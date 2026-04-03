@@ -1,6 +1,9 @@
 import { useMsal } from '@azure/msal-react';
-import { Bell, LogOut, Menu, MessageSquare, Moon, Search, Sun, User } from 'lucide-react';
+import { Bell, LogOut, Menu, MessageSquare, Moon, Search, Sun, User, ChevronDown } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
+import { useContext, useEffect, useState } from 'react';
+
+import { QueryContext } from '@/features/chat/contexts/QueryContext';
 
 import { useAuthZ } from '@/auth/useAuthZ';
 import AdminPortalLogo from '@/shared/ui/AdminPortalLogo';
@@ -26,10 +29,27 @@ export default function Topbar({ assistantOpen = false, onToggleAssistant }: Top
   const isCyber = themeId === 'cyber';
   const isCommerce = themeId === 'commerce';
   const navItems = getMenuItems(isAdmin);
+  const queryContext = useContext(QueryContext);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [previewSessions, setPreviewSessions] = useState<any[]>([]);
 
   const handleLogout = () => {
     instance.logoutPopup();
   };
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const isModifier = e.ctrlKey || e.metaKey;
+      if (isModifier && e.shiftKey && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        if (!assistantOpen) onToggleAssistant?.();
+        queryContext?.loadSessions();
+        setMenuOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [assistantOpen, onToggleAssistant, queryContext]);
 
   const items = [
     <Link key="home" to="/" className="opacity-60 hover:opacity-100">
@@ -115,6 +135,7 @@ export default function Topbar({ assistantOpen = false, onToggleAssistant }: Top
           >
             <MessageSquare size={18} />
           </button>
+          {/* Recent sessions dropdown moved into the assistant panel header */}
 
           <button
             onClick={toggleMode}

@@ -193,8 +193,54 @@ These may remain implementation-local at first, but they are already distinct ar
 - Service Bus is the integration boundary for downstream KEDA/AKS handling in first release
 - live Azure truth and push updates are outside the first-release core architecture
 
+### 11. AI Assistant
+
+- Location:
+  - `backend/function_ai_chat/`
+  - `frontend/src/features/chat/`
+- Responsibility:
+  - accept natural-language questions from authenticated portal users
+  - build a Tier 1 compact catalog (all clients, environments, schedules) and inject it into the prompt
+  - invoke Tier 2 execution-aggregation tools via OpenAI function-calling when execution-level data is needed
+  - maintain multi-turn conversation sessions with token-bounded history injection and rolling LLM summarization
+  - redact PII from all context before sending to the model
+  - return structured answers (`answer`, `remediation`, `references`, `session_id`, `history`)
+
+Key sub-components:
+
+- `_build_catalog()` — Tier 1 catalog builder
+- `_execute_tool()` — Tier 2 tool dispatcher (routes LLM tool calls to live stores)
+- `OpenAIService.chat_with_tools()` — Azure OpenAI function-calling wrapper
+- `ChatSessionStore` / `CosmosChatSessionStore` — session persistence with in-memory fallback
+- `redact_text()` — PII redaction applied to catalog, tool results, and history turns
+
+Important notes:
+
+- all model calls are server-side; the frontend never calls Azure OpenAI directly
+- the tool-calling loop runs at most 2 rounds per request to bound cost
+- session history injection is bounded by `CHAT_HISTORY_TOKEN_BUDGET` (default 3,000 tokens)
+- rolling summarization fires when `CHAT_SUMMARIZE_THRESHOLD` (default 6) un-summarized turns fall outside the budget window
+- sessions are stored in the `chatsessions` Cosmos container (partition key `/userId`, TTL-enabled) and fall back to in-memory for local dev
+
+### 12. Chat Session Store
+
+- Location:
+  - `backend/shared/chat_session_store.py`
+- Responsibility:
+  - create, read, and update `ChatSession` documents
+  - enumerate session turns and apply the token-budget window
+  - trigger and persist rolling LLM summarization of old turns
+  - enforce per-user session scoping
+  - expose `get_chat_session_store()` factory following the `_LazyProxy` pattern used by `execution_store.py`
+
+Storage targets:
+
+- **Local dev:** in-memory `CHAT_SESSIONS` dict (no Cosmos dependency)
+- **Deployed:** Cosmos DB container `chatsessions` via `COSMOS_CONNECTION_STRING`
+
 ## Follow-Up Candidates
 
 - add a dynamic view for scheduled stage execution
 - add a persistence-oriented execution-result view when the execution store is finalized
 - add a domain-specific component view for orchestration if executor types grow substantially
+- add a session history sidebar to the AI assistant panel (FEAT-ASSISTANT-004)

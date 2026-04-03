@@ -7,7 +7,7 @@
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
-      "route": "dashboard/{*any}",
+      "route": "api/dashboard/{*any}",
       "methods": ["get", "post", "put", "delete"]
     },
     {

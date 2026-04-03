@@ -7,7 +7,7 @@
         "type": "httpTrigger",
         "direction": "in",
         "name": "req",
-        "route": "diagrams/{*any}",
+        "route": "api/diagrams/{*any}",
         "methods": ["get", "post", "put", "delete"]
       },
       {

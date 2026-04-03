@@ -46,7 +46,7 @@ async def _fetch_cached(
     await cache.set(key, data)
     return data
 
-@app.get("/costs/health")
+@app.get("/api/costs/health")
 async def health(user=Depends(auth_only)):
     return {
         "ok": True,
@@ -54,13 +54,13 @@ async def health(user=Depends(auth_only)):
         "ttl": settings.cache_ttl_seconds
     }
 
-@app.get("/costs/admin/cache/clear")
+@app.get("/api/costs/admin/cache/clear")
 async def cache_clear(user=Depends(admin_only)):
     # ⚠️ Protect with app roles in production
     await cache.clear()
     return {"cleared": True}
 
-@app.get("/costs/increase/month", response_model=IncreaseResponse)
+@app.get("/api/costs/increase/month", response_model=IncreaseResponse)
 async def increase_by_month(
     response: Response,
     scope: Optional[str] = Query(default=None),
@@ -104,7 +104,7 @@ async def increase_by_month(
     response.headers["Cache-Control"] = f"public, max-age={settings.cache_ttl_seconds}"
     return payload
 
-@app.get("/costs/increase/week", response_model=IncreaseResponse)
+@app.get("/api/costs/increase/week", response_model=IncreaseResponse)
 async def increase_by_week(
     response: Response,
     scope: Optional[str] = Query(default=None),
@@ -162,7 +162,7 @@ async def increase_by_week(
     response.headers["Cache-Control"] = f"public, max-age={settings.cache_ttl_seconds}"
     return payload
 
-@app.get("/costs/top-drivers", response_model=TopDriversResponse)
+@app.get("/api/costs/top-drivers", response_model=TopDriversResponse)
 async def top_drivers(
     response: Response,
     scope: Optional[str] = Query(default=None),

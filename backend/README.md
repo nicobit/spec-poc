@@ -73,6 +73,20 @@ python --version
 
 It should report Python 3.13.x.
 
+Repository-local virtualenv (recommended)
+
+For consistent local runs across developers and CI, create the virtual environment at `backend/.venv` and point the Functions worker to it. Example commands:
+
+```powershell
+cd backend
+py -3.13 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+We set `languageWorkers:python:defaultExecutablePath` in `local.settings.json` to `.venv\Scripts\python.exe` so the Functions host uses the repo-local interpreter. This avoids machine-specific absolute paths and makes local development reproducible.
+
 ## Local Configuration
 
 For local Azure Functions startup, use:
@@ -229,3 +243,101 @@ See [Backend App Settings](../docs/standards/backend-app-settings.md) for the ru
 - Azure Functions `authLevel` is intentionally kept `anonymous` at the platform layer.
 - Application-level authentication protects all backend routes except `GET /health/healthz`.
 - The ASGI runtime is incremental; it loads feature apps and reports load issues through `/runtime/healthz`.
+
+## Azure / OpenAI local setup
+
+Purpose: explain how the backend fetches OpenAI credentials and how to run locally vs. production.
+
+Key concepts:
+
+- Secrets are stored in Azure Key Vault; the app reads secret *names* from environment variables and then fetches values at runtime.
+- Local dev uses `DefaultAzureCredential` (VS Code / `az login` / service principal). Production uses `ManagedIdentityCredential` (assign an identity to the host and grant Key Vault `get` permission).
+
+Important env vars (examples)
+
+- `KEY_VAULT_CORE_URI` — Key Vault base URL (e.g. `https://my-vault.vault.azure.net`)
+- `AZURE_OPENAI_KEY_SECRET_NAME` — name of the secret that holds the OpenAI key
+- `AZURE_OPENAI_ENDPOINT_SECRET_NAME` — name of the secret for the OpenAI endpoint
+- `AZURE_OPENAI_VERSION_SECRET_NAME` — name of the secret for API version (e.g. `2025-01-01-preview`)
+- `COMPLETION_MODEL` — Azure OpenAI deployment name used for completions (default `gpt-35-turbo`)
+- `VSCODE` — set to `true` for local dev to explicitly enable `VisualStudioCodeCredential` in the Azure Identity chain, with Azure CLI auth still available as a fallback; do NOT set in production
+- Optional local service principal vars: `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`
+
+Local quickstart
+
+1. Copy example env file:
+  ```powershell
+  copy backend\.env.example backend\.env
+  ```
+2. Edit `backend\.env` or `backend\local.settings.json` and set:
+  - `KEY_VAULT_CORE_URI`, `AZURE_OPENAI_*_SECRET_NAME` values, and choose one local auth mode:
+  - user auth via Azure CLI / VS Code: set `VSCODE=true`
+  - service principal auth: set `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, and `AZURE_CLIENT_SECRET`
+3. Sign in for `DefaultAzureCredential` when using user auth:
+  ```powershell
+  az login
+  # or sign into Azure in VS Code
+  ```
+  If Key Vault requires a tenant-specific MFA-backed token, sign in with the tenant and vault scope explicitly:
+  ```powershell
+  az logout
+  az login --tenant "<tenant-id>" --scope "https://vault.azure.net/.default"
+  ```
+  If browser login is awkward, use device code:
+  ```powershell
+  az login --tenant "<tenant-id>" --scope "https://vault.azure.net/.default" --use-device-code
+  ```
+4. Configure service principal auth when using app credentials instead of a user login:
+  ```json
+  {
+    "Values": {
+      "AZURE_TENANT_ID": "<tenant-id>",
+      "AZURE_CLIENT_ID": "<app-registration-client-id>",
+      "AZURE_CLIENT_SECRET": "<client-secret>",
+      "VSCODE": "false"
+    }
+  }
+  ```
+  Create the client secret in Microsoft Entra ID:
+  1. Open the target App Registration in Azure Portal.
+  2. Go to `Certificates & secrets`.
+  3. Select `New client secret`.
+  4. Copy the generated secret value into `AZURE_CLIENT_SECRET`.
+  5. Ensure that identity has permission to read secrets from the target Key Vault.
+5. Start Functions host:
+  ```powershell
+  cd backend
+  func start
+  ```
+6. Verify secret access quickly (Python snippet):
+  ```python
+  from app.services.secret_service import SecretService
+  print(SecretService.get_secret_value("https://my-vault.vault.azure.net", "azure-openai-key"))
+  ```
+
+Authentication notes
+
+- `VSCODE=true` enables developer-oriented credentials for local work. In practice, Azure CLI auth is the most reliable option for this repository.
+- If only `AZURE_TENANT_ID` and `AZURE_CLIENT_ID` are set, `EnvironmentCredential` is incomplete and will not authenticate. For service principal auth you must also set `AZURE_CLIENT_SECRET`.
+- `VisualStudioCodeCredential` may fail with newer Azure Account extension versions because of a known Azure SDK limitation. If that happens, prefer `az login`.
+- For production hosts, do not set `VSCODE=true`; use managed identity instead.
+
+Production notes
+
+- Provision Key Vault secrets and do not store secret values in plain `.env` in production.
+- Assign a Managed Identity to the host (App Service / VM / Function) and grant Key Vault `get` permission to that identity.
+- Ensure `VSCODE` is unset or `false` in production so `ManagedIdentityCredential` is used.
+- Confirm `COMPLETION_MODEL` equals your OpenAI deployment name and that the deployment exists.
+
+Troubleshooting
+
+- "Unauthorized" when fetching secrets: check Key Vault access policy / role assignment for the identity.
+- "Could not resolve host" / network errors: verify egress rules allow access to Key Vault and OpenAI endpoints.
+- Tests failing locally: most backend tests mock OpenAI and Key Vault; set `PYTHONPATH=backend` when running pytest.
+
+Helpful commands to provision secrets (example)
+```powershell
+az keyvault secret set --vault-name my-vault --name azure-openai-key --value "<openai-key>"
+az keyvault secret set --vault-name my-vault --name azure-openai-endpoint --value "https://my-openai-resource.openai.azure.com"
+az keyvault secret set --vault-name my-vault --name azure-openai-version --value "2025-01-01-preview"
+```

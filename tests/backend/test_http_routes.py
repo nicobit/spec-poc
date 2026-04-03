@@ -25,7 +25,7 @@ class HealthHttpRouteTests(unittest.TestCase):
         from function_health.app.app import fast_app
 
         with TestClient(fast_app) as client:
-            response = client.get("/health/healthz")
+            response = client.get("/api/health/healthz")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"status": "ok"})
@@ -34,7 +34,7 @@ class HealthHttpRouteTests(unittest.TestCase):
         from function_health.app.app import fast_app
 
         with TestClient(fast_app) as client:
-            response = client.get("/health/readyz")
+            response = client.get("/api/health/readyz")
 
         self.assertEqual(response.status_code, 401)
 
@@ -47,7 +47,7 @@ class HealthHttpRouteTests(unittest.TestCase):
         try:
             with patch("function_health.app.health_router._build_tasks_from_json", new=AsyncMock(return_value=([], 1))):
                 with TestClient(fast_app) as client:
-                    response = client.get("/health/readyz")
+                    response = client.get("/api/health/readyz")
         finally:
             fast_app.dependency_overrides.clear()
 
@@ -60,7 +60,7 @@ class CostsHttpRouteTests(unittest.TestCase):
         from function_costs.appl.fastapi_app import app
 
         with TestClient(app) as client:
-            response = client.get("/costs/health")
+            response = client.get("/api/costs/health")
 
         self.assertEqual(response.status_code, 401)
 
@@ -72,7 +72,7 @@ class CostsHttpRouteTests(unittest.TestCase):
 
         try:
             with TestClient(app) as client:
-                response = client.get("/costs/health")
+                response = client.get("/api/costs/health")
         finally:
             app.dependency_overrides.clear()
 
@@ -88,7 +88,7 @@ class CostsHttpRouteTests(unittest.TestCase):
         try:
             with patch("function_costs.appl.fastapi_app.cache.clear", new=AsyncMock()) as clear_mock:
                 with TestClient(app) as client:
-                    response = client.get("/costs/admin/cache/clear")
+                    response = client.get("/api/costs/admin/cache/clear")
         finally:
             app.dependency_overrides.clear()
 
@@ -102,7 +102,7 @@ class DiagramsHttpRouteTests(unittest.TestCase):
         from function_diagrams.__init__ import fast_app
 
         with TestClient(fast_app) as client:
-            response = client.get("/diagrams/")
+            response = client.get("/api/diagrams/")
 
         self.assertEqual(response.status_code, 401)
 
@@ -110,7 +110,7 @@ class DiagramsHttpRouteTests(unittest.TestCase):
         from function_diagrams.__init__ import fast_app
 
         with TestClient(fast_app) as client:
-            response = client.get("/diagrams/subscriptions")
+            response = client.get("/api/diagrams/subscriptions")
 
         self.assertEqual(response.status_code, 401)
 
@@ -128,7 +128,7 @@ class DiagramsHttpRouteTests(unittest.TestCase):
 
                 with TestClient(fast_app) as client:
                     response = client.get(
-                        "/diagrams/subscriptions",
+                        "/api/diagrams/subscriptions",
                         headers={"Authorization": "Bearer token-value"},
                     )
         finally:
@@ -159,7 +159,7 @@ class QueryExamplesHttpRouteTests(unittest.TestCase):
         queryexamples_module = self._import_queryexamples_module()
 
         with TestClient(queryexamples_module.fast_app) as client:
-            response = client.get("/queryexamples/databases")
+            response = client.get("/api/queryexamples/databases")
 
         self.assertEqual(response.status_code, 401)
 
@@ -172,7 +172,7 @@ class QueryExamplesHttpRouteTests(unittest.TestCase):
             new=AsyncMock(return_value={"oid": "user-1", "roles": ["Reader"]}),
         ), patch.object(queryexamples_module.DBHelper, "getDatabases", return_value=["db1", "db2"]):
             with TestClient(queryexamples_module.fast_app) as client:
-                response = client.get("/queryexamples/databases")
+                response = client.get("/api/queryexamples/databases")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"databases": ["db1", "db2"]})
@@ -225,7 +225,7 @@ class LlmProxyHttpRouteTests(unittest.TestCase):
         app, _usage_service = self._create_proxy_app()
 
         with TestClient(app) as client:
-            response = client.get("/llm/healthz")
+            response = client.get("/api/llm/healthz")
 
         self.assertEqual(response.status_code, 401)
 
@@ -233,7 +233,7 @@ class LlmProxyHttpRouteTests(unittest.TestCase):
         app, _usage_service = self._create_proxy_app()
 
         with TestClient(app) as client:
-            response = client.get("/llm/usage/today")
+            response = client.get("/api/llm/usage/today")
 
         self.assertEqual(response.status_code, 401)
 
@@ -243,7 +243,7 @@ class LlmProxyHttpRouteTests(unittest.TestCase):
 
         with TestClient(app) as client:
             response = client.get(
-                "/llm/usage/today",
+                "/api/llm/usage/today",
                 headers={"Authorization": "Bearer valid-token"},
             )
 

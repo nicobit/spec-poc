@@ -65,7 +65,7 @@ def validate_proxy_url(url: str) -> str | None:
 
     return None
 
-@fast_app.get("/dashboard/") 
+@fast_app.get("/api/dashboard/") 
 async def return_http_no_body(req: Request): 
     await get_current_user(req)
     return Response(content="Dashboard is working", media_type="text/plain") 
@@ -84,7 +84,7 @@ class DashboardData(BaseModel):
 # }
 
 
-@fast_app.get("/dashboard/data")
+@fast_app.get("/api/dashboard/data")
 async def get_dashboard_data(req: Request):
     try:
         user = await get_current_user(req)
@@ -96,7 +96,7 @@ async def get_dashboard_data(req: Request):
         return Response(content="Error fetching dashboard data", status_code=500)
 
 
-@fast_app.put("/dashboard/data")
+@fast_app.put("/api/dashboard/data")
 async def save_dashboard_data(req:Request,dashboard_data: DashboardData):
     try:
         user = await get_current_user(req)
@@ -109,7 +109,7 @@ async def save_dashboard_data(req:Request,dashboard_data: DashboardData):
         logger.error(f"Error saving dashboard data: {e}")
         return Response(content="Error saving dashboard data", status_code=500)
     
-@fast_app.get("/dashboard/rssproxy")
+@fast_app.get("/api/dashboard/rssproxy")
 async def get_rss_azure_update(req: Request, rssUrl: str):
     try:
         await get_current_user(req)
@@ -129,7 +129,7 @@ async def get_rss_azure_update(req: Request, rssUrl: str):
         return Response(content="Unexpected error occurred", status_code=500)
 
 
-@fast_app.get("/dashboard/proxy")
+@fast_app.get("/api/dashboard/proxy")
 async def proxy_content(req: Request, url: str):
     try:
         global STOCK_RESULTS, LAST_FETCH_TIMES

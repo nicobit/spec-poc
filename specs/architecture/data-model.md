@@ -248,6 +248,39 @@ Notes:
 - schedule-level policy is the intended primary ownership model for the user-facing flow
 - stage-level policy still exists in the current backend model
 
+### Chat Session
+
+Primary purpose:
+
+- persist the multi-turn conversation history between an authenticated user and the AI assistant, with a rolling LLM-generated summary of older turns, so the assistant can maintain context across requests and page refreshes
+
+Introduced by:
+
+- FEAT-ASSISTANT-003
+
+Current model source:
+
+- `backend/shared/chat_session_store.py` (in-memory fallback + Cosmos adapter)
+
+Important fields:
+
+- `id` — UUID, document identifier
+- `userId` — partition key; the authenticated user's identity
+- `createdAt` — ISO UTC timestamp
+- `updatedAt` — ISO UTC timestamp
+- `summary` — optional rolling LLM summary of turns older than the token-budget window
+- `summarizedUpTo` — index of the last turn included in the summary
+- `turns` — ordered list of `{ role, content, token_count, timestamp }` entries (redacted before storage)
+- `ttl` — Cosmos TTL in seconds (configurable via `CHAT_SESSION_TTL_DAYS`, default 7 days)
+
+Notes:
+
+- sessions are scoped to a single user; cross-user access is not permitted
+- content is redacted by the same pipeline used for the live prompt before being persisted
+- when the `summary` field is present it is injected as the first history entry in the prompt; raw turns older than `summarizedUpTo` are not re-injected
+- the in-memory fallback (`CHAT_SESSIONS` module-level dict) is used when `COSMOS_CONNECTION_STRING` is absent, consistent with `STAGE_EXECUTIONS` and `CLIENTS` patterns
+- Cosmos container: `chatsessions`, partition key `/userId`, TTL enabled
+
 ### Schedule
 
 Primary purpose:

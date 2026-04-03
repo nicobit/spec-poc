@@ -15,7 +15,7 @@ from shared.auth.roles import admin_only, auth_only
 
 router = APIRouter(tags=["health"])
 
-@router.get("/health/healthz")
+@router.get("/api/health/healthz")
 async def healthz():
     return {"status": "ok"}
 
@@ -95,7 +95,7 @@ async def _build_tasks_from_json():
 
     return tasks, timeout
 
-@router.get("/health/readyz", response_model=HealthResponse, dependencies=[Depends(auth_only)])
+@router.get("/api/health/readyz", response_model=HealthResponse, dependencies=[Depends(auth_only)])
 async def readyz():
     tasks, timeout = await _build_tasks_from_json()
     if not tasks:
@@ -129,6 +129,6 @@ async def readyz():
 
     return HealthResponse(status=overall, results=results)
 
-@router.get("/health/deps", response_model=HealthResponse)
+@router.get("/api/health/deps", response_model=HealthResponse)
 async def deps(user=Depends(auth_only)):
     return await readyz()

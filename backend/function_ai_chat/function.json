@@ -7,7 +7,7 @@
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
-      "route": "ai/chat",
+      "route": "api/ai/chat",
       "methods": ["post"]
     },
     {

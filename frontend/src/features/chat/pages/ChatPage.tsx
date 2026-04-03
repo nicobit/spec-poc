@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Menu as FaBars, X as FaTimes } from 'lucide-react';
 
 import Chat from '../components/Chat';
-import ChatSidebar from '../components/ChatSidebar';
+import SessionSidebar from '../components/SessionSidebar';
 
 export default function ChatPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -13,7 +13,7 @@ export default function ChatPage() {
         <div className="relative flex">
           {isSidebarOpen && (
             <div className="w-64 overflow-hidden transition-all duration-300">
-              <ChatSidebar />
+              <SessionSidebar />
             </div>
           )}
           <button

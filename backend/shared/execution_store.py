@@ -63,6 +63,56 @@ def list_stage_executions_for_schedule(schedule_id: str, limit: int = 20) -> Lis
     return deepcopy(items[:limit])
 
 
+def get_failure_summary(since_days: int = 7) -> List[Dict[str, Any]]:
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=since_days)
+    counts: Dict[str, Dict[str, Any]] = {}
+    for item in STAGE_EXECUTIONS:
+        if (item.get("status") or "").lower() not in ("failed", "error"):
+            continue
+        ts = item.get("requestedAt")
+        if ts:
+            try:
+                dt = datetime.fromisoformat(ts)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                if dt < cutoff:
+                    continue
+            except Exception:
+                pass
+        sid = item.get("scheduleId") or item.get("stageId") or ""
+        if sid not in counts:
+            counts[sid] = {"scheduleId": sid, "failures": 0, "last_failure": None}
+        counts[sid]["failures"] += 1
+        if ts and (counts[sid]["last_failure"] is None or ts > counts[sid]["last_failure"]):
+            counts[sid]["last_failure"] = ts
+    return sorted(counts.values(), key=lambda x: x["failures"], reverse=True)
+
+
+def list_failed_executions(since_days: int = 7, schedule_id: str | None = None, limit: int = 20) -> List[Dict[str, Any]]:
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=since_days)
+    results = []
+    for item in STAGE_EXECUTIONS:
+        if (item.get("status") or "").lower() not in ("failed", "error"):
+            continue
+        if schedule_id and item.get("scheduleId") != schedule_id:
+            continue
+        ts = item.get("requestedAt")
+        if ts:
+            try:
+                dt = datetime.fromisoformat(ts)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                if dt < cutoff:
+                    continue
+            except Exception:
+                pass
+        results.append(deepcopy(item))
+    results.sort(key=lambda x: x.get("requestedAt") or "", reverse=True)
+    return results[:limit]
+
+
 class CosmosStageExecutionStore:
     def __init__(self):
         if not COSMOS_CONN:
@@ -110,6 +160,41 @@ class CosmosStageExecutionStore:
         params = [{"name": "@scheduleId", "value": schedule_id}]
         items = list(self._container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
         return items[:limit]
+
+    def get_failure_summary(self, since_days: int = 7) -> List[Dict[str, Any]]:
+        from datetime import datetime, timezone, timedelta
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=since_days)).isoformat()
+        query = "SELECT c.scheduleId, c.requestedAt FROM c WHERE (c.status = 'failed' OR c.status = 'error') AND c.requestedAt >= @cutoff"
+        params = [{"name": "@cutoff", "value": cutoff}]
+        try:
+            items = list(self._container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
+        except Exception:
+            return []
+        counts: Dict[str, Dict[str, Any]] = {}
+        for item in items:
+            sid = item.get("scheduleId") or ""
+            if sid not in counts:
+                counts[sid] = {"scheduleId": sid, "failures": 0, "last_failure": None}
+            counts[sid]["failures"] += 1
+            ts = item.get("requestedAt")
+            if ts and (counts[sid]["last_failure"] is None or ts > counts[sid]["last_failure"]):
+                counts[sid]["last_failure"] = ts
+        return sorted(counts.values(), key=lambda x: x["failures"], reverse=True)
+
+    def list_failed_executions(self, since_days: int = 7, schedule_id: str | None = None, limit: int = 20) -> List[Dict[str, Any]]:
+        from datetime import datetime, timezone, timedelta
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=since_days)).isoformat()
+        if schedule_id:
+            query = "SELECT c.executionId, c.scheduleId, c.requestedAt, c.status, c.error FROM c WHERE (c.status = 'failed' OR c.status = 'error') AND c.requestedAt >= @cutoff AND c.scheduleId = @scheduleId ORDER BY c.requestedAt DESC"
+            params = [{"name": "@cutoff", "value": cutoff}, {"name": "@scheduleId", "value": schedule_id}]
+        else:
+            query = "SELECT c.executionId, c.scheduleId, c.requestedAt, c.status, c.error FROM c WHERE (c.status = 'failed' OR c.status = 'error') AND c.requestedAt >= @cutoff ORDER BY c.requestedAt DESC"
+            params = [{"name": "@cutoff", "value": cutoff}]
+        try:
+            items = list(self._container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
+            return items[:limit]
+        except Exception:
+            return []
 
 
 class _LazyExecutionStoreProxy:

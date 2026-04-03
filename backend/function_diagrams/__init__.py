@@ -12,7 +12,7 @@ from function_diagrams.tools.azure_services_retriever import AzureServicesRetrie
 fast_app = FastAPI() 
 logger = NBLogger().Log()
 
-@fast_app.get("/diagrams/") 
+@fast_app.get("/api/diagrams/") 
 async def return_http_no_body(user=Depends(auth_only)): 
     return Response(content="Diagrams is working", media_type="text/plain") 
 
@@ -24,7 +24,7 @@ def get_bearer_token(req: Request) -> str:
 
     return auth_header.split(" ", 1)[1].strip()
 
-@fast_app.get("/diagrams/subscriptions")
+@fast_app.get("/api/diagrams/subscriptions")
 async def getSubscriptions(req: Request, user=Depends(auth_only)):
     token = get_bearer_token(req)
   
@@ -39,7 +39,7 @@ async def getSubscriptions(req: Request, user=Depends(auth_only)):
         return Response(content="Unexpected error occurred", status_code=500)
     
 
-@fast_app.get("/diagrams/virtual-networks-and-subnets")
+@fast_app.get("/api/diagrams/virtual-networks-and-subnets")
 async def getVirtualNetworksAndSubnets(
     req: Request,
     subscriptionId: str,
@@ -57,7 +57,7 @@ async def getVirtualNetworksAndSubnets(
         logger.error(f"Error retrieving virtual networks and subnets: {str(e)}")
         return Response(content="Unexpected error occurred", status_code=500)
 
-@fast_app.get("/diagrams/data")
+@fast_app.get("/api/diagrams/data")
 async def getDiagram(
     req: Request,
     subscriptionId: str,

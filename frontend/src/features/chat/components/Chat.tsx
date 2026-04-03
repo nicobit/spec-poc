@@ -1,5 +1,7 @@
 import { lazy, Suspense, useContext, useEffect, useRef, useState, type FormEvent } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import {
   ArrowUp,
   ChevronDown,
@@ -48,7 +50,7 @@ export default function Chat() {
     );
   }
 
-  const { queries, runQuery, selectQuery } = queryContext;
+  const { queries, runQuery, selectQuery, resetSession } = queryContext;
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -71,6 +73,15 @@ export default function Chat() {
 
   return (
     <div className="flex h-full flex-col">
+      <div className="mb-2 flex items-center justify-end">
+        <button
+          onClick={() => resetSession()}
+          className="rounded-md border border-gray-300 px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+          aria-label="Start a new chat session"
+        >
+          New chat
+        </button>
+      </div>
       <ul className="custom-scrollbar mb-4 flex-1 space-y-4 overflow-y-auto overflow-y-scroll">
         {queries.map((entry, index) => (
           <li key={index} ref={index === queries.length - 1 ? listEndRef : null}>
@@ -102,14 +113,17 @@ export default function Chat() {
                     </button>
                   </div>
                   {entry.isExpanded && (
-                    <div className="prose prose-sm mt-1">
-                      <ReactMarkdown>{entry.reasoning}</ReactMarkdown>
+                      <div className="prose prose-sm mt-1">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{entry.reasoning}</ReactMarkdown>
                     </div>
                   )}
                 </div>
 
                 <div className="mt-2">
-                  <ReactMarkdown>{entry.answer!}</ReactMarkdown>
+                  <div
+                    className="prose prose-sm"
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(entry.answer || '')) }}
+                  />
                   <Suspense fallback={<div className="text-sm text-gray-500">Loading diagram...</div>}>
                     <MermaidDiagram chart={entry.mermaid || ''} />
                   </Suspense>

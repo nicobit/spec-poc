@@ -56,6 +56,14 @@ Example values:
 - `ENFORCE_QUOTA`
 - `ROWS_LIMIT`
 
+## Chat Sessions
+
+- `COSMOS_CONNECTION_STRING` — connection string for the Cosmos DB account; omit to use the in-memory fallback
+- `COSMOS_CHAT_CONTAINER_NAME` — Cosmos container name for chat sessions (default: `chatsessions`)
+- `CHAT_HISTORY_TOKEN_BUDGET` — max estimated tokens of prior turns injected per request (default: `3000`)
+- `CHAT_SUMMARIZE_THRESHOLD` — number of unsummarized turns that triggers rolling summarization (default: `6`)
+- `CHAT_SESSION_TTL_DAYS` — session document TTL in days (default: `7`)
+
 ## Observability
 
 - `APPLICATIONINSIGHTS_CONNECTION_STRING`
