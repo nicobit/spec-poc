@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from shared.context import get_current_user
 from shared.utils.nb_logger import NBLogger
 from shared.client_store import get_client
-from shared.environment_store import get_environment
+from shared.environment_store import get_environment, list_environments
 from shared.scheduler_store import SCHEDULES
 from shared.execution_store import list_stage_executions_for_schedule, get_stage_execution_store
 from app.services.llm.openai_service import OpenAIService
@@ -57,17 +57,61 @@ def _build_result_data(question: str, filters: dict | None):
         pieces.append(f"Filters: {json.dumps(filters)}")
 
     schedule = None
+    skip_executions = False
+
+    # environment filter resolution
+    env_filter_id = filters.get("environmentId") if filters else None
+    env_filter_name = filters.get("environmentName") if filters else None
+    matched_env = None
+    if env_filter_id:
+        matched_env = get_environment(env_filter_id)
+    elif env_filter_name:
+        for e in list_environments():
+            if e.get("name") and e.get("name").lower() == env_filter_name.lower():
+                matched_env = e
+                break
+    if matched_env:
+        pieces.append("Environment filter applied:")
+        pieces.append(json.dumps({"id": matched_env.get("id"), "name": matched_env.get("name"), "status": matched_env.get("status")}, indent=2))
     if filters and filters.get("scheduleId"):
         schedule = _find_schedule(filters.get("scheduleId"))
         if schedule:
-            pieces.append("Schedule summary:")
-            pieces.append(json.dumps({
-                "id": schedule.get("id"),
-                "clientId": schedule.get("client_id"),
-                "environment": schedule.get("environment"),
-                "next_run": schedule.get("next_run"),
-                "enabled": schedule.get("enabled")
-            }, indent=2))
+            # if environment filter present, enforce match or note mismatch
+            if matched_env:
+                sched_env_id = schedule.get("environment_id") or schedule.get("environment")
+                name_matches = env_filter_name and ((schedule.get("environment") or "").lower() == env_filter_name.lower())
+                id_matches = env_filter_id and schedule.get("environment_id") == env_filter_id
+                if (env_filter_id and not id_matches) or (env_filter_name and not name_matches and not id_matches):
+                    pieces.append("Note: requested schedule exists in a different environment than requested filter.")
+                    pieces.append(f"Requested schedule {schedule.get('id')} is in environment {schedule.get('environment')} which does not match requested environment {env_filter_id or env_filter_name}.")
+                    pieces.append("Schedule summary:")
+                    pieces.append(json.dumps({
+                        "id": schedule.get("id"),
+                        "clientId": schedule.get("client_id"),
+                        "environment": schedule.get("environment"),
+                        "next_run": schedule.get("next_run"),
+                        "enabled": schedule.get("enabled")
+                    }, indent=2))
+                    # avoid including executions from other environments
+                    skip_executions = True
+                else:
+                    pieces.append("Schedule summary:")
+                    pieces.append(json.dumps({
+                        "id": schedule.get("id"),
+                        "clientId": schedule.get("client_id"),
+                        "environment": schedule.get("environment"),
+                        "next_run": schedule.get("next_run"),
+                        "enabled": schedule.get("enabled")
+                    }, indent=2))
+            else:
+                pieces.append("Schedule summary:")
+                pieces.append(json.dumps({
+                    "id": schedule.get("id"),
+                    "clientId": schedule.get("client_id"),
+                    "environment": schedule.get("environment"),
+                    "next_run": schedule.get("next_run"),
+                    "enabled": schedule.get("enabled")
+                }, indent=2))
 
     # client
     client = None
@@ -86,9 +130,13 @@ def _build_result_data(question: str, filters: dict | None):
         if env:
             pieces.append("Environment summary:")
             pieces.append(json.dumps({"id": env.get("id"), "name": env.get("name"), "status": env.get("status")}, indent=2))
+    elif matched_env:
+        # include environment summary when filter used and no specific schedule
+        pieces.append("Environment summary:")
+        pieces.append(json.dumps({"id": matched_env.get("id"), "name": matched_env.get("name"), "status": matched_env.get("status")}, indent=2))
 
     # recent executions / failures
-    if schedule:
+    if schedule and not skip_executions:
         # try in-memory first
         try:
             executions = list_stage_executions_for_schedule(schedule.get("id"), limit=10)
@@ -106,6 +154,41 @@ def _build_result_data(question: str, filters: dict | None):
                 "error": e.get("error")
             })
         pieces.append(json.dumps(short, indent=2))
+
+    # if no specific schedule but an environment filter exists, include schedules and aggregated executions for that environment
+    if not schedule and matched_env:
+        env_id = matched_env.get("id")
+        # find schedules in environment
+        schedules_in_env = [s for s in SCHEDULES if (s.get("environment_id") == env_id) or ((s.get("environment") or "").lower() == (env_filter_name or "").lower())]
+        if schedules_in_env:
+            pieces.append("Schedules in requested environment:")
+            brief = []
+            for s in schedules_in_env:
+                brief.append({"id": s.get("id"), "clientId": s.get("client_id"), "stageId": s.get("stage_id"), "next_run": s.get("next_run"), "enabled": s.get("enabled")})
+            pieces.append(json.dumps(brief, indent=2))
+
+            # aggregate recent executions across these schedules (limit 10)
+            pieces.append("Recent executions (truncated):")
+            short = []
+            for s in schedules_in_env:
+                try:
+                    executions = list_stage_executions_for_schedule(s.get("id"), limit=10)
+                except Exception:
+                    store = get_stage_execution_store()
+                    executions = store.list_stage_executions_for_schedule(s.get("id"), limit=10) if store else []
+                for e in executions:
+                    if len(short) >= 10:
+                        break
+                    short.append({
+                        "executionId": e.get("executionId") or e.get("id"),
+                        "requestedAt": e.get("requestedAt"),
+                        "status": e.get("status"),
+                        "error": e.get("error"),
+                        "scheduleId": s.get("id"),
+                    })
+                if len(short) >= 10:
+                    break
+            pieces.append(json.dumps(short, indent=2))
 
     return "\n\n".join(pieces)
 
