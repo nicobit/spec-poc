@@ -2,6 +2,8 @@
 
 This folder defines the canonical agent model for the spec-driven delivery framework.
 
+Treat this folder as core framework guidance for agent categories and adapter mapping. It is not a convenience summary.
+
 Use these files to answer:
 
 - which agents are first-class in the framework

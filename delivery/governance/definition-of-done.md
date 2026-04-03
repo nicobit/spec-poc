@@ -46,3 +46,6 @@ A feature is done only when all applicable items below are satisfied.
 
 - traceability is visible from requirement to validation
 - reviewers can identify what was requested, built, and verified without guessing
+- at least one commit message or code comment references the feature ID
+- all open items in the validation report have an owner and a due date
+- spec status is updated to `Completed` only after the above conditions are met

@@ -181,7 +181,7 @@ def create_environment(data: Dict[str, Any]) -> Dict[str, Any]:
     env["stages"] = env.get("stages") or []
     # Validate
     try:
-        EnvironmentModel.parse_obj(env)
+        EnvironmentModel.model_validate(env)
     except Exception:
         # For in-memory dev/test convenience, still allow creation but propagate error
         raise
@@ -201,7 +201,7 @@ def update_environment(env: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     from .environment_model import EnvironmentModel
 
     try:
-        EnvironmentModel.parse_obj(env)
+        EnvironmentModel.model_validate(env)
     except Exception:
         raise
 

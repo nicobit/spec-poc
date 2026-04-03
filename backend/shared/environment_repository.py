@@ -70,7 +70,7 @@ class TableEnvironmentStore(_BaseStore):
 
         env = dict(data)
         try:
-            EnvironmentModel.parse_obj(env)
+            EnvironmentModel.model_validate(env)
         except Exception:
             raise
         env_id = env.get("id") or f"env-{os.urandom(4).hex()}"
@@ -121,7 +121,7 @@ class TableEnvironmentStore(_BaseStore):
         # validate payload
         from .environment_model import EnvironmentModel
         try:
-            EnvironmentModel.parse_obj(env)
+            EnvironmentModel.model_validate(env)
         except Exception:
             raise
 

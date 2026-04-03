@@ -23,9 +23,25 @@ Read these first when relevant:
 - `delivery/agents/claude-mapping.md`
 - `delivery/agents/codex-mapping.md`
 
+## Instruction Priority
+
+When guidance overlaps, use this priority order:
+
+1. `AGENTS.md`
+2. `delivery/governance/ai-working-contract.md`
+3. core workflow docs in `delivery/workflows/`
+4. tool-specific adapter docs in `.github/`, `.claude/`, and `.codex/`
+5. secondary summaries and reference docs
+
 ## Working Contract
 
 Use [AI Working Contract](delivery/governance/ai-working-contract.md) as the shared cross-agent behavior layer.
+
+High-signal local summary:
+
+- For feature-like work, start with `business-request.md`, `spec-refinement.md`, and `feature-spec.md`.
+- Do not move from a newly created or materially refined feature package into implementation unless the user has asked to proceed or the request clearly implies implementation now.
+- Add `api-spec.md` and `test-plan.md` only when the shared contract says they are needed.
 
 When handling a feature:
 
@@ -46,7 +62,7 @@ Feature artifacts should normally live under:
 
 `specs/features/FEAT-<area>-<id>-<short-name>/`
 
-Typical contents:
+Possible contents:
 
 - `business-request.md`
 - `spec-refinement.md`
@@ -57,6 +73,8 @@ Typical contents:
 - `test-plan.md`
 - `task-breakdown.md`
 - `validation-report.md`
+
+Do not create all of these by default. Start with the minimum package from [AI Working Contract](delivery/governance/ai-working-contract.md) and add the rest only when needed.
 
 ## Repo Structure Principle
 

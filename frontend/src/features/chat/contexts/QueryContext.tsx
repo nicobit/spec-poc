@@ -2,6 +2,7 @@ import { createContext, useState, type ReactNode } from 'react';
 import { useMsal } from '@azure/msal-react';
 
 import { submitQuery } from '@/features/chat/api/query';
+import { submitAiChat } from '@/features/chat/api/ai';
 import { useAuth } from '@/contexts/AuthContext';
 import type { QueryResponse } from '@/features/chat/api/query';
 
@@ -73,6 +74,27 @@ export function QueryProvider({ children }: QueryProviderProps) {
     }
 
     try {
+      // If user explicitly prefixes with `ai:` use AI chat endpoint
+      if (queryText.trim().toLowerCase().startsWith('ai:')) {
+        const message = queryText.trim().slice(3).trim();
+        const aiResp = await submitAiChat(instance, message);
+        // Map AI response into Query shape
+        const entry = {
+          query: queryText,
+          result: null,
+          answer: aiResp.answer || '',
+          chartType: '',
+          error: null,
+          sql_query: undefined,
+          execution_history: [],
+          mermaid: undefined,
+          reasoning: aiResp.references ? JSON.stringify(aiResp.references, null, 2) : '',
+        } as Query;
+        setQueries((previous) => [...previous, entry]);
+        setSelectedIndex(queries.length);
+        return;
+      }
+
       const resultData = await submitQuery(instance, queryText);
       setQueries((previous) => {
         return [...previous, buildQuerySuccessEntry(queryText, resultData)];

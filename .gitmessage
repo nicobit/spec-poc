@@ -1,0 +1,17 @@
+# <type>(<FEAT-ID>): <short description>
+#
+# Types: feat | fix | test | docs | refactor | chore | ci
+# FEAT-ID: e.g. FEAT-ADMIN-002  (omit for chore/ci with no spec)
+#
+# Examples:
+#   feat(FEAT-ADMIN-004): implement environment stop endpoint
+#   fix(FEAT-ADMIN-003): handle missing client id on update
+#   test(FEAT-ADMIN-002): add integration coverage for AC-ENV-003
+#
+# Body (optional — explain why, not what):
+#
+#
+# Traceability reminder:
+#   - Does this commit reference a FEAT-ID?
+#   - Are acceptance criteria covered by tests?
+#   - Is the validation report up to date?

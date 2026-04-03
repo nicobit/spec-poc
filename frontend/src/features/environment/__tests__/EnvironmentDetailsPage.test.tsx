@@ -39,6 +39,40 @@ describe('EnvironmentDetailsPage', () => {
     mockGetEnvironment.mockReset();
   });
 
+  it('highlights failed stage card when latestExecution.status is failed', async () => {
+    mockGetEnvironment.mockResolvedValue({
+      id: 'env-1',
+      name: 'My Env',
+      client: 'Client A',
+      status: 'running',
+      stages: [
+        {
+          id: 'stage-1',
+          name: 'Stage One',
+          status: 'stopped',
+          resourceActions: [],
+          latestExecution: { status: 'failed', requestedAt: new Date().toISOString() },
+        },
+      ],
+      schedules: [],
+    } as any);
+
+    render(
+      <MemoryRouter initialEntries={["/environment/env-1"]}>
+        <Routes>
+          <Route path="/environment/:id" element={<EnvironmentDetailsPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const heading = await screen.findByText('Stage One');
+    const article = heading.closest('article');
+    expect(article).toBeTruthy();
+    // highlight uses subtle ring + bg classes
+    expect(article?.className).toContain('ring-2');
+    expect(article?.className).toContain('bg-red-50');
+  });
+
   it('renders the redesigned details overview and stage sections', async () => {
     mockGetEnvironment.mockResolvedValue({
       id: 'env-1',

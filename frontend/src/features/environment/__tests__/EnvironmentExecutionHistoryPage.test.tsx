@@ -105,7 +105,7 @@ describe('EnvironmentExecutionHistoryPage', () => {
     );
 
     expect(await screen.findByText('Environment execution history')).toBeTruthy();
-    expect(screen.getByText('Track scheduled and manual runs, including failures and per-resource results.')).toBeTruthy();
+    expect(await screen.findByText('Track scheduled and manual runs, including failures and per-resource results.')).toBeTruthy();
     expect(screen.getByText('start - STG')).toBeTruthy();
     expect(screen.getByText('stop - MDL')).toBeTruthy();
 

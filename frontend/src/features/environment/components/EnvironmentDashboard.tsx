@@ -115,6 +115,14 @@ export default function EnvironmentDashboard({ instance: msalInstance }: Props) 
       .slice(0, 6);
   }, [schedules]);
 
+  const postponedSchedules = useMemo(() => {
+    const now = new Date();
+    return schedules
+      .filter((s) => s.postponed_until && new Date(s.postponed_until) > now)
+      .sort((a, b) => new Date(a.postponed_until as any).getTime() - new Date(b.postponed_until as any).getTime())
+      .slice(0, 6);
+  }, [schedules]);
+
   const recentExecutionSignal = useMemo(() => {
     const allExecutions = flattenExecutions(environments);
     const failures = sortByRequestedAtDescending(
@@ -264,6 +272,34 @@ export default function EnvironmentDashboard({ instance: msalInstance }: Props) 
                 </Link>
               ))
             )}
+            {/* Postponed schedules subsection */}
+            <div className="mt-6 border-t pt-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)]">Postponed schedules</h3>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)]">Schedules postponed until a later time.</p>
+                </div>
+                <Clock3 className="mt-1 h-4 w-4 text-[var(--text-muted)]" />
+              </div>
+
+              <div className="mt-3 space-y-3">
+                {postponedSchedules.length === 0 ? (
+                  <div className="text-sm ui-text-muted">No postponed schedules.</div>
+                ) : (
+                  postponedSchedules.map((s) => (
+                    <Link key={s.id} to="/environment/schedules" className="flex items-start justify-between gap-3 rounded-xl border border-[var(--border-subtle)] px-4 py-3 transition hover:bg-[var(--surface-hover)]">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-[var(--text-primary)]">{s.environment}</div>
+                        <div className="mt-1 text-sm text-[var(--text-secondary)]">{s.stage} · {s.action}</div>
+                        <div className="mt-1 text-xs ui-text-muted">Postponed until {formatDateTime(s.postponed_until)}{s.postponed_by ? ` · by ${s.postponed_by}` : ''}</div>
+                        {s.postpone_reason ? <div className="mt-1 text-xs ui-text-muted">Reason: {s.postpone_reason}</div> : null}
+                      </div>
+                      <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+                    </Link>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
         </section>
       </div>

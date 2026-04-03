@@ -159,6 +159,11 @@ class ClientRetireIn(BaseModel):
     reason: Optional[str] = None
 
 
+class ClientsBulkRetireIn(BaseModel):
+    ids: List[str]
+    reason: Optional[str] = None
+
+
 def compute_next_run(cron_expr: str, tz: str) -> str:
     tzinfo = get_timezone_info(tz)
     now = datetime.now(tzinfo)
@@ -642,6 +647,39 @@ async def retire_client(client_id: str, req: Request, body: ClientRetireIn):
     return {"updated": _client_response_payload(updated)}
 
 
+@fast_app.post("/api/clients/retire")
+async def retire_clients_bulk(req: Request, body: ClientsBulkRetireIn):
+    user = await _resolve_user(req)
+    if not has_any_role(user, ["admin", "environment-manager"]):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    actor = user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid")
+    updated_items = []
+    for client_id in body.ids:
+        existing = get_client_item(client_id)
+        if not existing:
+            # skip unknown ids
+            continue
+        updated = retire_client_inmemory(client_id, retired_by=actor)
+        if not updated:
+            continue
+        append_audit(
+            {
+                "client": client_id,
+                "clientName": updated.get("name"),
+                "shortCode": updated.get("shortCode"),
+                "action": "retire",
+                "status": "success",
+                "eventType": "client-retired",
+                "requestedBy": actor,
+                "reason": body.reason,
+            }
+        )
+        updated_items.append(_client_response_payload(updated))
+
+    return {"updated": updated_items}
+
+
 @fast_app.get("/api/environments")
 @fast_app.get("/api/environments/")
 async def list_environments(req: Request):
@@ -754,7 +792,7 @@ async def post_environment(req: Request, body: EnvironmentIn):
         # ensure stages is a list for validation (incoming EnvironmentIn may set None)
         if tmp.get("stages") is None:
             tmp["stages"] = []
-        EnvironmentModel.parse_obj(tmp)
+        EnvironmentModel.model_validate(tmp)
     except ValidationError as e:
         raise HTTPException(status_code=400, detail=e.errors())
     client_val = item.get("clientId") or item.get("client")
@@ -858,7 +896,7 @@ async def put_environment(env_id: str, req: Request, body: EnvironmentIn):
     # validate merged object
     try:
         from shared.environment_model import EnvironmentModel
-        EnvironmentModel.parse_obj(existing)
+        EnvironmentModel.model_validate(existing)
     except ValidationError as e:
         raise HTTPException(status_code=400, detail=e.errors())
 

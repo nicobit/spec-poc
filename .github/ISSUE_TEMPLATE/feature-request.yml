@@ -16,7 +16,7 @@ body:
     attributes:
       label: Feature ID
       description: Use the repository feature naming convention.
-      placeholder: FEAT-ADMIN-003-example-feature
+      placeholder: FEAT-CLIENTS-001-example-feature
     validations:
       required: true
   - type: input
@@ -24,7 +24,7 @@ body:
     attributes:
       label: Feature Spec Path
       description: Path to the feature specification file.
-      placeholder: specs/features/FEAT-ADMIN-003-example-feature/feature-spec.md
+      placeholder: specs/features/FEAT-CLIENTS-001-example-feature/feature-spec.md
     validations:
       required: true
   - type: input
@@ -32,7 +32,7 @@ body:
     attributes:
       label: Test Plan Path
       description: Path to the test plan for this feature.
-      placeholder: specs/features/FEAT-ADMIN-003-example-feature/test-plan.md
+      placeholder: specs/features/FEAT-CLIENTS-001-example-feature/test-plan.md
     validations:
       required: true
   - type: textarea

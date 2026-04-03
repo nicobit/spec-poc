@@ -79,6 +79,19 @@ export async function retireClient(
   return body.updated;
 }
 
+export async function retireClients(
+  msalInstance: IPublicClientApplication,
+  ids: string[],
+  payload?: { reason?: string },
+): Promise<ClientRecord[]> {
+  const res = await authFetch(msalInstance, apiUrl('/clients/retire'), {
+    method: 'POST',
+    body: JSON.stringify({ ids, ...(payload || {}) }),
+  });
+  const body = await getJson<{ updated?: ClientRecord[] }>(res);
+  return body.updated || [];
+}
+
 export async function deleteClientNotSupported(
   msalInstance: IPublicClientApplication,
   id: string,

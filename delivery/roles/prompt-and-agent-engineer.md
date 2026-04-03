@@ -1,5 +1,7 @@
 # Prompt And Agent Engineer
 
+This is a niche framework-maintenance role, not part of the default feature delivery path.
+
 ## Purpose
 
 Maintain prompts, instructions, skills, and orchestration assets so AI-assisted delivery stays aligned with the repository's spec-driven contract.

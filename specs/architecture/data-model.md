@@ -298,7 +298,7 @@ Primary purpose:
 
 Current status:
 
-- architecturally defined for `FEAT-ADMIN-004 Start/Stop Services`
+- architecturally defined for `FEAT-EXECUTION-001 Start/Stop Services`
 - first-release recommended durable persistence is Azure Cosmos DB
 - persistence and runtime implementation are still evolving
 
