@@ -4,8 +4,10 @@ from pydantic import BaseModel
 from shared.context import get_current_user
 from shared.utils.nb_logger import NBLogger
 from shared.client_store import list_clients, get_client
-from shared.environment_store import list_environments
-from shared.scheduler_store import SCHEDULES
+from shared.environment_store import list_environments as _list_environments_seed
+from shared.environment_repository import get_environment_store
+from shared.scheduler_store import SCHEDULES as _SCHEDULES_SEED
+from shared.cosmos_store import get_cosmos_store
 from shared.execution_store import (
     list_stage_executions_for_schedule,
     get_failure_summary,
@@ -14,6 +16,7 @@ from shared.execution_store import (
 )
 from app.services.llm.openai_service import OpenAIService
 from app.services.llm.schemas import AiAnswerModel
+from app.services.azure_stage_services import get_stage_services
 from .redaction import redact_text
 from shared.chat_session_store import (
     new_session,
@@ -48,6 +51,23 @@ _TOOLS = [
                     "limit": {"type": "integer", "description": "Max executions to return (default 10)"},
                 },
                 "required": ["schedule_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_stage_services",
+            "description": "Get Azure services and recent failures for a specific stage.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "stage_id": {"type": "string", "description": "The stage ID"},
+                    "include_failures": {"type": "boolean", "description": "Include recent failure events"},
+                    "lookback_days": {"type": "integer", "description": "How many days of failures to include"},
+                    "realtime": {"type": "boolean", "description": "If true, perform live Azure queries (may be slow and require credentials)"},
+                },
+                "required": ["stage_id"],
             },
         },
     },
@@ -114,20 +134,27 @@ def _build_catalog() -> str:
         {"id": c.get("id"), "name": c.get("name"), "shortCode": c.get("shortCode"), "retired": c.get("retired")}
         for c in list_clients(include_retired=True)
     ]
+    _env_store = get_environment_store()
+    _raw_envs = _env_store.list_environments() if _env_store else _list_environments_seed()
     environments = [
-        {"id": e.get("id"), "name": e.get("name"), "status": e.get("status")}
-        for e in list_environments()
+        {"id": e.get("id"), "name": e.get("name"), "status": e.get("status"), "client": e.get("client"), "clientId": e.get("clientId")}
+        for e in _raw_envs
     ]
+    _cosmos = get_cosmos_store()
+    _raw_schedules = _cosmos.list_schedules(limit=500) if _cosmos else list(_SCHEDULES_SEED)
     schedules = [
         {
             "id": s.get("id"),
-            "clientId": s.get("client_id"),
+            "clientId": s.get("client_id") or s.get("clientId"),
             "environment": s.get("environment"),
-            "environmentId": s.get("environment_id"),
+            "environmentId": s.get("environment_id") or s.get("environmentId"),
+            "stage": s.get("stage"),
+            "stageId": s.get("stage_id") or s.get("stageId"),
+            "action": s.get("action"),
             "enabled": s.get("enabled"),
             "next_run": s.get("next_run"),
         }
-        for s in SCHEDULES
+        for s in _raw_schedules
     ]
     return json.dumps({"clients": clients, "environments": environments, "schedules": schedules}, indent=2)
 
@@ -173,6 +200,21 @@ def _execute_tool(name: str, args: dict) -> str:
                 for e in result
             ]
             return json.dumps(short)
+
+        if name == "get_stage_services":
+            # args: { stage_id: str, include_failures?: bool, lookback_days?: int }
+            stage_id = args.get("stage_id")
+            if not stage_id:
+                return json.dumps({"error": "stage_id is required"})
+            include_failures = bool(args.get("include_failures", True))
+            lookback_days = int(args.get("lookback_days", 7))
+            realtime = bool(args.get("realtime", False))
+            try:
+                result = get_stage_services(stage_id, include_failures=include_failures, lookback_days=lookback_days, realtime=realtime)
+                return json.dumps(result)
+            except Exception as exc:
+                logger.exception("get_stage_services failed: %s", exc)
+                return json.dumps({"error": str(exc)})
 
     except Exception as exc:
         logger.exception("Tool %s failed: %s", name, exc)

@@ -4,6 +4,7 @@ import DOMPurify from 'dompurify';
 import { ArrowUp, Database, Loader2, Maximize2, MessageSquare, Minimize2, Sparkles, X, ChevronDown } from 'lucide-react';
 
 import { QueryContext } from '@/features/chat/contexts/QueryContext';
+import StageServicesPanel from './StageServicesPanel';
 import { themeClasses } from '@/theme/themeClasses';
 
 type AssistantPanelProps = {
@@ -40,6 +41,7 @@ export default function AssistantPanel({
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<'ai' | 'nl_sql'>('ai');
+  const [stagePanelOpen, setStagePanelOpen] = useState(false);
 
   const queries = queryContext?.queries ?? [];
   const hasPendingEntry = queries.some((entry) => entry.isPending);
@@ -191,6 +193,14 @@ export default function AssistantPanel({
           </div>
           <button
             type="button"
+            title="Stage services"
+            className={`${themeClasses.iconButton} rounded-full p-1`}
+            onClick={() => setStagePanelOpen((v) => !v)}
+          >
+            <Database className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
             className={`${themeClasses.iconButton} rounded-full p-1`}
             onClick={onToggleExpand}
             aria-label={expanded ? 'Restore AI assistant width' : 'Expand AI assistant'}
@@ -207,6 +217,7 @@ export default function AssistantPanel({
           </button>
         </div>
       </div>
+      {stagePanelOpen && <StageServicesPanel />}
 
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="custom-scrollbar flex-1 overflow-y-auto px-5 py-4">

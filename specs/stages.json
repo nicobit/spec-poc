@@ -1,0 +1,1 @@
+{"stage1": {"stage": "stage1", "client": "client-a", "environment": "DEV", "schedules": ["sched-1"], "azureResourceGroup": "rg-stage1", "azureServices": []}}
