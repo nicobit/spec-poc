@@ -99,7 +99,22 @@ export default function EnvironmentScheduleCreatePage() {
 
   const environmentsForClient = useMemo(() => {
     if (!selectedClient) return instances;
-    return instances.filter((item) => getClientKey(item) === selectedClient);
+    const filtered = instances.filter((item) => getClientKey(item) === selectedClient);
+    return filtered.slice().sort((a, b) => {
+      const ad = (a as any).displayOrder;
+      const bd = (b as any).displayOrder;
+      const aIsNone = ad === undefined || ad === null;
+      const bIsNone = bd === undefined || bd === null;
+      if (aIsNone && bIsNone) return a.name.localeCompare(b.name);
+      if (aIsNone) return 1;
+      if (bIsNone) return -1;
+      const an = Number(ad);
+      const bn = Number(bd);
+      if (!Number.isNaN(an) && !Number.isNaN(bn)) {
+        if (an !== bn) return an - bn;
+      }
+      return a.name.localeCompare(b.name);
+    });
   }, [instances, selectedClient]);
 
   const selectedEnv = useMemo(
@@ -123,7 +138,26 @@ export default function EnvironmentScheduleCreatePage() {
       (clientFromQuery && clientOptions.some((option) => option.value === clientFromQuery) ? clientFromQuery : null) ??
       getClientKey(instances[0]!) ??
       null;
-    const clientEnvironments = initialClient ? instances.filter((item) => getClientKey(item) === initialClient) : instances;
+    const clientEnvironments = initialClient
+      ? instances
+          .filter((item) => getClientKey(item) === initialClient)
+          .slice()
+          .sort((a, b) => {
+            const ad = (a as any).displayOrder;
+            const bd = (b as any).displayOrder;
+            const aIsNone = ad === undefined || ad === null;
+            const bIsNone = bd === undefined || bd === null;
+            if (aIsNone && bIsNone) return a.name.localeCompare(b.name);
+            if (aIsNone) return 1;
+            if (bIsNone) return -1;
+            const an = Number(ad);
+            const bn = Number(bd);
+            if (!Number.isNaN(an) && !Number.isNaN(bn)) {
+              if (an !== bn) return an - bn;
+            }
+            return a.name.localeCompare(b.name);
+          })
+      : instances;
     const initialEnvironment =
       (envIdFromQuery ? clientEnvironments.find((item) => item.id === envIdFromQuery) : null) ??
       clientEnvironments[0] ??

@@ -22,6 +22,6 @@ Then:
 7. Propose the smallest complete implementation plan.
 8. Implement code, tests, and docs together.
 9. Summarize assumptions, traceability, and validation evidence.
-```
+``` 
 
 

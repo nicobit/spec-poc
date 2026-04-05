@@ -1,5 +1,5 @@
 ---
-applyTo: "{README.md,docs/**/*.md,.github/**/*.md,.claude/**/*.md,.codex/**/*.md,templates/**/*.md}"
+applyTo: "{README.md,docs/**/*.md,delivery/**/*.md,.github/**/*.md,.claude/**/*.md,.codex/**/*.md,templates/**/*.md}"
 ---
 
 When editing repository documentation and guidance:

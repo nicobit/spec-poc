@@ -43,10 +43,13 @@ If you are new to this repository, use this order:
 Quick entrypoints:
 
 - Business user: start with [Business Request Template](templates/business-request.template.md)
+- Business user with AI: start with [Start From Idea](docs/spec-driven/start-from-idea.md)
 - Human contributor: start with [Adding A New Feature](#adding-a-new-feature)
 - GitHub Copilot: start with [GitHub Copilot Guidance](.github/copilot-instructions.md)
 - Claude: start with [Claude Workspace Guidance](.claude/README.md)
 - Codex: start with [Codex Workspace Guidance](.codex/README.md)
+
+For a raw feature-like request, the default AI-assisted starting point is `Feature Orchestrator`: give the request, let it draft the minimum governing feature package, review the spec, then ask for implementation only when ready.
 
 Instruction priority for AI tools:
 

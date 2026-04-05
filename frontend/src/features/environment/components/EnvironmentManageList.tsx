@@ -1,6 +1,6 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { IPublicClientApplication } from '@azure/msal-browser';
-import { ArrowUpDown, ChevronRight, Eye, MoreHorizontal, PencilLine, Trash2 } from 'lucide-react';
+import { ArrowUpDown, ChevronRight, Eye, MoreHorizontal, PencilLine, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import { enqueueSnackbar } from 'notistack';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 
@@ -10,7 +10,181 @@ import { useAuthZ } from '@/auth/useAuthZ';
 import { useTheme } from '@/contexts/ThemeContext';
 import { themeClasses } from '@/theme/themeClasses';
 
-import { EnvInstance, deleteEnvironment, listEnvironments } from '../api';
+import { EnvInstance, deleteEnvironment, listEnvironments, updateEnvironment } from '../api';
+
+type EnvRowProps = {
+  env: EnvInstance;
+  envIndex: number;
+  sortedEnvs: EnvInstance[];
+  canEdit: boolean;
+  msalInstance: IPublicClientApplication;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  location: ReturnType<typeof useLocation>;
+  navigate: ReturnType<typeof useNavigate>;
+  deletingId: string | null;
+  handleDelete: (environment: EnvInstance) => void;
+  refresh: () => Promise<void>;
+};
+
+function EnvRow({ env, envIndex, sortedEnvs, canEdit, msalInstance, containerRef, location, navigate, deletingId, handleDelete, refresh }: EnvRowProps) {
+  const [reordering, setReordering] = useState(false);
+
+  const handleMove = async (dir: number) => {
+    if (reordering) return;
+    const idx = sortedEnvs.findIndex((e) => e.id === env.id);
+    const targetIdx = idx + dir;
+    if (idx === -1 || targetIdx < 0 || targetIdx >= sortedEnvs.length) return;
+    setReordering(true);
+    try {
+      const newOrder = sortedEnvs.slice();
+      const tmp = newOrder[idx];
+      newOrder[idx] = newOrder[targetIdx];
+      newOrder[targetIdx] = tmp;
+
+      // assign sequential displayOrder starting at 1
+      const updates: Array<{ id: string; displayOrder: number }> = [];
+      for (let i = 0; i < newOrder.length; i++) {
+        const item = newOrder[i];
+        const desired = i + 1;
+        const orig = item.displayOrder ?? null;
+        if (orig !== desired) updates.push({ id: item.id, displayOrder: desired });
+      }
+
+      // perform updates sequentially
+      for (const u of updates) {
+        try {
+          await updateEnvironment(msalInstance, u.id, { displayOrder: u.displayOrder });
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.error('Failed to update displayOrder', u.id, err);
+        }
+      }
+
+      await refresh();
+    } finally {
+      setReordering(false);
+    }
+  };
+
+  return (
+    <article
+      key={env.id}
+      className="group rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-5 py-3.5 shadow-sm transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)]"
+    >
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className="truncate text-left text-[15px] font-semibold tracking-tight text-[var(--text-primary)] transition hover:text-[var(--accent-primary)]"
+              onClick={() =>
+                navigate(`/environment/${env.id}${location.search}`, {
+                  state: { scrollTop: containerRef.current?.scrollTop || 0, selectedId: env.id },
+                })
+              }
+            >
+              {env.name}
+            </button>
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+            {env.region ? (
+              <span className="rounded-full bg-[var(--surface-panel-muted)] px-2.5 py-1 text-[var(--text-secondary)]">
+                Region {env.region}
+              </span>
+            ) : null}
+            <span className="rounded-full bg-[var(--surface-panel-muted)] px-2.5 py-1 text-[var(--text-secondary)]">
+              {env.stages?.length || 0} stage{env.stages?.length === 1 ? '' : 's'}
+            </span>
+            {(env.stages || []).map((stage) => {
+              const tone = getStageStatusClasses(stage.status);
+
+              return (
+                <span
+                  key={stage.id}
+                  className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[10px] opacity-85 ${tone.chip}`}
+                  title={`${stage.name}: ${stage.status}`}
+                >
+                  <span className={`h-2.5 w-2.5 rounded-full ${tone.dot}`} />
+                  <span>{stage.name}</span>
+                </span>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end">
+          <div className="flex items-center gap-2">
+            <div
+              className={[
+                'flex items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-1 py-1 shadow-sm',
+                'md:invisible md:max-w-0 md:translate-x-2 md:overflow-hidden md:border-transparent md:bg-transparent md:px-0 md:py-0 md:opacity-0 md:shadow-none md:pointer-events-none',
+                'md:group-hover:visible md:group-hover:max-w-[22rem] md:group-hover:translate-x-0 md:group-hover:border-[var(--border-subtle)] md:group-hover:bg-[var(--surface-elevated)] md:group-hover:px-1 md:group-hover:py-1 md:group-hover:opacity-100 md:group-hover:shadow-sm md:group-hover:pointer-events-auto',
+                'md:group-focus-within:visible md:group-focus-within:max-w-[22rem] md:group-focus-within:translate-x-0 md:group-focus-within:border-[var(--border-subtle)] md:group-focus-within:bg-[var(--surface-elevated)] md:group-focus-within:px-1 md:group-focus-within:py-1 md:group-focus-within:opacity-100 md:group-focus-within:shadow-sm md:group-focus-within:pointer-events-auto',
+              ].join(' ')}
+            >
+              <InventoryActionButton
+                label="Details"
+                icon={<Eye className="h-4 w-4" />}
+                onClick={() =>
+                  navigate(`/environment/${env.id}${location.search}`, {
+                    state: { scrollTop: containerRef.current?.scrollTop || 0, selectedId: env.id },
+                  })
+                }
+              />
+              {canEdit ? (
+                <InventoryActionButton
+                  label="Edit"
+                  icon={<PencilLine className="h-4 w-4" />}
+                  onClick={() =>
+                    navigate(`/environment/edit/${env.id}${location.search}`, {
+                      state: { scrollTop: containerRef.current?.scrollTop || 0, selectedId: env.id },
+                    })
+                  }
+                />
+              ) : null}
+              {canEdit ? (
+                <InventoryActionButton
+                  label={deletingId === env.id ? 'Deleting...' : 'Delete'}
+                  icon={<Trash2 className="h-4 w-4" />}
+                  onClick={() => handleDelete(env)}
+                  disabled={deletingId === env.id}
+                  destructive
+                />
+              ) : null}
+            </div>
+
+            {canEdit ? (
+              <div className="flex items-center gap-1">
+                <InventoryActionButton
+                  label="Move up"
+                  icon={<ArrowUp className="h-4 w-4" />}
+                  onClick={() => void handleMove(-1)}
+                  disabled={reordering}
+                />
+                <InventoryActionButton
+                  label="Move down"
+                  icon={<ArrowDown className="h-4 w-4" />}
+                  onClick={() => void handleMove(1)}
+                  disabled={reordering}
+                />
+              </div>
+            ) : null}
+
+            <button
+              type="button"
+              className={`${themeClasses.iconButton} inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)]`}
+              aria-label={`Actions for ${env.name}`}
+              title="Show actions"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
 
 type Props = { instance: IPublicClientApplication; refreshNonce?: number; onLoadingChange?: (loading: boolean) => void };
 
@@ -364,107 +538,42 @@ export default function EnvironmentManageList({ instance: msalInstance, refreshN
 
               {expandedClients[group.client] === true ? (
                 <div className="ml-4 space-y-3 rounded-[1.75rem] border border-[var(--border-subtle)] bg-[var(--surface-panel-muted)]/50 p-3 md:ml-6 md:p-4">
-                  {group.environments.map((env) => (
-                    <article
-                      key={env.id}
-                      className="group rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-panel)] px-5 py-3.5 shadow-sm transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)]"
-                    >
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-3">
-                            <button
-                              type="button"
-                              className="truncate text-left text-[15px] font-semibold tracking-tight text-[var(--text-primary)] transition hover:text-[var(--accent-primary)]"
-                              onClick={() =>
-                                navigate(`/environment/${env.id}${location.search}`, {
-                                  state: { scrollTop: containerRef.current?.scrollTop || 0, selectedId: env.id },
-                                })
-                              }
-                            >
-                              {env.name}
-                            </button>
-                          </div>
+                  {(() => {
+                    const sortedEnvs = group.environments
+                      .slice()
+                      .sort((a, b) => {
+                        const ad = (a as any).displayOrder;
+                        const bd = (b as any).displayOrder;
+                        const aIsNone = ad === undefined || ad === null;
+                        const bIsNone = bd === undefined || bd === null;
+                        if (aIsNone && bIsNone) return a.name.localeCompare(b.name);
+                        if (aIsNone) return 1;
+                        if (bIsNone) return -1;
+                        const an = Number(ad);
+                        const bn = Number(bd);
+                        if (!Number.isNaN(an) && !Number.isNaN(bn)) {
+                          if (an !== bn) return an - bn;
+                        }
+                        return a.name.localeCompare(b.name);
+                      });
 
-                          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
-                            {env.region ? (
-                              <span className="rounded-full bg-[var(--surface-panel-muted)] px-2.5 py-1 text-[var(--text-secondary)]">
-                                Region {env.region}
-                              </span>
-                            ) : null}
-                            <span className="rounded-full bg-[var(--surface-panel-muted)] px-2.5 py-1 text-[var(--text-secondary)]">
-                              {env.stages?.length || 0} stage{env.stages?.length === 1 ? '' : 's'}
-                            </span>
-                            {(env.stages || []).map((stage) => {
-                              const tone = getStageStatusClasses(stage.status);
-
-                              return (
-                                <span
-                                  key={stage.id}
-                                  className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[10px] opacity-85 ${tone.chip}`}
-                                  title={`${stage.name}: ${stage.status}`}
-                                >
-                                  <span className={`h-2.5 w-2.5 rounded-full ${tone.dot}`} />
-                                  <span>{stage.name}</span>
-                                </span>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-end">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className={[
-                                'flex items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-1 py-1 shadow-sm',
-                                'md:invisible md:max-w-0 md:translate-x-2 md:overflow-hidden md:border-transparent md:bg-transparent md:px-0 md:py-0 md:opacity-0 md:shadow-none md:pointer-events-none',
-                                'md:group-hover:visible md:group-hover:max-w-[22rem] md:group-hover:translate-x-0 md:group-hover:border-[var(--border-subtle)] md:group-hover:bg-[var(--surface-elevated)] md:group-hover:px-1 md:group-hover:py-1 md:group-hover:opacity-100 md:group-hover:shadow-sm md:group-hover:pointer-events-auto',
-                                'md:group-focus-within:visible md:group-focus-within:max-w-[22rem] md:group-focus-within:translate-x-0 md:group-focus-within:border-[var(--border-subtle)] md:group-focus-within:bg-[var(--surface-elevated)] md:group-focus-within:px-1 md:group-focus-within:py-1 md:group-focus-within:opacity-100 md:group-focus-within:shadow-sm md:group-focus-within:pointer-events-auto',
-                              ].join(' ')}
-                            >
-                              <InventoryActionButton
-                                label="Details"
-                                icon={<Eye className="h-4 w-4" />}
-                                onClick={() =>
-                                  navigate(`/environment/${env.id}${location.search}`, {
-                                    state: { scrollTop: containerRef.current?.scrollTop || 0, selectedId: env.id },
-                                  })
-                                }
-                              />
-                              {canEdit ? (
-                                <InventoryActionButton
-                                  label="Edit"
-                                  icon={<PencilLine className="h-4 w-4" />}
-                                  onClick={() =>
-                                    navigate(`/environment/edit/${env.id}${location.search}`, {
-                                      state: { scrollTop: containerRef.current?.scrollTop || 0, selectedId: env.id },
-                                    })
-                                  }
-                                />
-                              ) : null}
-                              {canEdit ? (
-                                <InventoryActionButton
-                                  label={deletingId === env.id ? 'Deleting...' : 'Delete'}
-                                  icon={<Trash2 className="h-4 w-4" />}
-                                  onClick={() => handleDelete(env)}
-                                  disabled={deletingId === env.id}
-                                  destructive
-                                />
-                              ) : null}
-                            </div>
-
-                            <button
-                              type="button"
-                              className={`${themeClasses.iconButton} inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)]`}
-                              aria-label={`Actions for ${env.name}`}
-                              title="Show actions"
-                            >
-                              <MoreHorizontal className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </article>
-                  ))}
+                    return sortedEnvs.map((env, envIndex) => (
+                      <EnvRow
+                        key={env.id}
+                        env={env}
+                        envIndex={envIndex}
+                        sortedEnvs={sortedEnvs}
+                        canEdit={canEdit}
+                        msalInstance={msalInstance}
+                        containerRef={containerRef}
+                        location={location}
+                        navigate={navigate}
+                        deletingId={deletingId}
+                        handleDelete={handleDelete}
+                        refresh={refresh}
+                      />
+                    ));
+                  })()}
                 </div>
               ) : null}
             </section>

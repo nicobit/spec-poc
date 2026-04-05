@@ -61,6 +61,20 @@ Current model sources:
 - `backend/shared/client_model.py`
 - `backend/shared/client_store.py`
 
+Attribute table:
+
+| Attribute | Type | Constraints | Description |
+| --- | --- | --- | --- |
+| id | string | PK | Stable unique identifier |
+| name | string | NOT NULL | Display name |
+| shortCode | string | NOT NULL | Short reference code |
+| country | string | | Country or region |
+| timezone | string | | IANA timezone for schedule interpretation |
+| clientAdmins | array | | List of admin user identifiers |
+| retired | boolean | | Soft-delete flag |
+| retiredAt | datetime | nullable | Timestamp of retirement |
+| retiredBy | string | nullable | User who retired the record |
+
 Current key fields:
 
 - `id`
@@ -106,6 +120,24 @@ Current model source:
 
 - `backend/shared/environment_model.py`
 
+Attribute table:
+
+| Attribute | Type | Constraints | Description |
+| --- | --- | --- | --- |
+| id | string | PK | Stable unique identifier |
+| name | string | NOT NULL | Display name |
+| clientId | string | FK → Client.id | Canonical client linkage |
+| client | string | legacy | Legacy label-based client reference |
+| region | string | | Azure region |
+| status | string | | Current lifecycle status |
+| lifecycle | string | | Lifecycle state descriptor |
+| tags | object | | Arbitrary metadata tags |
+| owners | array | | Owning user identifiers |
+| created_at | datetime | | Record creation timestamp |
+| updated_at | datetime | | Last update timestamp |
+| stages | array | nested | Stage records (currently nested) |
+| metadata | object | | Free-form metadata |
+
 Important fields:
 
 - `id`
@@ -138,6 +170,18 @@ Primary purpose:
 Current model source:
 
 - `backend/shared/environment_model.py`
+
+Attribute table:
+
+| Attribute | Type | Constraints | Description |
+| --- | --- | --- | --- |
+| id | string | PK | Stable unique identifier |
+| name | string | NOT NULL | Display name (e.g. DEV, UAT, PROD) |
+| status | string | | Current status |
+| resourceActions | array | nested | Azure service/action descriptors |
+| notificationGroups | array | nested | Stage-level notification groups (transitioning to schedule ownership) |
+| postponementPolicy | object | nested | Stage-level postponement policy (transitioning to schedule ownership) |
+| azureConfig | object | | Azure configuration metadata |
 
 Important fields:
 
@@ -291,6 +335,31 @@ Current model source:
 
 - `backend/shared/schedule_model.py`
 
+Attribute table:
+
+| Attribute | Type | Constraints | Description |
+| --- | --- | --- | --- |
+| id | string | PK | Stable unique identifier |
+| clientId | string | FK → Client.id | Canonical client linkage (target) |
+| environmentId | string | FK → Environment.id | Canonical environment linkage (target) |
+| stageId | string | FK → Stage.id | Canonical stage linkage (target) |
+| client | string | legacy | Legacy label reference |
+| environment | string | legacy | Legacy label reference |
+| stage | string | legacy | Legacy label reference |
+| action | string | NOT NULL | start / stop |
+| cron | string | NOT NULL | Cron expression |
+| timezone | string | NOT NULL | IANA timezone |
+| next_run | datetime | | Next scheduled execution time |
+| enabled | boolean | | Whether the schedule is active |
+| notify_before_minutes | integer | | Minutes before execution to notify |
+| notification_groups | array | nested | Notification group definitions |
+| postponement_policy | object | nested | Postponement rules |
+| postponement_count | integer | | Number of times postponed |
+| postponed_until | datetime | nullable | Postponed execution time |
+| postponed_by | string | nullable | User who postponed |
+| postpone_reason | string | nullable | Reason for postponement |
+| last_notified_at | datetime | nullable | Timestamp of last notification |
+
 Important fields:
 
 - `id`
@@ -334,6 +403,23 @@ Current status:
 - architecturally defined for `FEAT-EXECUTION-001 Start/Stop Services`
 - first-release recommended durable persistence is Azure Cosmos DB
 - persistence and runtime implementation are still evolving
+
+Attribute table:
+
+| Attribute | Type | Constraints | Description |
+| --- | --- | --- | --- |
+| executionId | string | PK | Unique execution identifier |
+| clientId | string | FK → Client.id | Client context |
+| environmentId | string | FK → Environment.id | Environment context |
+| stageId | string | FK → Stage.id | Stage that was executed |
+| scheduleId | string | FK → Schedule.id, nullable | Source schedule (null for immediate) |
+| action | string | NOT NULL | start / stop |
+| source | string | | scheduled / manual |
+| status | string | NOT NULL | pending / running / succeeded / failed |
+| requestedAt | datetime | NOT NULL | When execution was requested |
+| startedAt | datetime | nullable | When execution began |
+| completedAt | datetime | nullable | When execution completed |
+| resourceActionResults | array | nested | Per-resource outcomes |
 
 Expected key fields:
 
@@ -463,6 +549,115 @@ Table-backed audit store:
 - table name default: `EnvironmentAudit`
 - partition key: environment or client, with fallback to `global`
 - row key: timestamp plus UUID
+
+## ER Diagram
+
+```mermaid
+erDiagram
+    CLIENT {
+        string id PK
+        string name
+        string shortCode
+        string country
+        string timezone
+        boolean retired
+    }
+    ENVIRONMENT {
+        string id PK
+        string name
+        string clientId FK
+        string region
+        string status
+        string lifecycle
+        datetime created_at
+        datetime updated_at
+    }
+    STAGE {
+        string id PK
+        string name
+        string status
+        json resourceActions
+        json notificationGroups
+        json postponementPolicy
+        json azureConfig
+    }
+    RESOURCE_DESCRIPTOR {
+        string id PK
+        string type
+        string subscriptionId
+        string resourceGroup
+        string region
+        json properties
+    }
+    SCHEDULE {
+        string id PK
+        string clientId FK
+        string environmentId FK
+        string stageId FK
+        string action
+        string cron
+        string timezone
+        datetime next_run
+        boolean enabled
+        json notification_groups
+        json postponement_policy
+    }
+    NOTIFICATION_GROUP {
+        string id PK
+        string name
+        array recipients
+    }
+    STAGE_EXECUTION {
+        string executionId PK
+        string clientId FK
+        string environmentId FK
+        string stageId FK
+        string scheduleId FK
+        string action
+        string source
+        string status
+        datetime requestedAt
+        datetime completedAt
+    }
+    STAGE_EXECUTION_ACTION_RESULT {
+        string resourceActionId FK
+        string type
+        string status
+        string resourceIdentifier
+        string message
+        string errorCode
+    }
+    AUDIT_EVENT {
+        string id PK
+        datetime timestamp
+        string client
+        string environment
+        string stage
+        string action
+        string eventType
+        string requestedBy
+    }
+    CHAT_SESSION {
+        string id PK
+        string userId FK
+        datetime createdAt
+        datetime updatedAt
+        string summary
+        int summarizedUpTo
+        array turns
+        int ttl
+    }
+
+    CLIENT ||--o{ ENVIRONMENT : "owns"
+    ENVIRONMENT ||--o{ STAGE : "contains (nested)"
+    STAGE ||--o{ RESOURCE_DESCRIPTOR : "defines (nested)"
+    STAGE ||--o{ SCHEDULE : "has"
+    STAGE ||--o{ STAGE_EXECUTION : "records"
+    STAGE_EXECUTION ||--o{ STAGE_EXECUTION_ACTION_RESULT : "produces"
+    SCHEDULE ||--o{ NOTIFICATION_GROUP : "notifies via"
+    CLIENT ||--o{ AUDIT_EVENT : "generates"
+    ENVIRONMENT ||--o{ AUDIT_EVENT : "generates"
+```
 
 ## Key Relationships
 

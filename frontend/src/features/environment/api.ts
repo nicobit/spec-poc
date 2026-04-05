@@ -86,6 +86,7 @@ export type EnvInstance = {
   region?: string;
   client?: string;
   clientId?: string;
+  displayOrder?: number;
   lifecycle?: string;
   stages: EnvironmentStage[];
   schedules?: Schedule[];

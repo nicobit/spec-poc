@@ -34,6 +34,8 @@ Read these first:
 - implement only after understanding scope and constraints
 - update docs and validation evidence along with code
 
+For a raw feature-like request, the default Claude path is: use `agents/feature-orchestrator.md`, draft the minimum governing feature package, review the spec, then continue into implementation only when asked.
+
 ## Backend Expectations
 
 - prefer `backend/shared/...` over direct legacy shared imports where possible
@@ -44,15 +46,27 @@ Read these first:
 
 ## Claude-Specific Assets
 
-- `agents/feature-orchestrator.md`
-- `agents/role-routing.md`
-- `agents/`
-- `commands/feature-delivery.md`
-- `commands/refine-feature.md`
-- `commands/test-plan.md`
-- `commands/validate-feature.md`
-- `commands/backend-bootstrap.md`
-- `commands/backend-runtime-review.md`
+**Agents** (`agents/`):
+- `feature-orchestrator.md` — primary entrypoint for feature work
+- `role-routing.md` — decides which role to activate
+- Full role catalog in `agents/`
+
+**Commands** (`commands/`):
+- `feature-delivery.md` — end-to-end feature workflow
+- `refine-feature.md` — spec refinement from a business request
+- `test-plan.md` — test plan generation
+- `validate-feature.md` — validation and DoD review
+- `backend-bootstrap.md` — Azure backend setup
+- `backend-runtime-review.md` — backend runtime review
+
+**Prompts** (`prompts/`) — generation templates with structured output formats:
+- `spec-refinement.md` — generate `spec-refinement.md` from a business-request
+- `feature-spec.md` — generate `feature-spec.md` with preconditions, requirements, and AC postconditions
+- `entity-model.md` — update `specs/architecture/data-model.md` with Mermaid ER and attribute tables
+- `task-breakdown.md` — generate `task-breakdown.md` with parallel markers
+- `backend-implementation.md` — implement Python shared logic + Azure Functions adapter + tests
+- `frontend-implementation.md` — implement React types + hooks + components + tests
+- `validation-report.md` — generate `validation-report.md` with traceability matrix and DoD checklist
 
 Use the templates in `../templates/` instead of inventing new artifact formats unless there is a clear reason to diverge.
 Prefer linking Claude workflows back to the canonical docs and shared role definitions instead of restating the same rules in multiple Claude files.

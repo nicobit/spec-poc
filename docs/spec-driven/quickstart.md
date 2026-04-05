@@ -1,84 +1,72 @@
 # Quickstart
 
-Use this page when you want to start a change quickly with AI assistance.
+Use this page when you want the fastest correct path.
 
-## Step 1: Start from the request
+## What To Do
 
-Begin with the request and decide which of these it is:
+1. Start with the request.
+2. Ask the AI tool to use `Feature Orchestrator`.
+3. Ask it to find or create the right `FEAT-...` package.
+4. Review the draft.
+5. Ask it to implement only after you approve the spec.
 
-- new feature
-- enhancement to an existing feature
-- serious bug fix
-- trivial bug fix
-- docs-only change
+## What To Ask
 
-If you are unsure, check the [Worked Examples](examples/README.md) before asking the AI tool to proceed.
+For most feature-like work, start with:
 
-## Step 2: Ask the AI tool to find the right feature package
+- `Use the Feature Orchestrator. Find or create the governing FEAT package and draft the spec. Do not implement yet.`
 
-Ask the AI tool to look under `specs/features/`.
+If you already know the package:
 
-What you should expect:
+- `Use FEAT-... for this request. Update the spec first. Do not implement yet.`
 
-- if the request extends something that already exists, it should update that existing `FEAT-...` package
-- if the request is genuinely new, it should create a new `FEAT-...` package
-- if the request is trivial, it should avoid creating a feature package unless there is a good reason
+If you are ready for code:
 
-Good default:
+- `The spec is reviewed. Proceed with implementation.`
 
-- prefer updating an existing governing package over creating a narrow enhancement-only package
+## What The AI Tool Should Do
 
-## Step 3: Let the AI tool create the minimum spec
-
-For normal feature-like work, the AI tool should start with:
+For a normal feature or enhancement, it should first create or update:
 
 - `business-request.md`
 - `spec-refinement.md`
 - `feature-spec.md`
 
-You can ask it to use the templates in [templates](../../templates/README.md).
+It should not jump straight to implementation unless you ask it to.
 
-Your job at this point is to review what was created and correct it if needed.
+## What You Should Review
 
-## Step 4: Check whether extra artifacts are needed
+Before implementation, check that the draft clearly explains:
 
-You should expect the AI tool to add:
+- what is being changed
+- what is not being changed
+- the assumptions
+- the acceptance criteria
+- whether the right `FEAT-...` package was selected
+- whether `api-spec.md` or `test-plan.md` is needed
 
-- `api-spec.md` if request/response shapes, validation, compatibility, or authorization behavior change materially
-- `test-plan.md` if the behavior is non-trivial, integration-heavy, role-sensitive, or edge-case-heavy
-- `task-breakdown.md` if the work needs explicit sequencing or coordination
-- `adr.md` if you are making a meaningful cross-cutting design decision
+If that looks right, ask the AI tool to continue.
 
-## Step 5: Ask for implementation only when the spec is clear enough
+## When More Files Are Needed
 
-You are ready to ask the AI tool to implement when the spec is clear enough to describe:
+The AI tool may also add:
 
-- scope
-- assumptions
-- constraints
-- affected surfaces
-- acceptance criteria or equivalent success conditions
+- `api-spec.md`
+- `test-plan.md`
+- `task-breakdown.md`
+- `adr.md`
+- `validation-report.md`
 
-If the request only says "create a feature" or "add a feature", that should not be treated as permission to skip the spec step.
+These are not required every time. They should only appear when the change needs them.
 
-## Step 6: Review the delivery output
+## For Bug Fixes
 
-Once implementation or validation begins, the AI tool should:
+If the change is just a typo or another clearly low-risk fix, ask:
 
-- add or update `validation-report.md`
-- update tests
-- update documentation when delivered behavior changes
+- `This looks like a trivial change. Confirm whether the lighter path is appropriate.`
 
-Before closing, you should check:
+If the fix changes real user-visible behavior or touches contracts, auth, or validation, ask the AI tool to use the existing governing `FEAT-...` package and update the spec first.
 
-- [Definition Of Done](../../delivery/governance/definition-of-done.md)
-- [Traceability](../../delivery/governance/traceability.md)
+## If You Are Unsure
 
-## Good Prompts To Use
-
-Examples:
-
-- "Create or update the governing feature package for this request, but do not implement yet."
-- "Use the existing `FEAT-ENVIRONMENTS-001-management` package for this change and update the spec first."
-- "This is a trivial bug fix. Confirm whether the lighter path is appropriate."
-- "Proceed with implementation now that the spec is reviewed."
+Use [Worked Examples](examples/README.md) and pick the one closest to your request.

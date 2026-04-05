@@ -27,6 +27,8 @@ This repository uses the following GitHub Copilot customization layers:
 - reusable skills in `.github/skills/*/SKILL.md`
 - optional reusable prompt files in `.github/prompts/*.prompt.md`
 
+`.github/agents/*.agent.md` is the canonical Copilot agent layer for this repository. Prompt files are task entrypoints and should not be treated as a parallel role model.
+
 ## Custom Agents
 
 Copilot custom agents live in:
@@ -47,10 +49,15 @@ These agents use explicit tool scopes rather than the default all-tools behavior
 
 ## Prompt Files
 
-Reusable Copilot prompt files live in:
+Reusable Copilot prompt files live in `.github/prompts/`:
 
-- `.github/prompts/feature-delivery.prompt.md`
-- `.github/prompts/orchestrate-feature-from-spec.prompt.md`
+**Core Entry Prompts**
+- `feature-delivery.prompt.md` — start a feature end-to-end
+- `orchestrate-feature-from-spec.prompt.md` — drive an existing feature package through the workflow
+
+Prompt files are convenience entrypoints for concrete tasks. They should defer to the canonical role and workflow guidance in `.github/agents/`, `delivery/workflows/`, and `delivery/governance/` rather than redefining those layers.
+
+Advanced phase-specific prompts are archived under `.github/prompts/advanced/` and are not part of the primary end-user path.
 
 ## Agent Routing
 
@@ -125,4 +132,3 @@ When helping with a feature, Copilot should aim to produce:
 ## Ambiguity Handling
 
 If requirements are incomplete, explicitly list assumptions and open questions instead of silently inventing behavior. Ask a clarifying question only when [AI Working Contract](../delivery/governance/ai-working-contract.md) says the ambiguity is material enough to require one.
-

@@ -49,6 +49,8 @@ class EnvironmentModel(BaseModel):
     client: str
     clientId: Optional[str] = None
     region: Optional[str] = None
+    # Optional integer to control display ordering per-client
+    displayOrder: Optional[int] = None
     status: Optional[str] = "stopped"
     lifecycle: Optional[str] = None
     tags: Optional[Dict[str, str]] = None

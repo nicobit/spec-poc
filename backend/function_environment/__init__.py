@@ -266,7 +266,7 @@ def _resolve_environment_reference(item: dict, environments: list[dict], *, allo
             for e in environments
             if str(e.get("id") or "").lower() == label
             or str(e.get("name") or "").lower() == label
-            or (e.get("lifecycle") and str(e.get("lifecycle")).lower() == label)
+            or ((e.get("lifecycle")) and str(e.get("lifecycle")).lower() == label)
         ]
         if len(matches) == 1:
             resolved_env = matches[0]
@@ -742,16 +742,35 @@ async def list_environments(req: Request):
 
     filtered = [it for it in items if match(it)]
 
-    # apply sorting if requested
-    if sort_by:
+    # If client filter is present, prefer server-side ordering by `displayOrder` (then name)
+    if client_q:
         try:
-            valid_keys = {"name", "client", "clientId", "region", "status"}
-            if sort_by in valid_keys:
-                reverse = sort_dir == "desc"
-                filtered = sorted(filtered, key=lambda x: str((x.get(sort_by) or "")).lower(), reverse=reverse)
+            def _display_key(x: dict):
+                # None displayOrder should sort after numeric values
+                d = x.get("displayOrder")
+                is_none = d is None
+                # coerce to int for stable numeric sort when provided
+                try:
+                    val = int(d) if d is not None else 0
+                except Exception:
+                    val = 0
+                return (is_none, val, str(x.get("name") or "").lower())
+
+            filtered = sorted(filtered, key=_display_key)
         except Exception:
-            # ignore sorting errors and continue
+            # ignore ordering errors and continue
             pass
+    else:
+        # apply sorting if requested
+        if sort_by:
+            try:
+                valid_keys = {"name", "client", "clientId", "region", "status"}
+                if sort_by in valid_keys:
+                    reverse = sort_dir == "desc"
+                    filtered = sorted(filtered, key=lambda x: str((x.get(sort_by) or "")).lower(), reverse=reverse)
+            except Exception:
+                # ignore sorting errors and continue
+                pass
     total = len(filtered)
     start = max(0, page) * per_page
     end = start + per_page
@@ -770,6 +789,15 @@ class EnvironmentIn(BaseModel):
     client: Optional[str] = None
     clientId: Optional[str] = None
     stages: Optional[List[dict]] = None
+
+
+class EnvironmentUpdate(BaseModel):
+    name: Optional[str] = None
+    region: Optional[str] = None
+    client: Optional[str] = None
+    clientId: Optional[str] = None
+    stages: Optional[List[dict]] = None
+    displayOrder: Optional[int] = None
 
 
 @fast_app.post("/api/environments")
@@ -868,7 +896,7 @@ async def post_environment(req: Request, body: EnvironmentIn):
 
 
 @fast_app.put("/api/environments/{env_id}")
-async def put_environment(env_id: str, req: Request, body: EnvironmentIn):
+async def put_environment(env_id: str, req: Request, body: EnvironmentUpdate):
     user = await _resolve_user(req)
     # load existing
     existing = None
@@ -889,7 +917,7 @@ async def put_environment(env_id: str, req: Request, body: EnvironmentIn):
 
     update = _canonicalize_environment_record(body.model_dump(), existing=existing)
     # apply allowed updates
-    for k in ("name", "region", "stages", "client", "clientId"):
+    for k in ("name", "region", "stages", "client", "clientId", "displayOrder"):
         if k in update and update.get(k) is not None:
             existing[k] = update.get(k)
 

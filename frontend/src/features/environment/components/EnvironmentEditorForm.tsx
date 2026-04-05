@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Layers, Server, Sparkles } from 'lucide-react';
 
 import { themeClasses } from '@/theme/themeClasses';
@@ -12,7 +13,6 @@ type Props = {
   client: string;
   clientId?: string;
   clientOptions?: ClientRecord[];
-  lifecycle?: string;
   stages: EnvironmentStage[];
   saving: boolean;
   error: string | null;
@@ -20,7 +20,6 @@ type Props = {
   onNameChange: (value: string) => void;
   onClientChange: (value: string) => void;
   onClientIdChange?: (value: string) => void;
-  onLifecycleChange?: (value: string) => void;
   onStagesChange: (stages: EnvironmentStage[]) => void;
   onCancel: () => void;
   onSubmit: () => void;
@@ -57,7 +56,6 @@ export default function EnvironmentEditorForm({
   client,
   clientId,
   clientOptions = [],
-  lifecycle,
   stages,
   saving,
   error,
@@ -65,11 +63,11 @@ export default function EnvironmentEditorForm({
   onNameChange,
   onClientChange,
   onClientIdChange,
-  onLifecycleChange,
   onStagesChange,
   onCancel,
   onSubmit,
 }: Props) {
+  const [showSummary, setShowSummary] = useState(false);
   const derivedTypes = deriveEnvironmentTypes(stages);
   const resourceCount = stages.reduce((count, stage) => count + (stage.resourceActions?.length || 0), 0);
   const actionLabel = mode === 'create' ? 'Create' : 'Save';
@@ -104,19 +102,6 @@ export default function EnvironmentEditorForm({
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label htmlFor="environment-name" className={`block ${themeClasses.fieldLabel}`}>
-                Name
-              </label>
-              <input
-                id="environment-name"
-                className={`${themeClasses.field} mt-1 w-full rounded-lg px-3 py-2 text-sm`}
-                value={name}
-                onChange={(event) => onNameChange(event.target.value)}
-                placeholder="client01-dev"
-              />
-            </div>
-
-            <div>
               <label htmlFor="environment-client" className={`block ${themeClasses.fieldLabel}`}>
                 Client
               </label>
@@ -135,7 +120,7 @@ export default function EnvironmentEditorForm({
                   <option value="">Select a client</option>
                   {clientOptions.map((option) => (
                     <option key={option.id} value={option.id}>
-                      {option.shortCode} - {option.name}
+                      {option.name}
                     </option>
                   ))}
                 </select>
@@ -150,26 +135,35 @@ export default function EnvironmentEditorForm({
               )}
             </div>
 
-            {onLifecycleChange ? (
-              <div className="md:col-span-2 lg:max-w-xs">
-                <label htmlFor="environment-lifecycle" className={`block ${themeClasses.fieldLabel}`}>
-                  Lifecycle
-                </label>
-                <input
-                  id="environment-lifecycle"
-                  className={`${themeClasses.field} mt-1 w-full rounded-lg px-3 py-2 text-sm`}
-                  value={lifecycle || ''}
-                  onChange={(event) => onLifecycleChange(event.target.value)}
-                  placeholder="DEV"
-                />
-              </div>
-            ) : null}
+            <div>
+              <label htmlFor="environment-name" className={`block ${themeClasses.fieldLabel}`}>
+                Name
+              </label>
+              <input
+                id="environment-name"
+                className={`${themeClasses.field} mt-1 w-full rounded-lg px-3 py-2 text-sm`}
+                value={name}
+                onChange={(event) => onNameChange(event.target.value)}
+                placeholder="client01-dev"
+              />
+            </div>
           </div>
         </div>
 
         <aside className={`${themeClasses.formSection} rounded-3xl p-6`}>
-          <div className={themeClasses.sectionEyebrow}>Configuration summary</div>
-          <div className="mt-4 grid gap-3 xl:grid-cols-3">
+          <div className="flex items-center justify-between">
+            <div className={themeClasses.sectionEyebrow}>Configuration summary</div>
+            <button
+              type="button"
+              className="text-sm text-sky-600 hover:underline"
+              onClick={() => setShowSummary((s) => !s)}
+            >
+              {showSummary ? 'Hide' : 'Show'}
+            </button>
+          </div>
+
+          {showSummary ? (
+            <div className="mt-4 grid gap-3 xl:grid-cols-3">
             <div className={`${themeClasses.subsectionCard} flex items-start gap-3 rounded-2xl p-4`}>
               <div className="rounded-xl bg-[var(--surface-elevated)] p-2">
                 <Layers className="h-4 w-4 text-[var(--text-secondary)]" />
@@ -213,6 +207,14 @@ export default function EnvironmentEditorForm({
               </div>
             </div>
           </div>
+        ) : (
+          <div className="mt-3 flex items-center justify-between">
+            <div className="text-sm">
+              <strong>{stages.length}</strong> stage{stages.length === 1 ? '' : 's'}, <strong>{resourceCount}</strong> service action{resourceCount === 1 ? '' : 's'}
+            </div>
+            <div className={themeClasses.helperText}>Click Show to view full configuration summary</div>
+          </div>
+        )}
         </aside>
       </section>
 

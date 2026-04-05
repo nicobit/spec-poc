@@ -15,11 +15,11 @@ export default function EnvironmentCreatePage() {
   const [client, setClient] = useState('');
   const [clientId, setClientId] = useState('');
   const [clientOptions, setClientOptions] = useState<ClientRecord[]>([]);
-  const [lifecycle, setLifecycle] = useState('DEV');
   const [stages, setStages] = useState<EnvironmentStage[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  
 
   useEffect(() => {
     let mounted = true;
@@ -48,7 +48,7 @@ export default function EnvironmentCreatePage() {
     setSaving(true);
     setError(null);
     try {
-      await createEnvironment(instance, { name, client, clientId, lifecycle, stages });
+      await createEnvironment(instance, { name, client, clientId, stages });
       navigate('/environment');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create environment');
@@ -58,14 +58,13 @@ export default function EnvironmentCreatePage() {
   };
 
   return (
-    <EnvironmentPageLayout title="Create Environment" description="Provide basic details and save to create a new environment.">
+    <EnvironmentPageLayout title="Create Environment Config" description="Provide basic details and save to create a new environment.">
       <EnvironmentEditorForm
         mode="create"
         name={name}
         client={client}
         clientId={clientId}
         clientOptions={clientOptions}
-        lifecycle={lifecycle}
         stages={stages}
         saving={saving}
         error={error}
@@ -73,11 +72,11 @@ export default function EnvironmentCreatePage() {
         onNameChange={setName}
         onClientChange={setClient}
         onClientIdChange={setClientId}
-        onLifecycleChange={setLifecycle}
         onStagesChange={setStages}
         onCancel={() => navigate('/environment')}
         onSubmit={onSave}
       />
+      
     </EnvironmentPageLayout>
   );
 }
