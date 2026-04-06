@@ -40,7 +40,10 @@ Use [AI Working Contract](delivery/governance/ai-working-contract.md) as the sha
 High-signal local summary:
 
 - For feature-like work, start with `business-request.md`, `spec-refinement.md`, and `feature-spec.md`.
+- Before writing feature code, first search for an existing governing `specs/features/FEAT-.../` package for the same shipped capability and update it by default when the capability is still materially evolving.
 - Do not move from a newly created or materially refined feature package into implementation unless the user has asked to proceed or the request clearly implies implementation now.
+- Treat short product-language requests such as "I would like...", "add a page...", "show...", or "create a submenu..." as raw feature intake by default, not as approval to skip spec refinement and start coding immediately.
+- Even when the user clearly wants implementation in the same turn, create or update the governing feature package first and then implement from that updated spec.
 - Add `api-spec.md` and `test-plan.md` only when the shared contract says they are needed.
 
 When handling a feature:

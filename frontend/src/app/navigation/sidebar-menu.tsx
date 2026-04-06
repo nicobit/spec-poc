@@ -61,11 +61,21 @@ export const getMenuItems = (isAdmin: boolean): MenuItem[] => [
       activePatterns: ["/environment/create", "/environment/edit/:id", "/environment/:id", "/environment/:id/executions"],
       inactivePatterns: ["/environment/schedules"],
     },
+    { name: "Events", path: "/environment/events", icon: MessageSquare },
       { name: "Schedules", path: "/environment/schedules", icon: CalendarClock, activePatterns: ["/environment/schedules/create"] },
     ],
   },
   { name: "Account", icon: User, path: "/user" },
-  ...includeIf(isAdmin, [{ name: "Settings", icon: Settings, path: "/settings" }]),
+  ...includeIf(isAdmin, [
+    {
+      name: "Admin",
+      icon: CalendarClock,
+      children: [
+        { name: "Settings", path: "/settings", icon: Settings },
+        { name: "Audit", path: "/admin/audit", icon: CalendarClock },
+      ],
+    },
+  ]),
   { name: "Costs", icon: Server, path: "/costs" },
   { name: "Status", icon: Heart, path: "/status" },
 ];

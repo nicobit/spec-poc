@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMsal } from '@azure/msal-react';
 import { AlertTriangle, CalendarClock, CheckCircle2, ChevronDown, ChevronRight, Loader2, RotateCcw, XCircle } from 'lucide-react';
@@ -240,115 +240,75 @@ export default function EnvironmentExecutionHistoryPage() {
                             <h3 className="text-lg font-semibold text-[var(--text-primary)]">
                               {execution.action} - {stageName}
                             </h3>
-                            <span
-                              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${getExecutionStatusTone(
-                                execution.status,
-                              )}`}
-                            >
-                              {getExecutionStatusIcon(execution.status)}
-                              {execution.status.replace(/_/g, ' ')}
-                            </span>
-                            <span className="rounded-full bg-[var(--surface-panel-muted)] px-2.5 py-1 text-xs text-[var(--text-secondary)]">
-                              {execution.source}
-                            </span>
+                            <div className="ml-2 inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs">
+                              <span className={`${getExecutionStatusTone(execution.status)}`}>{execution.status}</span>
+                              <span className="text-xs text-[var(--text-secondary)] ml-2">{formatTimestamp(execution.requestedAt)}</span>
+                            </div>
                           </div>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            <span className="rounded-full bg-[var(--surface-panel-muted)] px-2.5 py-1 text-xs text-[var(--text-secondary)]">
-                              Requested {formatTimestamp(execution.requestedAt)}
-                            </span>
-                            <span className="rounded-full bg-[var(--surface-panel-muted)] px-2.5 py-1 text-xs text-[var(--text-secondary)]">
-                              Completed {formatTimestamp(execution.completedAt || execution.startedAt)}
-                            </span>
-                            <span className="rounded-full bg-[var(--surface-panel-muted)] px-2.5 py-1 text-xs text-[var(--text-secondary)]">
-                              {execution.resourceActionResults.length} action{execution.resourceActionResults.length === 1 ? '' : 's'}
-                            </span>
-                          </div>
-                          <div className={`${themeClasses.helperText} mt-3`}>
-                            {execution.message || 'Execution recorded without an additional message.'}
-                          </div>
+                          <div className={`${themeClasses.helperText} mt-2`}>Requested by: {execution.requestedBy || 'unknown'}</div>
                         </div>
 
-                        <button
-                          type="button"
-                          className={`${themeClasses.buttonSecondary} inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm`}
-                          aria-expanded={isExpanded}
-                          onClick={() =>
-                            setExpandedExecutionIds((current) => ({
-                              ...current,
-                              [execution.executionId]: !current[execution.executionId],
-                            }))
-                          }
-                        >
-                          {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                          {isExpanded ? 'Hide action results' : 'View action results'}
-                        </button>
+                        <div className="flex shrink-0 items-center gap-3">
+                          <button
+                            className={`${themeClasses.buttonGhost} rounded-md px-3 py-1.5 text-sm`}
+                            onClick={() => setExpandedExecutionIds((s) => ({ ...s, [execution.executionId]: !isExpanded }))}
+                          >
+                            {isExpanded ? 'Collapse' : 'Details'}
+                          </button>
+                          <div className="text-right text-sm text-[var(--text-secondary)]">
+                            <div>Resources: {(execution.resourceActionResults || []).length}</div>
+                            <div>Verification: {(execution.resourceActionResults || []).every((r) => r.verificationPassed === true) ? 'All verified' : 'Partial/Unverified'}</div>
+                          </div>
+                        </div>
                       </div>
 
                       {isExpanded ? (
-                        <div className="mt-5 space-y-3">
-                          {execution.resourceActionResults.length > 0 ? (
-                            execution.resourceActionResults.map((result) => (
-                              <div key={result.resourceActionId} className={`${themeClasses.subsectionCard} rounded-2xl p-4`}>
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <span className="font-medium text-[var(--text-primary)]">{result.type}</span>
-                                  <span
-                                    className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${getExecutionStatusTone(
-                                      result.status as StageExecution['status'],
-                                    )}`}
-                                  >
-                                    {getExecutionStatusIcon(result.status as StageExecution['status'])}
-                                    {result.status.replace(/_/g, ' ')}
-                                  </span>
+                        <div className="mt-4 space-y-3">
+                          {(execution.resourceActionResults || []).map((r) => (
+                            <div key={`${execution.executionId}-${r.resourceActionId}`} className="rounded-lg border p-3">
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <div className="font-medium">{r.type}</div>
+                                  <div className={`${themeClasses.helperText} mt-1`}>{getResourceResultSummary(r as any)}</div>
                                 </div>
-                                <div className={`${themeClasses.helperText} mt-2`}>
-                                  {getResourceResultSummary(result) || 'No resource identifier recorded.'}
+                                <div className="text-right">
+                                  <div className="text-sm">Status: {r.status}</div>
+                                  <div className="text-sm">Verification: {r.verificationPassed ? 'passed' : r.verificationPassed === false ? 'failed' : 'unknown'}</div>
+                                  {r.verifiedState ? <div className="text-sm">State: {String(r.verifiedState)}</div> : null}
+                                  {r.verificationMessage ? <div className="text-sm text-[var(--text-secondary)]">{r.verificationMessage}</div> : null}
                                 </div>
-                                {result.message ? <div className={`${themeClasses.helperText} mt-1`}>{result.message}</div> : null}
                               </div>
-                            ))
-                          ) : (
-                            <div className={`${themeClasses.emptyState} rounded-2xl px-4 py-6 text-sm`}>
-                              No per-resource action results were recorded for this execution.
                             </div>
-                          )}
+                          ))}
                         </div>
                       ) : null}
                     </article>
                   );
                 })}
+
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-[var(--text-secondary)]">Page {page + 1} of {pageCount}</div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className={`${themeClasses.buttonGhost} rounded-md px-3 py-1.5 text-sm`}
+                      onClick={() => setPage((p) => Math.max(0, p - 1))}
+                      disabled={page <= 0}
+                    >
+                      Prev
+                    </button>
+                    <button
+                      className={`${themeClasses.buttonGhost} rounded-md px-3 py-1.5 text-sm`}
+                      onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+                      disabled={page >= pageCount - 1}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
               </div>
             ) : (
-              <div className={`${themeClasses.emptyState} mt-5 rounded-2xl px-4 py-8 text-sm`}>
-                No executions match the current filters yet.
-              </div>
+              <div className="py-8 text-center">No executions found.</div>
             )}
-
-            <div className="flex flex-col gap-3 pt-5 sm:flex-row sm:items-center sm:justify-between">
-              <div className="text-sm ui-text-muted">
-                Showing {pagedExecutions.length} of {filteredExecutions.length} executions
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={page <= 0}
-                  className={`${themeClasses.buttonSecondary} rounded-lg px-3 py-1.5 text-sm disabled:opacity-50`}
-                  onClick={() => setPage((currentPage) => Math.max(0, currentPage - 1))}
-                >
-                  Previous
-                </button>
-                <div className="text-sm text-[var(--text-secondary)]">
-                  Page {Math.min(page + 1, pageCount)} of {pageCount}
-                </div>
-                <button
-                  type="button"
-                  disabled={(page + 1) * PAGE_SIZE >= filteredExecutions.length}
-                  className={`${themeClasses.buttonSecondary} rounded-lg px-3 py-1.5 text-sm disabled:opacity-50`}
-                  onClick={() => setPage((currentPage) => currentPage + 1)}
-                >
-                  Next
-                </button>
-              </div>
-            </div>
           </section>
         </div>
       ) : null}

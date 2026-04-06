@@ -146,16 +146,16 @@ const WidgetGrid: React.FC<Props> = ({ tab, editMode, addRequest, clearAddReques
               data-grid={layout}
               className="ui-panel relative rounded-2xl"
             >
-              {editMode && (
-                <div className="drag-handle absolute right-1 top-1 cursor-move p-1">
-                  <Move size={16} className="text-[var(--text-muted)]" />
-                </div>
-              )}
+              {/* Drag handle removed: entire header is draggable via the header area */}
               <WidgetWrapper
                 widget={widget}
                 editMode={editMode}
                 layout={layout}
                 onLayoutChange={(nextLayout) => onLayoutChange([nextLayout], tab.layouts)}
+                onConfigChange={(config) => {
+                  const widgets = tab.widgets.map((w) => (w.id === widget.id ? { ...w, config } : w));
+                  onUpdate({ widgets });
+                }}
                 onRemove={() => {
                   setConfirmState({ open: true, title: 'Delete widget', message: 'Delete this widget?', onConfirm: async () => {
                     const widgets = tab.widgets.filter((item) => item.id !== widget.id);

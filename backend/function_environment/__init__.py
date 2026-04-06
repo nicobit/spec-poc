@@ -1,20 +1,13 @@
-import os
 import uuid
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
 
 import azure.functions as func
-from fastapi import FastAPI, Request, Response, HTTPException
-from fastapi.encoders import jsonable_encoder
-from pydantic import BaseModel, Field, ValidationError
-from croniter import croniter
+from fastapi import FastAPI, HTTPException, Query, Request
+from pydantic import ValidationError
 
 from shared import scheduler_store as mem_store
-from shared.context import get_current_user
 from shared.authz import has_any_role, has_client_admin_for
-from shared.cosmos_store import get_cosmos_store
-from shared.timezone_support import get_timezone_info
 from shared.environment_store import (
     get_default_stage,
     get_environment as get_environment_item,
@@ -25,65 +18,43 @@ from shared.environment_store import (
     create_environment as create_environment_inmemory,
     delete_environment as delete_environment_inmemory,
 )
-from shared.client_store import (
-    list_clients as list_client_items,
-    get_client as get_client_item,
-    create_client as create_client_inmemory,
-    update_client as update_client_inmemory,
-    retire_client as retire_client_inmemory,
-    resolve_client_reference,
-)
-from shared.environment_repository import get_environment_store
-from shared.environment_store import create_environment
 from shared.audit_store import append_audit
-from shared.execution_store import (
-    get_stage_execution as get_stage_execution_item,
-    get_stage_execution_store,
-    get_latest_stage_execution,
-    list_stage_executions_for_schedule,
-    list_stage_executions_for_stage,
-)
 from app.utils.cors_helper import CORSHelper
+from .clients_routes import router as clients_router
+from .common import (
+    _augment_schedule_with_execution_refs,
+    _augment_stage_with_execution_refs,
+    _canonicalize_environment_record,
+    _canonicalize_schedule_record,
+    _decorate_environment_for_response,
+    _decorate_schedule_for_response,
+    _derive_type_from_stages,
+    _execution_response_payload,
+    _get_stage_execution_ref,
+    _list_environment_refs,
+    _resolve_user,
+    _utc_now,
+    _utc_now_iso,
+    _validation_error_detail,
+    env_store,
+    logger,
+    schedule_store,
+    stage_execution_store,
+)
+from .favorites_routes import router as favorites_router
+from .models import (
+    EnvironmentIn,
+    EnvironmentUpdate,
+    PostponeIn,
+    ScheduleIn,
+    StageConfigurationIn,
+    compute_next_run,
+)
 
 fast_app = FastAPI()
-
-# enable CORS for the functions app
 CORSHelper.set_CORS(fast_app)
-
-# simple request logging middleware to aid debugging of incoming requests
-import logging
-
-logger = logging.getLogger("function_environment")
-import inspect
-
-
-def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def _utc_now_iso() -> str:
-    return _utc_now().isoformat()
-
-
-def _validation_error_detail(exc: ValidationError):
-    return jsonable_encoder(exc.errors(), custom_encoder={ValueError: str})
-
-
-async def _resolve_user(req: Request):
-    """Call `get_current_user(req)` and await if it returns an awaitable.
-
-    This allows tests to monkeypatch `get_current_user` with a sync function
-    that returns a dict.
-    """
-    try:
-        maybe = get_current_user(req)
-    except TypeError:
-        # some test setups may replace get_current_user with a plain dict
-        return get_current_user
-    if inspect.isawaitable(maybe):
-        return await maybe
-    return maybe
-
+fast_app.include_router(favorites_router)
+fast_app.include_router(clients_router)
 
 @fast_app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -95,590 +66,6 @@ async def log_requests(request: Request, call_next):
     response = await call_next(request)
     logger.info("Response %s %s -> %s", request.method, request.url.path, response.status_code)
     return response
-
-COSMOS_ENABLED = bool(os.environ.get("COSMOS_CONNECTION_STRING"))
-cosmos = get_cosmos_store() if COSMOS_ENABLED else None
-stage_execution_store = get_stage_execution_store() if COSMOS_ENABLED else None
-
-
-class ScheduleIn(BaseModel):
-    environment: Optional[str] = None
-    environment_id: Optional[str] = None
-    client: Optional[str] = None
-    client_id: Optional[str] = None
-    stage: Optional[str] = None
-    stage_id: Optional[str] = None
-    action: str
-    cron: Optional[str] = None
-    timezone: Optional[str] = "UTC"
-    enabled: bool = True
-    owner: Optional[str] = None
-    notify_before_minutes: int = 30
-    notification_groups: List[dict] = Field(default_factory=list)
-    postponement_policy: Optional[dict] = None
-
-
-class StageConfigurationIn(BaseModel):
-    resourceActions: List[dict] = Field(default_factory=list)
-    notificationGroups: List[dict] = Field(default_factory=list)
-    postponementPolicy: Optional[dict] = None
-
-
-class StageIn(BaseModel):
-    name: str
-    status: Optional[str] = "stopped"
-
-
-class OwnerIn(BaseModel):
-    principalId: str
-    displayName: Optional[str] = None
-    role: str
-
-
-class PostponeIn(BaseModel):
-    postponeUntil: Optional[str] = None
-    postponeByMinutes: Optional[int] = None
-    reason: Optional[str] = None
-
-
-class ClientAdminAssignmentIn(BaseModel):
-    type: str = "user"
-    id: str
-    displayName: Optional[str] = None
-
-
-class ClientIn(BaseModel):
-    name: str
-    shortCode: str
-    country: str
-    timezone: str
-    clientAdmins: List[ClientAdminAssignmentIn] = Field(default_factory=list)
-
-
-class ClientRetireIn(BaseModel):
-    reason: Optional[str] = None
-
-
-class ClientsBulkRetireIn(BaseModel):
-    ids: List[str]
-    reason: Optional[str] = None
-
-
-def compute_next_run(cron_expr: str, tz: str) -> str:
-    tzinfo = get_timezone_info(tz)
-    now = datetime.now(tzinfo)
-    it = croniter(cron_expr, now)
-    nr = it.get_next(datetime)
-    # normalize to UTC
-    return nr.astimezone(timezone.utc).isoformat()
-
-
-env_store = get_environment_store()
-
-
-def _list_environment_refs() -> list[dict]:
-    try:
-        return env_store.list_environments() if env_store else list_environment_items()
-    except Exception:
-        return list_environment_items()
-
-
-def _list_client_refs(*, include_retired: bool = False) -> list[dict]:
-    try:
-        return list_client_items(include_retired=include_retired)
-    except Exception:
-        return list_client_items(include_retired=include_retired)
-
-
-def _client_response_payload(item: dict) -> dict:
-    return {
-        "id": item.get("id"),
-        "name": item.get("name"),
-        "shortCode": item.get("shortCode"),
-        "country": item.get("country"),
-        "timezone": item.get("timezone"),
-        "clientAdmins": item.get("clientAdmins") or [],
-        "retired": bool(item.get("retired")),
-        "retiredAt": item.get("retiredAt"),
-        "retiredBy": item.get("retiredBy"),
-    }
-
-
-def _decorate_environment_for_response(item: dict) -> dict:
-    decorated = dict(item)
-    client_id = decorated.get("clientId")
-    if client_id:
-        resolved_client = get_client_item(client_id)
-        if resolved_client:
-            decorated["client"] = resolved_client.get("name")
-    return decorated
-
-
-def _resolve_client_link(item: dict, *, existing: Optional[dict] = None) -> tuple[Optional[str], Optional[str], Optional[dict]]:
-    client_id = item.get("client_id") or item.get("clientId")
-    client_label = item.get("client")
-    resolved_client = None
-
-    if client_id:
-        resolved_client = get_client_item(client_id)
-        if not resolved_client:
-            raise HTTPException(status_code=400, detail="clientId not found")
-        client_label = resolved_client.get("name")
-    elif client_label:
-        try:
-            resolved_client = resolve_client_reference(client_label)
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        if resolved_client:
-            client_id = resolved_client.get("id")
-            client_label = resolved_client.get("name")
-    elif existing:
-        client_id = existing.get("client_id") or existing.get("clientId")
-        client_label = existing.get("client")
-        if client_id:
-            resolved_client = get_client_item(client_id)
-            if resolved_client:
-                client_label = resolved_client.get("name")
-
-    return client_id, client_label, resolved_client
-
-
-def _canonicalize_environment_record(item: dict, *, existing: Optional[dict] = None) -> dict:
-    canonical = dict(item)
-    client_id, client_label, _resolved_client = _resolve_client_link(canonical, existing=existing)
-    canonical["clientId"] = client_id
-    canonical["client"] = client_label
-    return canonical
-
-
-def _resolve_environment_reference(item: dict, environments: list[dict], *, allow_missing_label: bool, existing: Optional[dict] = None):
-    env_id = item.get("environment_id") or item.get("environmentId")
-    resolved_env = None
-
-    if env_id:
-        resolved_env = next((e for e in environments if e.get("id") == env_id), None)
-        if not resolved_env:
-            raise HTTPException(status_code=400, detail="environment_id not found")
-    elif item.get("environment"):
-        label = str(item.get("environment") or "").lower()
-        matches = [
-            e
-            for e in environments
-            if str(e.get("id") or "").lower() == label
-            or str(e.get("name") or "").lower() == label
-            or ((e.get("lifecycle")) and str(e.get("lifecycle")).lower() == label)
-        ]
-        if len(matches) == 1:
-            resolved_env = matches[0]
-            env_id = resolved_env.get("id")
-        elif len(matches) == 0:
-            if allow_missing_label:
-                env_id = None
-                resolved_env = None
-            else:
-                raise HTTPException(status_code=400, detail="environment not found")
-        else:
-            raise HTTPException(status_code=400, detail="environment label is ambiguous; provide environment_id")
-    elif existing:
-        env_id = existing.get("environment_id") or existing.get("environment")
-        resolved_env = next((e for e in environments if e.get("id") == env_id), None) if env_id else None
-    else:
-        raise HTTPException(status_code=400, detail="environment_id or environment label is required")
-
-    return env_id, resolved_env
-
-
-def _resolve_stage_reference(item: dict, resolved_env: Optional[dict], *, existing: Optional[dict] = None):
-    stage_id = item.get("stage_id") or item.get("stageId")
-    stage_label = item.get("stage")
-
-    if resolved_env:
-        stages = resolved_env.get("stages") or []
-        resolved_stage = None
-        if stage_id:
-            resolved_stage = next((s for s in stages if s.get("id") == stage_id), None)
-            if not resolved_stage:
-                raise HTTPException(status_code=400, detail="stage_id not found for environment")
-        elif stage_label:
-            label = str(stage_label).lower()
-            matches = [
-                s for s in stages if str(s.get("id") or "").lower() == label or str(s.get("name") or "").lower() == label
-            ]
-            if len(matches) == 1:
-                resolved_stage = matches[0]
-                stage_id = resolved_stage.get("id")
-            elif len(matches) == 0:
-                raise HTTPException(status_code=400, detail="stage not found for environment")
-            else:
-                raise HTTPException(status_code=400, detail="stage label is ambiguous; provide stage_id")
-        elif existing and existing.get("stage_id"):
-            resolved_stage = next((s for s in stages if s.get("id") == existing.get("stage_id")), None)
-            stage_id = existing.get("stage_id")
-        elif existing and existing.get("stage"):
-            matches = [s for s in stages if str(s.get("name") or "").lower() == str(existing.get("stage") or "").lower()]
-            if len(matches) == 1:
-                resolved_stage = matches[0]
-                stage_id = resolved_stage.get("id")
-
-        if not resolved_stage and stage_id:
-            raise HTTPException(status_code=400, detail="stage_id not found for environment")
-
-        if resolved_stage:
-            return resolved_stage.get("id"), resolved_stage.get("name"), resolved_stage
-        return stage_id, stage_label, None
-
-    # legacy or free-form fallback when environment is unresolved
-    return stage_id, stage_label, None
-
-
-def _canonicalize_schedule_record(item: dict, *, environments: Optional[list[dict]] = None, existing: Optional[dict] = None, allow_missing_environment_label: bool = False) -> dict:
-    canonical = dict(item)
-    envs = environments or _list_environment_refs()
-    env_id, resolved_env = _resolve_environment_reference(canonical, envs, allow_missing_label=allow_missing_environment_label, existing=existing)
-    stage_id, stage_name, _resolved_stage = _resolve_stage_reference(canonical, resolved_env, existing=existing)
-    client_id, client_label, _resolved_client = _resolve_client_link(canonical, existing=existing)
-
-    canonical["environment_id"] = env_id
-    canonical["environment"] = resolved_env.get("name") if resolved_env else canonical.get("environment")
-    canonical["stage_id"] = stage_id
-    canonical["stage"] = stage_name if stage_name is not None else canonical.get("stage")
-    if resolved_env:
-        canonical["client"] = resolved_env.get("client") or client_label
-        canonical["client_id"] = resolved_env.get("clientId") or client_id
-    else:
-        canonical["client"] = client_label
-        canonical["client_id"] = client_id
-    return canonical
-
-
-def _decorate_schedule_for_response(item: dict, environments: Optional[list[dict]] = None) -> dict:
-    decorated = dict(item)
-    envs = environments or _list_environment_refs()
-    resolved_env = None
-    env_id = decorated.get("environment_id")
-    if env_id:
-        resolved_env = next((e for e in envs if e.get("id") == env_id), None)
-    elif decorated.get("environment"):
-        matches = [e for e in envs if str(e.get("name") or "").lower() == str(decorated.get("environment") or "").lower()]
-        if len(matches) == 1:
-            resolved_env = matches[0]
-            decorated["environment_id"] = resolved_env.get("id")
-    if resolved_env:
-        decorated["environment"] = resolved_env.get("name")
-        decorated["client"] = decorated.get("client") or resolved_env.get("client")
-        decorated["client_id"] = decorated.get("client_id") or resolved_env.get("clientId")
-        stage_id = decorated.get("stage_id")
-        resolved_stage = None
-        if stage_id:
-            resolved_stage = next((s for s in resolved_env.get("stages", []) or [] if s.get("id") == stage_id), None)
-        elif decorated.get("stage"):
-            matches = [
-                s
-                for s in resolved_env.get("stages", []) or []
-                if str(s.get("name") or "").lower() == str(decorated.get("stage") or "").lower()
-            ]
-            if len(matches) == 1:
-                resolved_stage = matches[0]
-                decorated["stage_id"] = resolved_stage.get("id")
-        if resolved_stage:
-            decorated["stage"] = resolved_stage.get("name")
-    elif decorated.get("client_id"):
-        resolved_client = get_client_item(decorated.get("client_id"))
-        if resolved_client:
-            decorated["client"] = resolved_client.get("name")
-    return decorated
-
-
-def _execution_response_payload(item: dict) -> dict:
-    return dict(item)
-
-
-def _list_stage_execution_refs(stage_id: str, *, limit: int = 20) -> list[dict]:
-    if stage_execution_store:
-        try:
-            return stage_execution_store.list_stage_executions_for_stage(stage_id, limit=limit)
-        except Exception:
-            logger.exception("Failed to read stage executions from Cosmos; falling back to in-memory store")
-    return list_stage_executions_for_stage(stage_id, limit=limit)
-
-
-def _list_schedule_execution_refs(schedule_id: str, *, limit: int = 20) -> list[dict]:
-    if stage_execution_store:
-        try:
-            return stage_execution_store.list_stage_executions_for_schedule(schedule_id, limit=limit)
-        except Exception:
-            logger.exception("Failed to read schedule executions from Cosmos; falling back to in-memory store")
-    return list_stage_executions_for_schedule(schedule_id, limit=limit)
-
-
-def _get_latest_stage_execution_ref(stage_id: str) -> Optional[dict]:
-    if stage_execution_store:
-        try:
-            return stage_execution_store.get_latest_stage_execution(stage_id)
-        except Exception:
-            logger.exception("Failed to read latest stage execution from Cosmos; falling back to in-memory store")
-    return get_latest_stage_execution(stage_id)
-
-
-def _get_stage_execution_ref(execution_id: str) -> Optional[dict]:
-    if stage_execution_store:
-        try:
-            return stage_execution_store.get_stage_execution(execution_id)
-        except Exception:
-            logger.exception("Failed to read stage execution from Cosmos; falling back to in-memory store")
-    return get_stage_execution_item(execution_id)
-
-
-def _augment_schedule_with_execution_refs(schedule: dict) -> dict:
-    decorated = dict(schedule)
-    schedule_id = decorated.get("id")
-    if not schedule_id:
-        decorated["latestExecution"] = None
-        decorated["executionCount"] = 0
-        return decorated
-
-    executions = _list_schedule_execution_refs(schedule_id, limit=5)
-    decorated["executionCount"] = len(executions)
-    decorated["latestExecution"] = _execution_response_payload(executions[0]) if executions else None
-    return decorated
-
-
-def _augment_stage_with_execution_refs(stage: dict) -> dict:
-    decorated = dict(stage)
-    stage_id = decorated.get("id")
-    if not stage_id:
-        decorated["latestExecution"] = None
-        decorated["executions"] = []
-        decorated["executionCount"] = 0
-        return decorated
-
-    latest_execution = _get_latest_stage_execution_ref(stage_id)
-    executions = _list_stage_execution_refs(stage_id, limit=5)
-    decorated["latestExecution"] = _execution_response_payload(latest_execution) if latest_execution else None
-    decorated["executions"] = [_execution_response_payload(item) for item in executions]
-    decorated["executionCount"] = len(executions)
-    return decorated
-
-
-def _derive_type_from_stages(details: dict) -> Optional[str]:
-    """Derive a simple environment type from stage resource action types.
-
-    Heuristic:
-    - collect all non-empty `resourceActions[].type` values across stages
-    - if none found -> return None
-    - if single unique type -> return that type
-    - if multiple types but share a common prefix before '-' -> return that prefix
-    - otherwise return the literal string 'mixed'
-    """
-    try:
-        types = set()
-        for s in details.get("stages", []) or []:
-            for ra in s.get("resourceActions", []) or []:
-                t = ra.get("type") if isinstance(ra, dict) else None
-                if t:
-                    types.add(str(t))
-        if not types:
-            return None
-        if len(types) == 1:
-            return next(iter(types))
-        prefixes = {t.split("-", 1)[0] for t in types}
-        if len(prefixes) == 1:
-            return prefixes.pop()
-        return "mixed"
-    except Exception:
-        return None
-
-
-# `type` is removed from Environment contract; do not derive/attach it here.
-
-
-@fast_app.get("/api/clients")
-@fast_app.get("/api/clients/")
-async def list_clients(
-    req: Request,
-    search: Optional[str] = None,
-    retired: Optional[bool] = False,
-    page: int = 0,
-    per_page: int = 20,
-    sort_by: Optional[str] = "name",
-    sort_dir: Optional[str] = "asc",
-):
-    user = await _resolve_user(req)
-    if not has_any_role(user, ["admin", "environment-manager"]):
-        raise HTTPException(status_code=403, detail="Forbidden")
-
-    items = _list_client_refs(include_retired=bool(retired))
-    if search:
-        needle = search.strip().lower()
-        items = [
-            item
-            for item in items
-            if needle in str(item.get("name") or "").lower()
-            or needle in str(item.get("shortCode") or "").lower()
-            or needle in str(item.get("country") or "").lower()
-            or needle in str(item.get("timezone") or "").lower()
-        ]
-
-    allowed_sort = {"name", "shortCode", "country", "timezone"}
-    sort_key = sort_by if sort_by in allowed_sort else "name"
-    reverse = str(sort_dir or "asc").lower() == "desc"
-    items.sort(key=lambda item: str(item.get(sort_key) or "").lower(), reverse=reverse)
-
-    total = len(items)
-    start = max(page, 0) * max(per_page, 1)
-    paged = items[start : start + max(per_page, 1)]
-    return {
-        "clients": [_client_response_payload(item) for item in paged],
-        "total": total,
-        "page": max(page, 0),
-        "per_page": max(per_page, 1),
-    }
-
-
-@fast_app.get("/api/clients/{client_id}")
-async def get_client(client_id: str, req: Request):
-    user = await _resolve_user(req)
-    if not has_any_role(user, ["admin", "environment-manager"]):
-        raise HTTPException(status_code=403, detail="Forbidden")
-    item = get_client_item(client_id)
-    if not item:
-        raise HTTPException(status_code=404, detail="Client not found")
-    return _client_response_payload(item)
-
-
-@fast_app.post("/api/clients")
-async def create_client(req: Request, body: ClientIn):
-    user = await _resolve_user(req)
-    if not has_any_role(user, ["admin", "environment-manager"]):
-        raise HTTPException(status_code=403, detail="Forbidden")
-
-    item = body.model_dump()
-    item["id"] = f"client-{uuid.uuid4().hex[:8]}"
-    item["retired"] = False
-    item["retiredAt"] = None
-    item["retiredBy"] = None
-
-    try:
-        created = create_client_inmemory(item)
-    except ValidationError as exc:
-        raise HTTPException(status_code=400, detail=_validation_error_detail(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-
-    actor = user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid")
-    append_audit(
-        {
-            "client": created.get("id"),
-            "clientName": created.get("name"),
-            "shortCode": created.get("shortCode"),
-            "action": "create",
-            "status": "success",
-            "eventType": "client-created",
-            "requestedBy": actor,
-        }
-    )
-    return {"created": _client_response_payload(created)}
-
-
-@fast_app.put("/api/clients/{client_id}")
-async def update_client(client_id: str, req: Request, body: ClientIn):
-    user = await _resolve_user(req)
-    if not has_any_role(user, ["admin", "environment-manager"]):
-        raise HTTPException(status_code=403, detail="Forbidden")
-
-    existing = get_client_item(client_id)
-    if not existing:
-        raise HTTPException(status_code=404, detail="Client not found")
-
-    payload = body.model_dump()
-    payload["retired"] = bool(existing.get("retired"))
-    payload["retiredAt"] = existing.get("retiredAt")
-    payload["retiredBy"] = existing.get("retiredBy")
-
-    try:
-        updated = update_client_inmemory(client_id, payload)
-    except ValidationError as exc:
-        raise HTTPException(status_code=400, detail=_validation_error_detail(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-
-    actor = user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid")
-    append_audit(
-        {
-            "client": client_id,
-            "clientName": updated.get("name") if updated else payload.get("name"),
-            "shortCode": updated.get("shortCode") if updated else payload.get("shortCode"),
-            "action": "update",
-            "status": "success",
-            "eventType": "client-updated",
-            "requestedBy": actor,
-        }
-    )
-    return {"updated": _client_response_payload(updated)}
-
-
-@fast_app.post("/api/clients/{client_id}/retire")
-async def retire_client(client_id: str, req: Request, body: ClientRetireIn):
-    user = await _resolve_user(req)
-    if not has_any_role(user, ["admin", "environment-manager"]):
-        raise HTTPException(status_code=403, detail="Forbidden")
-
-    existing = get_client_item(client_id)
-    if not existing:
-        raise HTTPException(status_code=404, detail="Client not found")
-
-    actor = user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid")
-    updated = retire_client_inmemory(client_id, retired_by=actor)
-    if not updated:
-        raise HTTPException(status_code=404, detail="Client not found")
-
-    append_audit(
-        {
-            "client": client_id,
-            "clientName": updated.get("name"),
-            "shortCode": updated.get("shortCode"),
-            "action": "retire",
-            "status": "success",
-            "eventType": "client-retired",
-            "requestedBy": actor,
-            "reason": body.reason,
-        }
-    )
-    return {"updated": _client_response_payload(updated)}
-
-
-@fast_app.post("/api/clients/retire")
-async def retire_clients_bulk(req: Request, body: ClientsBulkRetireIn):
-    user = await _resolve_user(req)
-    if not has_any_role(user, ["admin", "environment-manager"]):
-        raise HTTPException(status_code=403, detail="Forbidden")
-
-    actor = user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid")
-    updated_items = []
-    for client_id in body.ids:
-        existing = get_client_item(client_id)
-        if not existing:
-            # skip unknown ids
-            continue
-        updated = retire_client_inmemory(client_id, retired_by=actor)
-        if not updated:
-            continue
-        append_audit(
-            {
-                "client": client_id,
-                "clientName": updated.get("name"),
-                "shortCode": updated.get("shortCode"),
-                "action": "retire",
-                "status": "success",
-                "eventType": "client-retired",
-                "requestedBy": actor,
-                "reason": body.reason,
-            }
-        )
-        updated_items.append(_client_response_payload(updated))
-
-    return {"updated": updated_items}
-
 
 @fast_app.get("/api/environments")
 @fast_app.get("/api/environments/")
@@ -781,24 +168,6 @@ async def list_environments(req: Request):
         "page": page,
         "per_page": per_page,
     }
-
-
-class EnvironmentIn(BaseModel):
-    name: str
-    region: Optional[str] = None
-    client: Optional[str] = None
-    clientId: Optional[str] = None
-    stages: Optional[List[dict]] = None
-
-
-class EnvironmentUpdate(BaseModel):
-    name: Optional[str] = None
-    region: Optional[str] = None
-    client: Optional[str] = None
-    clientId: Optional[str] = None
-    stages: Optional[List[dict]] = None
-    displayOrder: Optional[int] = None
-
 
 @fast_app.post("/api/environments")
 async def post_environment(req: Request, body: EnvironmentIn):
@@ -1049,10 +418,7 @@ async def _legacy_duplicate_create_schedule(req: Request, body: ScheduleIn):
     else:
         item["next_run"] = _utc_now_iso()
 
-    if cosmos:
-        cosmos.upsert_schedule(item)
-    else:
-        mem_store.SCHEDULES.append(item)
+    schedule_store.upsert_schedule(item)
 
     # legacy clients/tests expect a `target` field indicating a canonical
     # target environment id; when we don't have a resolved environment, fall
@@ -1079,7 +445,7 @@ async def _legacy_duplicate_create_schedule(req: Request, body: ScheduleIn):
 async def _legacy_duplicate_update_schedule(req: Request, schedule_id: str, body: ScheduleIn):
     user = await _resolve_user(req)
     # load existing schedule to check client scope
-    existing = cosmos.get_schedule(schedule_id) if cosmos else next((s for s in mem_store.SCHEDULES if s.get("id") == schedule_id), None)
+    existing = schedule_store.get_schedule(schedule_id)
     if not existing:
         raise HTTPException(status_code=404, detail="Schedule not found")
     sched_client = existing.get("client")
@@ -1104,13 +470,7 @@ async def _legacy_duplicate_update_schedule(req: Request, schedule_id: str, body
         except Exception:
             # If cron parsing fails during update, fallback to now.
             item["next_run"] = _utc_now_iso()
-    if cosmos:
-        cosmos.upsert_schedule(item)
-    else:
-        for idx, s in enumerate(mem_store.SCHEDULES):
-            if s.get("id") == schedule_id:
-                mem_store.SCHEDULES[idx] = item
-                break
+    schedule_store.upsert_schedule(item)
     append_audit(
         {
             "environment": item.get("environment"),
@@ -1129,22 +489,16 @@ async def _legacy_duplicate_update_schedule(req: Request, schedule_id: str, body
 async def _legacy_duplicate_delete_schedule(req: Request, schedule_id: str):
     user = await _resolve_user(req)
     # require admin/environment-manager or client-admin for schedule.client
-    existing = cosmos.get_schedule(schedule_id) if cosmos else next((s for s in mem_store.SCHEDULES if s.get("id") == schedule_id), None)
+    existing = schedule_store.get_schedule(schedule_id)
     if not existing:
         raise HTTPException(status_code=404, detail="Schedule not found")
     sched_client = existing.get("client")
     if not (has_any_role(user, ["admin", "environment-manager"]) or (sched_client and has_client_admin_for(user, sched_client))):
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    if cosmos:
-        ok = cosmos.delete_schedule(schedule_id)
-        if not ok:
-            raise HTTPException(status_code=404, detail="Schedule not found")
-    else:
-        before = len(mem_store.SCHEDULES)
-        mem_store.SCHEDULES = [s for s in mem_store.SCHEDULES if s.get("id") != schedule_id]
-        if len(mem_store.SCHEDULES) == before:
-            raise HTTPException(status_code=404, detail="Schedule not found")
+    ok = schedule_store.delete_schedule(schedule_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Schedule not found")
     append_audit(
         {
             "action": "delete",
@@ -1179,7 +533,7 @@ def _legacy_duplicate_can_postpone(user: dict, schedule: dict) -> bool:
 
 async def _legacy_duplicate_postpone_schedule(req: Request, schedule_id: str, body: PostponeIn):
     user = await _resolve_user(req)
-    schedule = cosmos.get_schedule(schedule_id) if cosmos else next((s for s in mem_store.SCHEDULES if s.get("id") == schedule_id), None)
+    schedule = schedule_store.get_schedule(schedule_id)
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
     if not _legacy_duplicate_can_postpone(user, schedule):
@@ -1201,24 +555,13 @@ async def _legacy_duplicate_postpone_schedule(req: Request, schedule_id: str, bo
     if body.postponeByMinutes and policy.get("maxPostponeMinutes") and body.postponeByMinutes > int(policy.get("maxPostponeMinutes")):
         raise HTTPException(status_code=409, detail="Requested postponement exceeds policy")
 
-    if cosmos:
-        schedule["next_run"] = postponed_until
-        schedule["postponed_until"] = postponed_until
-        schedule["postponed_by"] = user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid")
-        schedule["postpone_reason"] = body.reason
-        schedule["postponement_count"] = schedule.get("postponement_count", 0) + 1
-        cosmos.upsert_schedule(schedule)
-        updated = schedule
-    else:
-        def _updater(existing):
-            existing["next_run"] = postponed_until
-            existing["postponed_until"] = postponed_until
-            existing["postponed_by"] = user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid")
-            existing["postpone_reason"] = body.reason
-            existing["postponement_count"] = existing.get("postponement_count", 0) + 1
-            return existing
-
-        updated = mem_store.update_schedule(schedule_id, _updater)
+    schedule["next_run"] = postponed_until
+    schedule["postponed_until"] = postponed_until
+    schedule["postponed_by"] = user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid")
+    schedule["postpone_reason"] = body.reason
+    schedule["postponement_count"] = schedule.get("postponement_count", 0) + 1
+    schedule_store.upsert_schedule(schedule)
+    updated = schedule
 
     append_audit(
         {
@@ -1426,8 +769,222 @@ async def put_stage_configuration(env_id: str, stage_id: str, req: Request, body
     return {"updated": updated}
 
 
+def _set_stage_status_internal(env_id: str, stage_id: str, desired_status: str):
+    """Update stage status in whatever store is active (env_store or in-memory)."""
+    if env_store:
+        try:
+            env_obj = env_store.get_environment(env_id)
+            if env_obj:
+                for s in env_obj.get("stages", []):
+                    if s.get("id") == stage_id or s.get("name") == stage_id:
+                        s["status"] = desired_status
+                        try:
+                            env_store.update_environment(env_obj)
+                        except Exception:
+                            pass
+                        return
+        except Exception:
+            pass
+    set_stage_status(env_id, stage_id, desired_status)
+
+
+def _run_stage_lifecycle(env_id: str, stage_id: str, action: str, stage: dict, actor: str):
+    """Execute Azure resource actions for a manual start/stop request.
+
+    Runs in a background thread after the HTTP response has already been returned.
+    Sets the stage status to the final confirmed state when done.
+    """
+    from shared.resource_action_contract import normalize_resource_action
+    from shared.app_service_executor import execute_app_service_action
+    from shared.container_instance_executor import execute_container_instance_action
+    from shared.azure_function_app_executor import execute_function_app_action
+    from shared.execution_store import upsert_stage_execution
+    from datetime import timezone
+
+    execution_id = f"exec-manual-{uuid.uuid4().hex[:8]}"
+    requested_at = datetime.now(timezone.utc).isoformat()
+    execution_ctx = {"action": action, "executionId": execution_id}
+    resource_actions = [normalize_resource_action(a) for a in (stage.get("resourceActions") or [])]
+    results = []
+
+    # Resolve environment to obtain clientId and environment name for the execution model
+    try:
+        env_obj, _ = _resolve_stage_from_env(env_id, stage_id)
+        client_id = (env_obj.get("clientId") or env_obj.get("client")) if env_obj else None
+        environment_name = env_obj.get("name") if env_obj else None
+    except Exception:
+        client_id = None
+        environment_name = None
+
+    # Persist a minimal execution record immediately so the UI/history
+    # can show that an execution was requested even if executors fail.
+    try:
+        initial_record = {
+            "id": execution_id,
+            "executionId": execution_id,
+            "clientId": client_id,
+            "environmentId": env_id,
+            "environmentName": environment_name,
+            "stageId": stage_id,
+            "stageName": stage.get("name"),
+            "action": action,
+            "source": "portal",
+            "requestedAt": requested_at,
+            "requestedBy": actor,
+            "status": "in_progress",
+            "resourceActionResults": [],
+        }
+        if stage_execution_store:
+            try:
+                stage_execution_store.upsert_stage_execution(initial_record)
+            except Exception:
+                logger.exception("Failed to upsert initial in-progress execution to Cosmos")
+        else:
+            try:
+                upsert_stage_execution(initial_record)
+            except Exception:
+                logger.exception("Failed to upsert initial in-memory in-progress execution")
+    except Exception:
+        logger.exception("Failed to create initial execution record")
+
+    resource_actions = [normalize_resource_action(a) for a in (stage.get("resourceActions") or [])]
+    results = []
+
+    for ra in resource_actions:
+        ra_id = ra.get("id") or ra.get("type") or "resource-action"
+        ra_type = (ra.get("type") or "").lower()
+        started = datetime.now(timezone.utc).isoformat()
+        try:
+            if ra_type in {"app-service", "web-app", "appservice"}:
+                lifecycle = execute_app_service_action(ra, execution_ctx)
+            elif ra_type in {"container-instance", "containerinstance", "aci"}:
+                lifecycle = execute_container_instance_action(ra, execution_ctx)
+            elif ra_type in {"function-app", "azure-function"}:
+                lifecycle = execute_function_app_action(ra, execution_ctx)
+            else:
+                logger.warning("No executor for resource type '%s'; skipping", ra_type)
+                results.append({
+                    "resourceActionId": ra_id,
+                    "type": ra_type,
+                    "status": "skipped",
+                    "startedAt": started,
+                    "completedAt": datetime.now(timezone.utc).isoformat(),
+                    "message": f"No executor for type '{ra_type}'",
+                })
+                continue
+
+            verification_passed = lifecycle.get("verificationPassed", True)
+            results.append({
+                "resourceActionId": ra_id,
+                "type": ra_type,
+                "status": "succeeded" if verification_passed else "failed",
+                "startedAt": started,
+                "completedAt": datetime.now(timezone.utc).isoformat(),
+                "message": lifecycle.get("message"),
+                "verificationPassed": lifecycle.get("verificationPassed"),
+                "verifiedState": lifecycle.get("verifiedState"),
+                "verificationAttempts": lifecycle.get("verificationAttempts"),
+                "verificationMessage": lifecycle.get("verificationMessage"),
+            })
+        except Exception as exc:
+            logger.exception("Resource action %s failed: %s", ra_id, exc)
+            results.append({
+                "resourceActionId": ra_id,
+                "type": ra_type,
+                "status": "failed",
+                "startedAt": started,
+                "completedAt": datetime.now(timezone.utc).isoformat(),
+                "message": str(exc),
+                "errorCode": "execution_failed",
+            })
+
+    # Determine overall outcome
+    non_skipped = [r for r in results if r.get("status") != "skipped"]
+    all_succeeded = all(r.get("status") == "succeeded" for r in non_skipped) if non_skipped else True
+    any_failed = any(r.get("status") == "failed" for r in non_skipped)
+
+    if all_succeeded:
+        final_stage_status = "running" if action == "start" else "stopped"
+        execution_status = "succeeded"
+    elif any_failed and non_skipped:
+        final_stage_status = "failed"
+        execution_status = "failed"
+    else:
+        # only skipped (no real executors); still apply desired final state
+        final_stage_status = "running" if action == "start" else "stopped"
+        execution_status = "succeeded"
+
+    try:
+        _set_stage_status_internal(env_id, stage_id, final_stage_status)
+    except Exception:
+        logger.exception("Failed to update stage status after manual lifecycle execution")
+
+    # Persist an execution record for audit / history view
+    try:
+        execution_record = {
+            "id": execution_id,
+            "executionId": execution_id,
+            "clientId": client_id,
+            "environmentId": env_id,
+            "environmentName": environment_name,
+            "stageId": stage_id,
+            "stageName": stage.get("name"),
+            "action": action,
+            "source": "portal",
+            "requestedAt": requested_at,
+            "requestedBy": actor,
+            "completedAt": datetime.now(timezone.utc).isoformat(),
+            "status": execution_status,
+            "resourceActionResults": results,
+        }
+        if stage_execution_store:
+            stage_execution_store.upsert_stage_execution(execution_record)
+        else:
+            upsert_stage_execution(execution_record)
+    except Exception:
+        logger.exception("Failed to persist manual execution record")
+
+    append_audit({
+        "environment": env_id,
+        "stage": stage_id,
+        "stageName": stage.get("name"),
+        "action": action,
+        "status": execution_status,
+        "eventType": "manual-lifecycle-completed",
+        "requestedBy": actor,
+        "finalStageStatus": final_stage_status,
+    })
+    logger.info("Manual %s for %s/%s completed: status=%s stageStatus=%s", action, env_id, stage_id, execution_status, final_stage_status)
+
+
+def _resolve_stage_from_env(env_id: str, stage_id: str):
+    """Fetch environment + stage from active store; returns (environment, stage) or (None, None)."""
+    environment = None
+    stage = None
+    if env_store:
+        try:
+            env_obj = env_store.get_environment(env_id)
+            if env_obj:
+                for s in env_obj.get("stages", []):
+                    if s.get("id") == stage_id or s.get("name") == stage_id:
+                        environment = env_obj
+                        stage = s
+                        break
+        except Exception:
+            pass
+    if not stage:
+        environment = get_environment_item(env_id)
+        if environment:
+            for s in (environment.get("stages") or []):
+                if s.get("id") == stage_id or s.get("name") == stage_id:
+                    stage = s
+                    break
+    return environment, stage
+
+
 @fast_app.post("/api/environments/{env_id}/stages/{stage_id}/start")
-async def start_stage(env_id: str, stage_id: str, req: Request):
+async def start_stage(env_id: str, stage_id: str, req: Request, force: bool = Query(default=False)):
+    import threading
     user = await _resolve_user(req)
     env_client = None
     env_item = get_environment_item(env_id) or {}
@@ -1441,27 +998,50 @@ async def start_stage(env_id: str, stage_id: str, req: Request):
             pass
     if not (has_any_role(user, ["admin", "environment-manager"]) or (env_client and has_client_admin_for(user, env_client))):
         raise HTTPException(status_code=403, detail="Forbidden")
-    stage = set_stage_status(env_id, stage_id, "running")
-    environment = get_environment_item(env_id)
+
+    environment, stage = _resolve_stage_from_env(env_id, stage_id)
     if not stage or not environment:
         raise HTTPException(status_code=404, detail="Stage not found")
-    append_audit(
-        {
-            "environment": env_id,
-            "client": environment.get("client"),
-            "stage": stage.get("name"),
-            "action": "start",
-            "status": "requested",
-            "eventType": "manual-lifecycle",
-            "resourceActions": [item.get("type") for item in stage.get("resourceActions", [])],
-            "requestedBy": user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid"),
-        }
+
+    current_status = (stage or {}).get("status", "")
+    if not force and current_status in ("starting", "stopping", "in_progress"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Stage is already '{current_status}'. Use ?force=true to override.",
+        )
+
+    # Immediately mark starting so the UI shows activity
+    _set_stage_status_internal(env_id, stage_id, "starting")
+    stage = dict(stage)
+    stage["status"] = "starting"
+
+    actor = user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid")
+    append_audit({
+        "environment": env_id,
+        "client": environment.get("client"),
+        "stage": stage.get("name"),
+        "action": "start",
+        "status": "requested",
+        "eventType": "manual-lifecycle",
+        "resourceActions": [item.get("type") for item in stage.get("resourceActions", [])],
+        "requestedBy": actor,
+    })
+
+    # Run actual Azure operations in background thread so response is instant
+    stage_snapshot = dict(stage)
+    thread = threading.Thread(
+        target=_run_stage_lifecycle,
+        args=(env_id, stage_id, "start", stage_snapshot, actor or "unknown"),
+        daemon=True,
     )
+    thread.start()
+
     return {"updated": stage}
 
 
 @fast_app.post("/api/environments/{env_id}/stages/{stage_id}/stop")
-async def stop_stage(env_id: str, stage_id: str, req: Request):
+async def stop_stage(env_id: str, stage_id: str, req: Request, force: bool = Query(default=False)):
+    import threading
     user = await _resolve_user(req)
     env_client = None
     env_item = get_environment_item(env_id) or {}
@@ -1475,38 +1055,134 @@ async def stop_stage(env_id: str, stage_id: str, req: Request):
             pass
     if not (has_any_role(user, ["admin", "environment-manager"]) or (env_client and has_client_admin_for(user, env_client))):
         raise HTTPException(status_code=403, detail="Forbidden")
-    stage = set_stage_status(env_id, stage_id, "stopped")
-    environment = get_environment_item(env_id)
+
+    environment, stage = _resolve_stage_from_env(env_id, stage_id)
     if not stage or not environment:
         raise HTTPException(status_code=404, detail="Stage not found")
+
+    current_status = (stage or {}).get("status", "")
+    if not force and current_status in ("starting", "stopping", "in_progress"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Stage is already '{current_status}'. Use ?force=true to override.",
+        )
+
+    # Immediately mark stopping so the UI shows activity
+    _set_stage_status_internal(env_id, stage_id, "stopping")
+    stage = dict(stage)
+    stage["status"] = "stopping"
+
+    actor = user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid")
+    append_audit({
+        "environment": env_id,
+        "client": environment.get("client"),
+        "stage": stage.get("name"),
+        "action": "stop",
+        "status": "requested",
+        "eventType": "manual-lifecycle",
+        "resourceActions": [item.get("type") for item in stage.get("resourceActions", [])],
+        "requestedBy": actor,
+    })
+
+    # Run actual Azure operations in background thread so response is instant
+    stage_snapshot = dict(stage)
+    thread = threading.Thread(
+        target=_run_stage_lifecycle,
+        args=(env_id, stage_id, "stop", stage_snapshot, actor or "unknown"),
+        daemon=True,
+    )
+    thread.start()
+
+    return {"updated": stage}
+
+
+@fast_app.post("/api/environments/{env_id}/stages/{stage_id}/status")
+async def set_stage_status_endpoint(env_id: str, stage_id: str, req: Request):
+    user = await _resolve_user(req)
+    env_client = None
+    env_item = get_environment_item(env_id) or {}
+    env_client = env_item.get("clientId") or env_item.get("client")
+    if env_store:
+        try:
+            env_tmp = env_store.get_environment(env_id)
+            if env_tmp:
+                env_client = env_tmp.get("clientId") or env_tmp.get("client")
+        except Exception:
+            pass
+    # allow environment-manager or client-admin
+    if not (has_any_role(user, ["admin", "environment-manager"]) or (env_client and has_client_admin_for(user, env_client))):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    try:
+        body = await req.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    desired = str(body.get("status") or "").strip()
+    if not desired:
+        raise HTTPException(status_code=400, detail="status is required")
+
+    stage = None
+    environment = None
+    if env_store:
+        try:
+            env_obj = env_store.get_environment(env_id)
+            if env_obj:
+                for s in env_obj.get("stages", []):
+                    if s.get("id") == stage_id or s.get("name") == stage_id:
+                        s["status"] = desired
+                        environment = env_obj
+                        stage = s
+                        break
+                if environment and stage:
+                    try:
+                        env_store.update_environment(environment)
+                    except Exception:
+                        pass
+        except Exception:
+            stage = None
+    if not stage:
+        stage = set_stage_status(env_id, stage_id, desired)
+    if not environment:
+        environment = get_environment_item(env_id)
+    if not stage or not environment:
+        raise HTTPException(status_code=404, detail="Stage not found")
+
     append_audit(
         {
             "environment": env_id,
             "client": environment.get("client"),
             "stage": stage.get("name"),
-            "action": "stop",
-            "status": "requested",
-            "eventType": "manual-lifecycle",
-            "resourceActions": [item.get("type") for item in stage.get("resourceActions", [])],
+            "action": "status-update",
+            "status": "success",
+            "eventType": "lifecycle-status-updated",
             "requestedBy": user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid"),
+            "newStatus": desired,
         }
     )
     return {"updated": stage}
+
+
+@fast_app.get("/api/stages/{stage_id}/azure-services")
+async def get_stage_azure_services(stage_id: str, req: Request, include_failures: bool = True, lookback_days: int = 7, realtime: bool = False):
+    user = await _resolve_user(req)
+    if not has_any_role(user, ["admin", "environment-manager", "client-admin", "viewer"]):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    try:
+        from app.services.azure_stage_services import get_stage_services
+        result = get_stage_services(stage_id, include_failures=include_failures, lookback_days=lookback_days, realtime=realtime)
+        return result
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Azure service unavailable") from exc
 
 
 @fast_app.get("/api/environments/schedules")
 async def list_schedules():
     environments = _list_environment_refs()
-    if cosmos:
-        items = cosmos.list_schedules()
-        return {"schedules": [_augment_schedule_with_execution_refs(_decorate_schedule_for_response(item, environments)) for item in items]}
-    else:
-        return {
-            "schedules": [
-                _augment_schedule_with_execution_refs(_decorate_schedule_for_response(item, environments))
-                for item in mem_store.SCHEDULES
-            ]
-        }
+    items = schedule_store.list_schedules()
+    return {"schedules": [_augment_schedule_with_execution_refs(_decorate_schedule_for_response(item, environments)) for item in items]}
 
 
 @fast_app.post("/api/environments/schedules")
@@ -1542,10 +1218,7 @@ async def create_schedule(req: Request, body: ScheduleIn):
     else:
         item["next_run"] = _utc_now_iso()
 
-    if cosmos:
-        cosmos.upsert_schedule(item)
-    else:
-        mem_store.SCHEDULES.append(item)
+    schedule_store.upsert_schedule(item)
 
     append_audit(
         {
@@ -1567,7 +1240,7 @@ async def create_schedule(req: Request, body: ScheduleIn):
 async def update_schedule(req: Request, schedule_id: str, body: ScheduleIn):
     user = await _resolve_user(req)
 
-    existing = cosmos.get_schedule(schedule_id) if cosmos else next((s for s in mem_store.SCHEDULES if s.get("id") == schedule_id), None)
+    existing = schedule_store.get_schedule(schedule_id)
     if not existing:
         raise HTTPException(status_code=404, detail="Schedule not found")
 
@@ -1626,13 +1299,7 @@ async def update_schedule(req: Request, schedule_id: str, body: ScheduleIn):
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid cron/timezone: {e}")
 
-    if cosmos:
-        cosmos.upsert_schedule(item)
-    else:
-        for idx, s in enumerate(mem_store.SCHEDULES):
-            if s.get("id") == schedule_id:
-                mem_store.SCHEDULES[idx] = item
-                break
+    schedule_store.upsert_schedule(item)
 
     append_audit(
         {
@@ -1655,15 +1322,9 @@ async def delete_schedule(req: Request, schedule_id: str):
     if not has_any_role(user, ["admin", "environment-manager"]):
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    if cosmos:
-        ok = cosmos.delete_schedule(schedule_id)
-        if not ok:
-            raise HTTPException(status_code=404, detail="Schedule not found")
-    else:
-        before = len(mem_store.SCHEDULES)
-        mem_store.SCHEDULES = [s for s in mem_store.SCHEDULES if s.get("id") != schedule_id]
-        if len(mem_store.SCHEDULES) == before:
-            raise HTTPException(status_code=404, detail="Schedule not found")
+    ok = schedule_store.delete_schedule(schedule_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Schedule not found")
     append_audit(
         {
             "action": "delete",
@@ -1699,7 +1360,7 @@ def _can_postpone(user: dict, schedule: dict) -> bool:
 @fast_app.post("/api/environments/schedules/{schedule_id}/postpone")
 async def postpone_schedule(req: Request, schedule_id: str, body: PostponeIn):
     user = await _resolve_user(req)
-    schedule = cosmos.get_schedule(schedule_id) if cosmos else next((s for s in mem_store.SCHEDULES if s.get("id") == schedule_id), None)
+    schedule = schedule_store.get_schedule(schedule_id)
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
     if not _can_postpone(user, schedule):
@@ -1721,24 +1382,13 @@ async def postpone_schedule(req: Request, schedule_id: str, body: PostponeIn):
     if body.postponeByMinutes and policy.get("maxPostponeMinutes") and body.postponeByMinutes > int(policy.get("maxPostponeMinutes")):
         raise HTTPException(status_code=409, detail="Requested postponement exceeds policy")
 
-    if cosmos:
-        schedule["next_run"] = postponed_until
-        schedule["postponed_until"] = postponed_until
-        schedule["postponed_by"] = user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid")
-        schedule["postpone_reason"] = body.reason
-        schedule["postponement_count"] = schedule.get("postponement_count", 0) + 1
-        cosmos.upsert_schedule(schedule)
-        updated = schedule
-    else:
-        def _updater(existing):
-            existing["next_run"] = postponed_until
-            existing["postponed_until"] = postponed_until
-            existing["postponed_by"] = user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid")
-            existing["postpone_reason"] = body.reason
-            existing["postponement_count"] = existing.get("postponement_count", 0) + 1
-            return existing
-
-        updated = mem_store.update_schedule(schedule_id, _updater)
+    schedule["next_run"] = postponed_until
+    schedule["postponed_until"] = postponed_until
+    schedule["postponed_by"] = user.get("preferred_username") or user.get("upn") or user.get("email") or user.get("oid")
+    schedule["postpone_reason"] = body.reason
+    schedule["postponement_count"] = schedule.get("postponement_count", 0) + 1
+    schedule_store.upsert_schedule(schedule)
+    updated = schedule
 
     append_audit(
         {
@@ -1777,24 +1427,14 @@ async def get_environment_by_id(env_id: str):
     try:
         schedules = []
         environment_refs = _list_environment_refs()
-        if cosmos:
-            # cosmos.list_schedules returns schedule items
-            all_sched = cosmos.list_schedules(limit=200)
-            for s in all_sched:
-                decorated = _decorate_schedule_for_response(s, environment_refs)
-                if str(decorated.get("environment_id") or decorated.get("environment") or "").lower() in (
-                    str(env_id).lower(),
-                    str(environment.get("name") or "").lower(),
-                ):
-                    schedules.append(decorated)
-        else:
-            for s in mem_store.SCHEDULES:
-                decorated = _decorate_schedule_for_response(s, environment_refs)
-                if str(decorated.get("environment_id") or decorated.get("environment") or "").lower() in (
-                    str(env_id).lower(),
-                    str(environment.get("name") or "").lower(),
-                ):
-                    schedules.append(decorated)
+        all_sched = schedule_store.list_schedules(limit=200)
+        for s in all_sched:
+            decorated = _decorate_schedule_for_response(s, environment_refs)
+            if str(decorated.get("environment_id") or decorated.get("environment") or "").lower() in (
+                str(env_id).lower(),
+                str(environment.get("name") or "").lower(),
+            ):
+                schedules.append(decorated)
         details["schedules"] = [_augment_schedule_with_execution_refs(item) for item in schedules]
     except Exception:
         details["schedules"] = []

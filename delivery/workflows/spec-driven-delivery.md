@@ -14,6 +14,8 @@ A short high-level request is valid input for this workflow.
 
 AI tools should treat a plain-language request as enough to begin orchestration, refinement, and minimum artifact creation. They should not require the requester to pre-write a full technical specification before work can start.
 
+Treat short product-language requests such as "I would like...", "add a page...", "show...", or "create a submenu..." as intake for refinement by default, not as implicit approval to skip directly to implementation.
+
 ## Request Classification
 
 Before implementation, classify the request as one of:
@@ -29,10 +31,16 @@ Requests in the first four categories should normally follow the spec-first flow
 
 ## Minimum Artifact Policy
 
-When a request is feature-like and no adequate governing feature package exists, create or update a feature package under `specs/features/FEAT-<area>-<id>-<short-name>/`.
+When a request is feature-like, first search for an existing governing feature package for the same shipped capability. If no adequate governing package exists, create or update a feature package under `specs/features/FEAT-<area>-<id>-<short-name>/`.
 
 Use the minimum artifact set and "add only when needed" rules from [AI Working Contract](../governance/ai-working-contract.md).
 When later work materially evolves an existing shipped feature, keep the governing `FEAT-...` package current rather than creating a disconnected replacement unless the work is genuinely separate. Use the spec-maintenance rule in [AI Working Contract](../governance/ai-working-contract.md).
+
+Use the artifact-enrichment rule from [AI Working Contract](../governance/ai-working-contract.md) when drafting these files:
+
+- enrich the existing artifacts with stronger actors, flows, business rules, domain/data language, and non-functional expectations when that improves clarity
+- do not create a parallel mandatory artifact set just because another method or prompt uses terms such as requirements, use cases, or entity models
+- keep optional visual clarification inside the existing artifact set unless the workflow explicitly calls for a separate artifact
 
 Still add these supporting artifacts when they are warranted:
 
@@ -73,10 +81,12 @@ When using this exemption, the AI tool should say so explicitly.
 1. Intake
    - Capture the user need, business problem, constraints, and desired outcomes.
    - Classify the request before implementation starts.
+   - Treat outcome-oriented product requests as refinement intake unless the user also explicitly asks to implement now.
    - If the request is feature-like and the governing feature package is missing or stale, create or update the minimum artifact set first.
 2. Specification
    - Produce or update the governing feature artifacts using the canonical templates.
    - Include scope, non-scope, assumptions, constraints, requirements, edge cases, and acceptance criteria.
+   - Strengthen the content with actors, outcomes, non-functional expectations, main and alternative flows, failure paths, business rules, and domain/data considerations when those improve implementation clarity.
 3. Design
    - Produce supporting artifacts as needed:
    - API spec
@@ -132,6 +142,19 @@ A feature is done only when all of the following are true:
 - Test plan: expected coverage and validation strategy
 - Task breakdown: implementation sequencing and ownership (with parallelization markers)
 - Validation report: evidence of what was verified, updated post-release when material
+
+## Optional Diagram Guidance
+
+Use a lightweight interaction or use-case diagram only when it clarifies the feature better than prose alone.
+
+Good candidates include:
+
+- multi-actor behavior
+- materially branching workflows
+- role-sensitive or authorization-sensitive interaction paths
+- navigation-heavy features where user movement is central to the change
+
+Do not make such diagrams mandatory for simple CRUD, small page enhancements, isolated backend changes, or straightforward bug fixes. Prefer embedding the diagram inside `feature-spec.md` or `spec-refinement.md` instead of creating a separate default artifact.
 
 ## Preferred Working Sequence For AI Tools
 

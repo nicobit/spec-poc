@@ -19,11 +19,17 @@
 - `specs/features/FEAT-ASSISTANT-001-panel/test-plan.md`
 - `specs/features/FEAT-ASSISTANT-001-panel/task-breakdown.md`
 - `specs/features/FEAT-ASSISTANT-001-panel/validation-report.md`
+- `backend/function_ai_chat/__init__.py`
 - `frontend/src/app/AppShell.tsx`
 - `frontend/src/app/components/Topbar.tsx`
 - `frontend/src/app/components/AssistantPanel.tsx`
+- `frontend/src/features/chat/components/MarkdownAnswer.tsx`
+- `frontend/src/features/chat/api/ai.ts`
+- `frontend/src/features/chat/contexts/QueryContext.tsx`
 - `frontend/src/app/AppShell.test.tsx`
 - `frontend/src/app/components/AssistantPanel.test.tsx`
+- `frontend/src/features/chat/components/MarkdownAnswer.test.tsx`
+- `frontend/src/features/chat/contexts/QueryContext.test.ts`
 
 ## Validation Performed
 
@@ -36,15 +42,17 @@
 - Implemented a rounded integrated composer with the send icon inside the same composer surface
 - Implemented a vertically growing textarea composer with Enter-to-send and Shift+Enter newline behavior
 - Implemented conversation rendering using the existing query context, including empty state and loading state
+- Added inline Mermaid rendering for fenced `mermaid` Markdown blocks inside assistant answers
+- Preserved graceful fallback behavior when Mermaid content is invalid
+- Updated the AI system prompt so Mermaid fenced blocks are allowed when a diagram materially improves clarity
 - Added focused frontend tests for:
   - topbar toggle behavior
   - assistant panel render behavior
   - composer submit behavior
   - resize interaction propagation
+  - inline Mermaid answer rendering
 - Validation executed:
-  - `cd frontend; npx tsc --noEmit`
-  - `cd frontend; npx vitest run src/app/AppShell.test.tsx src/app/components/AssistantPanel.test.tsx`
-  - `cd frontend; npx vitest run src/app/AppShell.test.tsx src/app/components/AssistantPanel.test.tsx src/app/routes.test.ts src/app/navigation/sidebar-menu.test.ts`
+  - `cd frontend; npx vitest run src/app/components/AssistantPanel.test.tsx src/features/chat/components/MarkdownAnswer.test.tsx src/features/chat/contexts/QueryContext.test.ts`
 
 ## Validation Gaps
 
@@ -52,6 +60,7 @@
 - No persistence of conversation history beyond the current in-memory query context
 - No keyboard accessibility test yet for resize handle behavior
 - No visual regression coverage yet for shell layout at narrow viewport widths
+- Full frontend `npx tsc --noEmit` remains noisy due to pre-existing unrelated type errors outside the Mermaid support slice
 
 ## Recommended Next Steps
 

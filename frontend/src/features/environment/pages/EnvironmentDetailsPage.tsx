@@ -84,6 +84,27 @@ function getResourceTypeLabel(type: string) {
   }
 }
 
+function getResourceActionLabel(action: ResourceAction | Record<string, any>) {
+  if (!action) return '';
+  const props = (action as any).properties || {};
+  switch ((action as any).type) {
+    case 'sql-vm':
+      return props.serverName || (action as any).serverName || (action as any).name || getResourceTypeLabel((action as any).type);
+    case 'sql-managed-instance':
+      return props.instanceName || (action as any).instanceName || (action as any).name || getResourceTypeLabel((action as any).type);
+    case 'synapse-sql-pool':
+      return props.sqlPoolName || (action as any).sqlPoolName || (action as any).name || getResourceTypeLabel((action as any).type);
+    case 'service-bus-message':
+      return props.queueOrTopic || (action as any).queueOrTopic || (action as any).name || getResourceTypeLabel((action as any).type);
+    case 'app-service':
+      return props.siteName || (action as any).siteName || (action as any).name || getResourceTypeLabel((action as any).type);
+    case 'container-instance':
+      return props.containerGroupName || (action as any).containerGroupName || (action as any).name || getResourceTypeLabel((action as any).type);
+    default:
+      return (action as any).name || getResourceTypeLabel((action as any).type);
+  }
+}
+
 function getResourceProperty(action: ResourceAction, key: string) {
   const properties = (action as any).properties || {};
   if (properties && properties[key] != null) return properties[key];
@@ -192,6 +213,53 @@ function getExecutionSummary(execution?: StageExecution | null) {
   return `${prefix}: ${formatTimestamp(completed)}`;
 }
 
+function getResourceExecutionResult(stage: EnvInstance['stages'][0], resourceAction: ResourceAction) {
+  const exec = stage?.latestExecution as StageExecution | null;
+  if (!exec || !exec.resourceActionResults) return null;
+  const id = (resourceAction as any).id || resourceAction.type;
+  return exec.resourceActionResults.find((r) => r.resourceActionId === id || r.resourceActionId === resourceAction.type) || null;
+}
+
+function getResourceStatusLabel(stage: EnvInstance['stages'][0], resourceAction: ResourceAction) {
+  const res = getResourceExecutionResult(stage, resourceAction) as any | null;
+  if (!res) return 'unknown';
+  const action = (stage?.latestExecution?.action || '').toLowerCase();
+  if (res.status === 'in_progress' || res.status === 'pending') return action === 'start' ? 'starting' : action === 'stop' ? 'stopping' : res.status;
+  if (res.status === 'succeeded') return action === 'start' ? 'running' : action === 'stop' ? 'stopped' : 'succeeded';
+  if (res.status === 'failed') return 'failed';
+  return res.status || 'unknown';
+}
+
+function getResourceStatusTone(status?: string) {
+  switch (status) {
+    case 'running':
+      return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300';
+    case 'stopped':
+      return 'border-[var(--border-subtle)] bg-[var(--surface-panel-muted)] text-[var(--text-secondary)]';
+    case 'starting':
+    case 'stopping':
+      return 'border-sky-500/30 bg-sky-500/10 text-sky-300';
+    case 'failed':
+      return 'border-red-500/30 bg-red-500/10 text-red-300';
+    default:
+      return 'border-[var(--border-subtle)] bg-[var(--surface-panel-muted)] text-[var(--text-secondary)]';
+  }
+}
+
+function getResourceStatusIcon(status?: string) {
+  switch (status) {
+    case 'running':
+      return <CheckCircle2 className="h-3.5 w-3.5" />;
+    case 'failed':
+      return <XCircle className="h-3.5 w-3.5" />;
+    case 'starting':
+    case 'stopping':
+      return <Loader2 className="h-3.5 w-3.5 animate-spin" />;
+    default:
+      return null;
+  }
+}
+
 export default function EnvironmentDetailsPage() {
   const { id } = useParams();
   const { instance } = useMsal();
@@ -245,7 +313,7 @@ export default function EnvironmentDetailsPage() {
       Array.from(
         new Set(
           (env?.stages || []).flatMap((stage) =>
-            (stage.resourceActions || []).map((resourceAction) => getResourceTypeLabel(resourceAction.type)),
+            (stage.resourceActions || []).map((resourceAction) => getResourceActionLabel(resourceAction)),
           ),
         ),
       ),
@@ -365,16 +433,16 @@ export default function EnvironmentDetailsPage() {
         <div className="rounded-2xl border border-red-200 p-4">Environment not found.</div>
       ) : !loading && env ? (
         <div className="space-y-6">
-          <section className="grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(20rem,0.9fr)]">
+          <section className="grid gap-4">
             <div className={`${themeClasses.formSection} rounded-3xl p-6`}>
               <div className={themeClasses.sectionEyebrow}>Overview</div>
               <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
                   {env.client ? (
-                    <div className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">{env.client}</div>
+                    <div className="text-lg font-semibold tracking-tight text-[var(--text-primary)]">{env.client}</div>
                   ) : null}
-                  <div className="mt-2 flex flex-wrap items-center gap-3">
-                    <h2 className="text-lg font-medium tracking-tight text-[var(--text-secondary)]">{env.name}</h2>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <h2 className="text-base font-medium tracking-tight text-[var(--text-secondary)]">{env.name}</h2>
                     <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-panel-muted)] px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--text-secondary)]">
                       {env.status || 'unknown'}
                     </span>
@@ -395,48 +463,68 @@ export default function EnvironmentDetailsPage() {
               </div>
             </div>
 
-            <aside className={`${themeClasses.formSection} rounded-3xl p-6`}>
-              <div className={themeClasses.sectionEyebrow}>Derived types</div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {derivedTypes.length > 0 ? (
-                  derivedTypes.map((type) => (
-                    <span
-                      key={type}
-                      className="rounded-full bg-[var(--surface-panel-muted)] px-2.5 py-1 text-xs text-[var(--text-secondary)]"
-                    >
-                      {type}
-                    </span>
-                  ))
-                ) : (
-                  <span className={themeClasses.helperText}>No resource types configured yet.</span>
-                )}
+            {/* Derived types removed to simplify header */}
+          </section>
+
+          <section className="grid gap-3">
+            <div className={`${themeClasses.formSection} rounded-3xl p-3`}> 
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  aria-label="Jump to stages"
+                  onClick={() => document.getElementById('stages-section')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="inline-flex items-center gap-3 rounded-md px-3 py-2 bg-[var(--surface-panel-muted)] hover:bg-[var(--surface-elevated)] focus:outline-none focus:ring-2 focus:ring-sky-500"
+                >
+                  <Layers className="h-4 w-4 text-[var(--text-secondary)]" />
+                  <div className="flex flex-col items-start">
+                    <div className="text-[11px] text-[var(--text-secondary)]">Stages</div>
+                    <div className="text-base font-semibold">{stageCount}</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  aria-label="Jump to services"
+                  onClick={() => document.getElementById('stages-section')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="inline-flex items-center gap-3 rounded-md px-3 py-2 bg-[var(--surface-panel-muted)] hover:bg-[var(--surface-elevated)] focus:outline-none focus:ring-2 focus:ring-sky-500"
+                >
+                  <Server className="h-4 w-4 text-[var(--text-secondary)]" />
+                  <div className="flex flex-col items-start">
+                    <div className="text-[11px] text-[var(--text-secondary)]">Azure services</div>
+                    <div className="text-base font-semibold">{resourceCount}</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  aria-label="Jump to schedules"
+                  onClick={() => document.getElementById('schedules-section')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="inline-flex items-center gap-3 rounded-md px-3 py-2 bg-[var(--surface-panel-muted)] hover:bg-[var(--surface-elevated)] focus:outline-none focus:ring-2 focus:ring-sky-500"
+                >
+                  <CalendarClock className="h-4 w-4 text-[var(--text-secondary)]" />
+                  <div className="flex flex-col items-start">
+                    <div className="text-[11px] text-[var(--text-secondary)]">Schedules</div>
+                    <div className="text-base font-semibold">{scheduleCount}</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  aria-label="Jump to recent activity"
+                  onClick={() => document.getElementById('activity-section')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="inline-flex items-center gap-3 rounded-md px-3 py-2 bg-[var(--surface-panel-muted)] hover:bg-[var(--surface-elevated)] focus:outline-none focus:ring-2 focus:ring-sky-500"
+                >
+                  <Activity className="h-4 w-4 text-[var(--text-secondary)]" />
+                  <div className="flex flex-col items-start">
+                    <div className="text-[11px] text-[var(--text-secondary)]">Recent activity</div>
+                    <div className="text-base font-semibold">{((env as any).activity?.entries || []).length}</div>
+                  </div>
+                </button>
               </div>
-            </aside>
+            </div>
           </section>
 
-          <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="Stages" value={stageCount} detail="Configured operating stages" icon={<Layers className="h-4 w-4" />} />
-            <StatCard
-              label="Azure services"
-              value={resourceCount}
-              detail="Configured service actions across all stages"
-              icon={<Server className="h-4 w-4" />}
-            />
-            <StatCard
-              label="Schedules"
-              value={scheduleCount}
-              detail={scheduleCount > 0 ? 'Recurring lifecycle schedules' : 'No schedules configured'}
-              icon={<CalendarClock className="h-4 w-4" />}
-            />
-            <StatCard
-              label="Recent activity"
-              value={((env as any).activity?.entries || []).length}
-              detail="Latest recorded events"
-              icon={<Activity className="h-4 w-4" />}
-            />
-          </section>
-
-          <section className={`${themeClasses.formSection} rounded-3xl p-6`}>
+          <section id="stages-section" className={`${themeClasses.formSection} rounded-3xl p-6`}>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <div className={themeClasses.sectionEyebrow}>Stages</div>
@@ -461,8 +549,26 @@ export default function EnvironmentDetailsPage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-3">
                         <h3 className="text-lg font-semibold text-[var(--text-primary)]">{stage.name}</h3>
-                        <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-panel-muted)] px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--text-secondary)]">
-                          {stage.status}
+                        <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.16em] ${
+                            stage.status === 'starting' || stage.status === 'stopping'
+                              ? 'border-sky-500/30 bg-sky-500/10 text-sky-300'
+                              : stage.status === 'in_progress'
+                                ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+                                : 'border-[var(--border-subtle)] bg-[var(--surface-panel-muted)] text-[var(--text-secondary)]'
+                          }`}>
+                          {(stage.status === 'starting' || stage.status === 'stopping') && (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          )}
+                          {stage.status === 'in_progress' && (
+                            <AlertTriangle className="h-3 w-3" />
+                          )}
+                          {stage.status === 'starting'
+                            ? 'Starting'
+                            : stage.status === 'stopping'
+                              ? 'Stopping'
+                              : stage.status === 'in_progress'
+                                ? 'Stale'
+                                : stage.status}
                         </span>
                         <button
                           type="button"
@@ -490,9 +596,7 @@ export default function EnvironmentDetailsPage() {
                         </span>
                         {stage.resourceActions.length > 0 ? (
                           <span className="rounded-full bg-[var(--surface-panel-muted)] px-2.5 py-1 text-xs text-[var(--text-secondary)]">
-                            {Array.from(
-                              new Set(stage.resourceActions.map((resourceAction) => getResourceTypeLabel(resourceAction.type))),
-                            ).join(', ')}
+                            {Array.from(new Set(stage.resourceActions.map((resourceAction) => getResourceActionLabel(resourceAction)))).join(', ')}
                           </span>
                         ) : null}
                         {stage.latestExecution ? (
@@ -513,83 +617,165 @@ export default function EnvironmentDetailsPage() {
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      <button
-                        className={`${themeClasses.buttonPrimary} inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm`}
-                        onClick={() => {
-                          setConfirmState({
-                            open: true,
-                            title: `Start stage ${stage.name}`,
-                            message: `Start stage ${stage.name}?`,
-                            onConfirm: async () => {
-                              try {
-                                await startStage(instance, (env as any).id, stage.id);
-                                setEnv((current) => {
-                                  if (!current) return current;
-                                  return {
-                                    ...current,
-                                    stages: current.stages.map((currentStage) =>
-                                      currentStage.id === stage.id ? { ...currentStage, status: 'starting' } : currentStage,
-                                    ),
-                                  };
-                                });
-                              } catch {
-                                enqueueSnackbar(`Failed to start stage ${stage.name}.`, { variant: 'error' });
-                              }
-                            },
-                          });
-                        }}
-                      >
-                        <Play className="h-4 w-4" />
-                        Start stage
-                      </button>
-                      <button
-                        className={`${themeClasses.buttonSecondary} inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm`}
-                        onClick={() => {
-                          setConfirmState({
-                            open: true,
-                            title: `Stop stage ${stage.name}`,
-                            message: `Stop stage ${stage.name}?`,
-                            onConfirm: async () => {
-                              try {
-                                await stopStage(instance, (env as any).id, stage.id);
-                                setEnv((current) => {
-                                  if (!current) return current;
-                                  return {
-                                    ...current,
-                                    stages: current.stages.map((currentStage) =>
-                                      currentStage.id === stage.id ? { ...currentStage, status: 'stopping' } : currentStage,
-                                    ),
-                                  };
-                                });
-                              } catch {
-                                enqueueSnackbar(`Failed to stop stage ${stage.name}.`, { variant: 'error' });
-                              }
-                            },
-                          });
-                        }}
-                      >
-                        <Square className="h-4 w-4" />
-                        Stop stage
-                      </button>
+                      {(() => {
+                        const hasServices = (stage.resourceActions || []).length > 0;
+                        const startDisabled = !hasServices || stage.status === 'running' || stage.status === 'starting';
+                        const startTitle = !hasServices
+                          ? 'No Azure services configured for this stage'
+                          : stage.status === 'running'
+                          ? 'Stage is already running'
+                          : stage.status === 'starting'
+                          ? 'Stage is already starting'
+                          : stage.status === 'stopping' || stage.status === 'in_progress'
+                          ? 'Stage is stuck — force start will override'
+                          : 'Start this stage';
+
+                        return (
+                          <button
+                            className={`${themeClasses.buttonPrimary} inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm ${
+                              startDisabled ? 'opacity-50 cursor-not-allowed' : ''
+                            }`}
+                            disabled={startDisabled}
+                            title={startTitle}
+                            onClick={() => {
+                              const isForce = stage.status === 'stopping' || stage.status === 'in_progress';
+                              setConfirmState({
+                                open: true,
+                                title: isForce ? `Force start stage ${stage.name}` : `Start stage ${stage.name}`,
+                                message: isForce
+                                  ? `Stage is stuck (status: "${stage.status}"). Force start ${stage.name}? This will override the current operation.`
+                                  : `Start stage ${stage.name}?`,
+                                onConfirm: async () => {
+                                  try {
+                                    await startStage(instance, (env as any).id, stage.id, isForce);
+                                    setEnv((current) => {
+                                      if (!current) return current;
+                                      return {
+                                        ...current,
+                                        stages: current.stages.map((currentStage) =>
+                                          currentStage.id === stage.id ? { ...currentStage, status: 'starting' } : currentStage,
+                                        ),
+                                      };
+                                    });
+                                  } catch {
+                                    enqueueSnackbar(`Failed to start stage ${stage.name}.`, { variant: 'error' });
+                                  }
+                                },
+                              });
+                            }}
+                          >
+                            {stage.status === 'starting' ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : stage.status === 'stopping' || stage.status === 'in_progress' ? (
+                              <AlertTriangle className="h-4 w-4" />
+                            ) : (
+                              <Play className="h-4 w-4" />
+                            )}
+                            {stage.status === 'starting'
+                              ? 'Starting...'
+                              : stage.status === 'stopping' || stage.status === 'in_progress'
+                              ? 'Force Start'
+                              : 'Start stage'}
+                          </button>
+                        );
+                      })()}
+                      {(() => {
+                        const hasServices = (stage.resourceActions || []).length > 0;
+                        const stopDisabled = !hasServices || stage.status === 'stopped' || stage.status === 'stopping';
+                        const stopTitle = !hasServices
+                          ? 'No Azure services configured for this stage'
+                          : stage.status === 'stopped'
+                          ? 'Stage is already stopped'
+                          : stage.status === 'stopping'
+                          ? 'Stage is already stopping'
+                          : stage.status === 'starting' || stage.status === 'in_progress'
+                          ? 'Stage is stuck — force stop will override'
+                          : 'Stop this stage';
+
+                        return (
+                          <button
+                            className={`${themeClasses.buttonSecondary} inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm ${
+                              stopDisabled ? 'opacity-50 cursor-not-allowed' : ''
+                            }`}
+                            disabled={stopDisabled}
+                            title={stopTitle}
+                            onClick={() => {
+                              const isForce = stage.status === 'starting' || stage.status === 'in_progress';
+                              setConfirmState({
+                                open: true,
+                                title: isForce ? `Force stop stage ${stage.name}` : `Stop stage ${stage.name}`,
+                                message: isForce
+                                  ? `Stage is stuck (status: "${stage.status}"). Force stop ${stage.name}? This will override the current operation.`
+                                  : `Stop stage ${stage.name}?`,
+                                onConfirm: async () => {
+                                  try {
+                                    await stopStage(instance, (env as any).id, stage.id, isForce);
+                                    setEnv((current) => {
+                                      if (!current) return current;
+                                      return {
+                                        ...current,
+                                        stages: current.stages.map((currentStage) =>
+                                          currentStage.id === stage.id ? { ...currentStage, status: 'stopping' } : currentStage,
+                                        ),
+                                      };
+                                    });
+                                  } catch {
+                                    enqueueSnackbar(`Failed to stop stage ${stage.name}.`, { variant: 'error' });
+                                  }
+                                },
+                              });
+                            }}
+                          >
+                            {stage.status === 'stopping' ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : stage.status === 'starting' || stage.status === 'in_progress' ? (
+                              <AlertTriangle className="h-4 w-4" />
+                            ) : (
+                              <Square className="h-4 w-4" />
+                            )}
+                            {stage.status === 'stopping'
+                              ? 'Stopping...'
+                              : stage.status === 'starting' || stage.status === 'in_progress'
+                              ? 'Force Stop'
+                              : 'Stop stage'}
+                          </button>
+                        );
+                      })()}
                     </div>
                   </div>
 
                   {expandedAzureServices[stage.id] && (
-                    <div id={`stage-details-${stage.id}`} className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(18rem,0.8fr)]">
+                    <div id={`stage-details-${stage.id}`} className="mt-5 grid gap-4">
                       <div className={`${themeClasses.subsectionCard} rounded-2xl p-4`}>
                         <div className={themeClasses.fieldLabel}>Azure services</div>
                         {stage.resourceActions.length > 0 ? (
-                          <div className="mt-3 space-y-3">
+                          <div className="mt-3 flex flex-wrap gap-3">
                             {stage.resourceActions.map((resourceAction, index) => (
-                              <div key={`${resourceAction.type}-${index}`} className="rounded-xl bg-[var(--surface-elevated)] px-3 py-3">
+                              <div key={`${resourceAction.type}-${index}`} className="rounded-xl bg-[var(--surface-elevated)] px-3 py-3 flex-shrink-0 w-full sm:w-1/2 md:w-1/3 lg:w-1/4">
                                 <div className="flex flex-wrap items-center gap-2">
                                   <span className="rounded-full bg-[var(--surface-elevated)] px-2.5 py-1 text-xs text-[var(--text-secondary)]">
-                                    {getResourceTypeLabel(resourceAction.type)}
+                                    {getResourceActionLabel(resourceAction)}
                                   </span>
                                 </div>
-                                <div className={`${themeClasses.helperText} mt-2`}>
-                                  {getResourceSummary(resourceAction as ResourceAction) || 'Configuration summary not available.'}
-                                </div>
+                                          <div className="flex items-start justify-between">
+                                            {(() => {
+                                              const summary = getResourceSummary(resourceAction as ResourceAction);
+                                              return summary ? (
+                                                <div className={`${themeClasses.helperText} mt-2`}>{summary}</div>
+                                              ) : null;
+                                            })()}
+                                            <div className="ml-3 mt-2 flex-shrink-0">
+                                              {(() => {
+                                                const statusLabel = getResourceStatusLabel(stage as any, resourceAction as ResourceAction);
+                                                return (
+                                                  <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${getResourceStatusTone(statusLabel)}`}>
+                                                    {getResourceStatusIcon(statusLabel)}
+                                                    {statusLabel}
+                                                  </span>
+                                                );
+                                              })()}
+                                            </div>
+                                          </div>
                               </div>
                             ))}
                           </div>
@@ -598,23 +784,7 @@ export default function EnvironmentDetailsPage() {
                         )}
                       </div>
 
-                      <div className={`${themeClasses.subsectionCard} rounded-2xl p-4`}>
-                        <div className={themeClasses.fieldLabel}>Additional settings</div>
-                        {stage.azureConfig && Object.keys(stage.azureConfig).length > 0 ? (
-                          <div className="mt-3 space-y-2">
-                            {Object.entries(stage.azureConfig).map(([key, value]) => (
-                              <div key={key} className="rounded-xl bg-[var(--surface-elevated)] px-3 py-2">
-                                <div className={themeClasses.sectionEyebrow}>{key}</div>
-                                <div className={`${themeClasses.helperText} mt-1`}>
-                                  {typeof value === 'string' ? value : JSON.stringify(value)}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className={`${themeClasses.helperText} mt-3`}>No additional Azure config recorded for this stage.</div>
-                        )}
-                      </div>
+                      {/* Additional settings intentionally hidden to simplify UI */}
                     </div>
                   )}
                     </article>
@@ -624,7 +794,7 @@ export default function EnvironmentDetailsPage() {
           </section>
 
           <section className="grid gap-4 xl:grid-cols-2">
-            <div className={`${themeClasses.formSection} rounded-3xl p-6`}>
+            <div id="schedules-section" className={`${themeClasses.formSection} rounded-3xl p-6`}> 
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <div className={themeClasses.sectionEyebrow}>Schedules</div>
@@ -699,7 +869,7 @@ export default function EnvironmentDetailsPage() {
               )}
             </div>
 
-            <div className={`${themeClasses.formSection} rounded-3xl p-6`}>
+            <div id="activity-section" className={`${themeClasses.formSection} rounded-3xl p-6`}>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <div className={themeClasses.sectionEyebrow}>Recent activity</div>

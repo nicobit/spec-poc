@@ -4,19 +4,15 @@ import os
 import logging
 import uuid
 import azure.functions as func
-from shared.scheduler_store import get_due_schedules as mem_get_due_schedules, mark_schedule_next_run as mem_mark_next_run
-from shared.cosmos_store import get_cosmos_store
-
-# If Cosmos DB is configured, use it; otherwise fall back to in-memory store
-COSMOS_ENABLED = bool(os.environ.get("COSMOS_CONNECTION_STRING"))
-
-cosmos = get_cosmos_store() if COSMOS_ENABLED else None
+from shared.schedule_store import get_schedule_store
 
 # optional azure queue client import (used when output binding is not configured)
 try:
     from azure.storage.queue import QueueClient
 except Exception:
     QueueClient = None
+
+schedule_store = get_schedule_store()
 
 logger = logging.getLogger("function_scheduler_timer")
 if not logger.handlers:
@@ -36,20 +32,7 @@ def _utc_now_iso_z() -> str:
 def main(mytimer: func.TimerRequest, outputQueueItem: func.Out[str] = None) -> None:
     now = _utc_now()
     now_iso = now.isoformat()
-    # Prefer in-memory schedules when present (useful for tests). If none,
-    # fall back to Cosmos when configured.
-    try:
-        import shared as _mem_pkg
-        _mem = _mem_pkg.scheduler_store
-        mem_has = bool(_mem.SCHEDULES)
-    except Exception:
-        mem_has = False
-    if mem_has:
-        due = mem_get_due_schedules(now)
-    elif cosmos:
-        due = cosmos.get_due_schedules(now_iso)
-    else:
-        due = mem_get_due_schedules(now)
+    due = schedule_store.get_due_schedules(now_iso)
     messages = []
     for s in due:
         msg = {
@@ -68,10 +51,7 @@ def main(mytimer: func.TimerRequest, outputQueueItem: func.Out[str] = None) -> N
         messages.append(msg)
         # mark next_run +1 hour as placeholder (real cron calculation later)
         next_run = now + datetime.timedelta(hours=1)
-        if cosmos:
-            cosmos.mark_next_run(s.get("id"), next_run.isoformat())
-        else:
-            mem_mark_next_run(s.get("id"), next_run)
+        schedule_store.mark_next_run(s.get("id"), next_run.isoformat())
 
     if messages:
         payload = json.dumps(messages)

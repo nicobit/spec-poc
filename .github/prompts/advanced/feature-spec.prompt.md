@@ -1,6 +1,6 @@
 ---
 agent: agent
-description: "Generate a feature-spec.md from a spec-refinement — produces goals, users/roles, preconditions, requirements, acceptance criteria with postconditions, and traceability"
+description: "Generate a feature-spec.md from a spec-refinement - produces goals, users/roles, preconditions, requirements, acceptance criteria with postconditions, and traceability"
 tools:
   - codebase
   - editFiles
@@ -15,7 +15,7 @@ Read the `spec-refinement.md` (and `business-request.md` if available), then pro
 
 ## Steps
 
-1. Read `delivery/governance/constitution.md` — confirm the proposed approach does not conflict with any article; surface any conflicts explicitly
+1. Read `delivery/governance/constitution.md` - confirm the proposed approach does not conflict with any article; surface any conflicts explicitly
 2. Read `specs/features/<FEAT-ID>/spec-refinement.md`
 3. Read related architecture docs under `specs/architecture/` if the feature touches existing domain entities
 4. Produce `feature-spec.md`
@@ -31,10 +31,13 @@ Create or update `specs/features/<FEAT-ID>/feature-spec.md`:
 **FEAT ID**: FEAT-<AREA>-XXX
 
 ## Summary
-[1–2 sentences: what this feature delivers and why]
+[1-2 sentences: what this feature delivers and why]
 
 ## Goals
 - [goal]
+
+## Non-Goals
+- [what this feature explicitly does not attempt]
 
 ## Users and Roles
 | Role | Description |
@@ -51,7 +54,15 @@ flowchart LR
 ```
 
 ## Preconditions
-- [What must be true before this feature can be used — authentication state, existing data, permissions]
+- [What must be true before this feature can be used - authentication state, existing data, permissions]
+
+## Postconditions
+- Success:
+- Failure:
+
+## Domain Terms and Entities
+- [domain term]
+- [entity or relationship]
 
 ## Functional Requirements
 | ID | Requirement | Priority |
@@ -64,13 +75,28 @@ flowchart LR
 ## Data Concepts
 [Key domain entities, fields, and relationships relevant to this feature. Reference specs/architecture/data-model.md for shared entities.]
 
+## Business Rules and Invariants
+| ID | Rule |
+|---|---|
+| BR-001 | [rule] |
+
+## Data Requirements
+| Entity | Operation | Fields / Notes |
+|---|---|---|
+| [Entity] | Create / Read / Update / Delete | [fields] |
+
 ## Non-Scope
 - [what is explicitly excluded from this feature]
 
+## Error, Empty, and Degraded States
+- Error state:
+- Empty state:
+- Degraded state:
+
 ## Acceptance Criteria
-| ID | Criterion | Postcondition |
-|---|---|---|
-| AC-<AREA>-001 | [testable criterion linked to a REQ] | [what is true after the criterion is satisfied] |
+| ID | Criterion | Related Requirement | Postcondition |
+|---|---|---|---|
+| AC-<AREA>-001 | [testable criterion linked to a REQ] | REQ-<AREA>-001 | [what is true after the criterion is satisfied] |
 
 ## Risks and Open Questions
 | # | Risk / Question | Status |
@@ -89,11 +115,12 @@ flowchart LR
 ## Rules
 
 - Include Actor Overview only when the feature has multiple roles with different capabilities, or when the Users and Roles table alone doesn't make the interaction model clear. Skip it for simple single-actor features.
-- In the Actor Overview: use `([Name])` for roles/actors, `[Name]` for capabilities. Keep it scoped to this feature only — not the whole system.
+- In the Actor Overview: use `([Name])` for roles/actors, `[Name]` for capabilities. Keep it scoped to this feature only - not the whole system.
 - Status starts as `Draft`; only advance to `In Progress` once implementation begins
-- Acceptance criteria must be testable — avoid "users can see X" without a measurable outcome
+- Acceptance criteria must be testable - avoid "users can see X" without a measurable outcome
 - Preconditions make the starting state explicit for test design
 - Postconditions in the AC table state what is true after the criterion is satisfied
+- Make domain terminology, business rules, and error/degraded states explicit when they matter to delivery behavior
 - Constitution alignment must be confirmed and noted before the spec is finalized
 - After producing the file, list any constitution conflicts found and how they were resolved
 

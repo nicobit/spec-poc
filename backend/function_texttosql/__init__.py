@@ -3,7 +3,7 @@ from fastapi import FastAPI, Request, Response
 from pydantic import BaseModel
 from function_texttosql.ai_bot import nl_to_sql,  get_graph_png
 from shared.utils.nb_logger import NBLogger
-from shared.context import get_current_user
+from shared.context import get_current_user, get_user_id_from_claims
 from shared.utils.cors_helper import CORSHelper
 from shared.utils.connection_string_parser import ConnectionStringParser
 
@@ -43,7 +43,10 @@ async def query(req: Request, body: QueryRequest):
     database = body.database
 
     logger.info(f"query called with the following parameters: query={query}; session_id={session_id}")
-    result = await nl_to_sql(query, session_id, user["oid"], database)
+    user_id = get_user_id_from_claims(user)
+    if not user_id:
+        raise ValueError("Authenticated user has no identifiable id")
+    result = await nl_to_sql(query, session_id, user_id, database)
     if result["chart_type"] is None:
         result["chart_type"] = "None"
 

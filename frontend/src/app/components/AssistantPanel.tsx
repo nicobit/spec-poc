@@ -1,9 +1,8 @@
 import { useContext, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { marked } from 'marked';
-import DOMPurify from 'dompurify';
 import { ArrowUp, Database, Loader2, Maximize2, MessageSquare, Minimize2, Sparkles, X, ChevronDown } from 'lucide-react';
 
 import { QueryContext } from '@/features/chat/contexts/QueryContext';
+import MarkdownAnswer from '@/features/chat/components/MarkdownAnswer';
 import StageServicesPanel from './StageServicesPanel';
 import { themeClasses } from '@/theme/themeClasses';
 
@@ -245,11 +244,7 @@ export default function AssistantPanel({
                         Thinking...
                       </div>
                     ) : entry.answer ? (
-                      <div className="prose prose-sm max-w-none dark:prose-invert">
-                        <div
-                          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(entry.answer || '')) }}
-                        />
-                      </div>
+                      <MarkdownAnswer content={entry.answer || ''} />
                     ) : (
                       <div className={themeClasses.helperText}>No answer returned.</div>
                     )}

@@ -14,6 +14,14 @@ All AI tools should:
 - make assumptions and unresolved ambiguity explicit
 - keep changes small, reviewable, and aligned with existing repository standards
 
+For Python backend delivery specifically:
+
+- keep runtime entrypoints and trigger adapters thin; they should primarily compose request handling, auth, and response wiring
+- extract request models, shared helpers, route groups, and domain logic into neighboring modules or shared packages when a single file starts carrying multiple responsibilities
+- prefer feature-local package organization for non-trivial backend areas instead of growing a single `__init__.py` or monolithic handler file indefinitely
+- avoid mixing request parsing, storage orchestration, business rules, and route registration in one oversized module when those concerns can be separated cleanly
+- run at least a lightweight Python validation step after edits such as import/syntax compilation, targeted tests, or repository-standard quality checks when available
+
 ## Feature-Like Work
 
 Treat these as feature-like by default:
@@ -25,13 +33,15 @@ Treat these as feature-like by default:
 
 For feature-like work:
 
-1. Create or update the governing feature package under `specs/features/FEAT-<area>-<id>-<short-name>/`.
-2. Start with the minimum package:
+1. Search for an existing governing `specs/features/FEAT-<area>-<id>-<short-name>/` package for the same shipped capability.
+2. Update the existing governing package by default when the same feature is still materially evolving.
+3. Create a new governing feature package under `specs/features/FEAT-<area>-<id>-<short-name>/` only when the new work is meaningfully separate in scope, ownership, or user-facing capability.
+4. Start with the minimum package:
    - `business-request.md`
    - `spec-refinement.md`
    - `feature-spec.md`
-3. Add `validation-report.md` when implementation or validation begins, and keep it current through closure.
-4. Add extra artifacts only when they are needed:
+5. Add `validation-report.md` when implementation or validation begins, and keep it current through closure.
+6. Add extra artifacts only when they are needed:
    - `api-spec.md` when contracts, validation rules, compatibility expectations, or authorization behavior change materially
    - `test-plan.md` when behavior is materially non-trivial, integration-heavy, role-sensitive, or edge-case-heavy
    - `task-breakdown.md` when sequencing or coordination needs to be explicit
@@ -39,6 +49,17 @@ For feature-like work:
    - `business-approval-summary.md` only when explicit business approval capture is needed
 
 Do not stop at only `business-request.md` and `feature-spec.md` by default unless the user explicitly asks for a lighter draft.
+
+## Artifact Enrichment Policy
+
+The repository may borrow useful content patterns from requirements analysis, use-case specification, domain/entity modeling, and lightweight use-case diagrams, but these should enrich the existing artifacts rather than create a second workflow.
+
+- Keep the core feature package centered on `business-request.md`, `spec-refinement.md`, and `feature-spec.md`.
+- Use requirements-style thinking to improve actors, outcomes, constraints, and non-functional expectations inside `business-request.md`.
+- Use use-case-style thinking to improve preconditions, main flow, alternative flows, failure paths, and business rules inside `spec-refinement.md` and, when relevant, `feature-spec.md`.
+- Use entity-model thinking selectively to improve domain terms, data requirements, relationships, validation, and invariants when the feature is data-rich or lifecycle-heavy.
+- Do not introduce separate mandatory user-facing artifacts such as standalone requirements catalogs, use-case documents, or entity-model files unless the repository workflow is intentionally changed.
+- Optional diagrams should live inside an existing artifact when they clarify the behavior better than prose alone.
 
 ## Spec Maintenance Over Time
 
@@ -74,6 +95,12 @@ After creating or materially refining a new feature package, implementation shou
 - the user explicitly asked to proceed
 - the request clearly implies implementation now
 - the work is a trivial-change exemption
+
+Interpret intent conservatively:
+
+- Short product-language requests such as "I would like...", "please add...", "show a page...", "create a submenu...", or similar outcome-oriented phrasing count as raw feature intake by default, not as approval to skip spec refinement.
+- "Clearly implies implementation now" means the user has directly asked to build, implement, or proceed now, or the surrounding context makes immediate delivery unambiguous.
+- Even when implementation now is clearly requested, feature-like work must still create or update the governing feature package before code is written in that turn.
 
 Implementation may begin once scope, assumptions, constraints, affected surfaces, and acceptance criteria are explicit enough to implement safely.
 

@@ -27,6 +27,8 @@ A feature is done only when all applicable items below are satisfied.
 
 - code aligns with the approved spec
 - backend changes preserve portability where intended
+- Python backend entrypoints remain thin when practical, and non-trivial request models, helpers, route groups, or domain logic are extracted when one file would otherwise carry multiple responsibilities
+- oversized backend modules touched by the change were reorganized when needed instead of extending the monolith further
 - frontend changes reflect UX and accessibility expectations
 - configuration and infrastructure impacts are captured
 
@@ -40,6 +42,7 @@ A feature is done only when all applicable items below are satisfied.
 
 - repository documentation is updated
 - validation evidence is recorded
+- Python changes include at least one lightweight validation step such as import/syntax compilation, targeted tests, or repository-standard quality checks
 - residual risks are stated clearly
 
 ## Review

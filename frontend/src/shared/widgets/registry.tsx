@@ -68,6 +68,12 @@ export const widgetDefinitions: WidgetDefinition[] = [
     title: 'Yahoo Stock Trend',
     component: lazy(() => import('./YahooStockTrendWidget')),
   },
+  {
+    type: 'envstatus',
+    title: 'Environment Status',
+    component: lazy(() => import('./EnvStatusWidget')),
+    icon: <Cloud className="h-6 w-6 text-green-500" />,
+  },
 ];
 
 const widgetDefinitionMap = new Map(

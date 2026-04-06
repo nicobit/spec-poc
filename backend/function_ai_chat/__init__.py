@@ -263,6 +263,7 @@ async def ai_chat(req: Request, body: ChatRequest):
         "Use only the provided CATALOG data and tool results to answer. "
         "Do not invent data. Respond with JSON: {\"answer\": str, \"remediation\": [str], \"references\": [str]}. "
         "The value of the \"answer\" field MUST be a Markdown-formatted string — use headings, lists, and fenced code blocks (```)... when appropriate. "
+        "When a diagram would materially improve clarity, you may include a fenced ```mermaid code block inside the Markdown answer. "
         "Do not return HTML. Keep the JSON valid and return ONLY the JSON object in your final message. "
         "When listing environments or showing environment details, prefer the environment name (human-facing label) and avoid exposing internal id values — do not include an \"Environment ID\" column in user-facing listings." 
     )

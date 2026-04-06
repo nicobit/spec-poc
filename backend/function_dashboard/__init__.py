@@ -15,7 +15,7 @@ from shared.config.settings import (
     KEY_VAULT_CORE_URI,
 )
 from shared.services.secret_service import SecretService
-from shared.context import get_current_user
+from shared.context import get_current_user, get_user_id_from_claims
 import httpx
 import time
 
@@ -88,7 +88,10 @@ class DashboardData(BaseModel):
 async def get_dashboard_data(req: Request):
     try:
         user = await get_current_user(req)
-        data = get_dashboard_service().load_dashboard_data(user["oid"])
+        user_id = get_user_id_from_claims(user)
+        if not user_id:
+            raise ValueError("Authenticated user has no identifiable id")
+        data = get_dashboard_service().load_dashboard_data(user_id)
        
         return data
     except Exception as e:
@@ -100,9 +103,12 @@ async def get_dashboard_data(req: Request):
 async def save_dashboard_data(req:Request,dashboard_data: DashboardData):
     try:
         user = await get_current_user(req)
+        user_id = get_user_id_from_claims(user)
+        if not user_id:
+            raise ValueError("Authenticated user has no identifiable id")
         if not dashboard_data.tabs or len(dashboard_data.tabs) == 0:
             return Response(content="No data provided", status_code=400)
-        get_dashboard_service().save_dashboard_data(user["oid"], dashboard_data.tabs)
+        get_dashboard_service().save_dashboard_data(user_id, dashboard_data.tabs)
         
         return Response(content="Dashboard data saved successfully", status_code=200)
     except Exception as e:

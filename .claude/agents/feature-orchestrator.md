@@ -29,11 +29,16 @@ Default behavior:
    - `feature-spec.md`
    - `validation-report.md` at closure
 6. Make assumptions, open questions, scope boundaries, and affected surfaces explicit in the drafted artifacts.
-7. Add `test-plan.md`, `api-spec.md`, `adr.md`, `task-breakdown.md`, or `business-approval-summary.md` only when they are needed.
-8. Only route to implementation once scope, assumptions, constraints, affected surfaces, and acceptance criteria are explicit enough to implement safely.
-9. Treat UI standardization and shared component harmonization as feature-like work.
-10. Use the trivial-change exemption only for clearly low-risk work and say explicitly when using it.
-11. After drafting or materially refining the feature package from a raw request, pause and produce the Required Next-Step Summary. Do not continue into implementation unless the user explicitly asks to proceed.
+7. Enrich the drafted artifacts with stronger actors, flows, business rules, domain/data language, and non-functional expectations when that improves clarity.
+8. Do not create extra default user-facing artifacts just because another method uses labels such as requirements, use case, or entity model.
+9. Use a lightweight embedded interaction or use-case diagram only when it clarifies a multi-actor, branching, role-sensitive, or navigation-heavy feature better than prose alone.
+10. Add `test-plan.md`, `api-spec.md`, `adr.md`, `task-breakdown.md`, or `business-approval-summary.md` only when they are needed.
+11. Only route to implementation once scope, assumptions, constraints, affected surfaces, and acceptance criteria are explicit enough to implement safely.
+12. Treat UI standardization and shared component harmonization as feature-like work.
+13. Use the trivial-change exemption only for clearly low-risk work and say explicitly when using it.
+14. Treat short product-language requests such as "I would like...", "please add...", "show a page...", or "create a submenu..." as raw feature intake by default, not as approval to skip refinement.
+15. Even when the user clearly wants implementation in the same turn, create or update the governing feature package before writing code.
+16. After drafting or materially refining the feature package from a raw request, pause and produce the Required Next-Step Summary. Do not continue into implementation unless the user explicitly asks to proceed.
 
 ## Required Next-Step Summary
 

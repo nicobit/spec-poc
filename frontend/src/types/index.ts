@@ -10,8 +10,9 @@ export type WidgetType =
   | 'text'
   | 'timezone'
   | 'world'
-  | 'yahoostocktrend';
-export interface WidgetConfig { id: string; type: WidgetType; }
+  | 'yahoostocktrend'
+  | 'envstatus';
+export interface WidgetConfig { id: string; type: WidgetType; config?: any; }
 export interface TabConfig { id: string; name: string; widgets: WidgetConfig[]; layouts: Layouts; }
 
 const legacyWidgetTypeMap = {

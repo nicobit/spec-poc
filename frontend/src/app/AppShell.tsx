@@ -61,7 +61,9 @@ export default function AppShell() {
     if (!element || typeof ResizeObserver === 'undefined') return;
 
     const updateHeight = () => {
-      setTopbarHeight(element.getBoundingClientRect().height);
+      const h = element.getBoundingClientRect().height;
+      setTopbarHeight(h);
+      document.documentElement.style.setProperty('--topbar-height', `${h}px`);
     };
 
     updateHeight();

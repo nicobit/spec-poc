@@ -120,7 +120,7 @@ describe('EnvironmentDetailsPage', () => {
     expect(await screen.findByText('CLIENT01 - DEV')).toBeTruthy();
     expect(screen.getByText('CLIENT 1')).toBeTruthy();
     expect(await screen.findByText('Overview')).toBeTruthy();
-    expect(screen.getByText('Derived types')).toBeTruthy();
+    expect(screen.queryByText('Derived types')).toBeNull();
     expect(screen.getAllByText('Stages').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Azure services').length).toBeGreaterThan(0);
     expect(screen.queryByText('Additional settings')).toBeNull();
@@ -134,9 +134,9 @@ describe('EnvironmentDetailsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'View details' }));
     expect(screen.getByRole('button', { name: 'Hide details' }).getAttribute('aria-expanded')).toBe('true');
     expect(screen.getByText('sub-1 | rg-1 | sqlvm-01')).toBeTruthy();
-    expect(screen.getAllByText('Additional settings').length).toBeGreaterThan(0);
-    expect(screen.getByText('workspace')).toBeTruthy();
-    expect(screen.getByText('ops')).toBeTruthy();
+    expect(screen.queryByText('Additional settings')).toBeNull();
+    expect(screen.queryByText('workspace')).toBeNull();
+    expect(screen.queryByText('ops')).toBeNull();
     expect(screen.queryByText('Azure config')).toBeNull();
   });
 

@@ -36,25 +36,30 @@ When handling a request:
    - `feature-spec.md`
    - `validation-report.md` at closure
 7. Make assumptions, open questions, scope boundaries, and affected surfaces explicit in the drafted artifacts.
-8. Add `test-plan.md`, `api-spec.md`, `adr.md`, `task-breakdown.md`, or `business-approval-summary.md` only when they are needed:
+8. Enrich the drafted artifacts with stronger actors, flows, business rules, domain/data language, and non-functional expectations when that improves clarity.
+9. Do not create extra default user-facing artifacts just because another method uses labels such as requirements, use case, or entity model.
+10. Use a lightweight embedded interaction or use-case diagram only when it clarifies a multi-actor, branching, role-sensitive, or navigation-heavy feature better than prose alone.
+11. Add `test-plan.md`, `api-spec.md`, `adr.md`, `task-breakdown.md`, or `business-approval-summary.md` only when they are needed:
    - add `api-spec.md` when contracts, validation rules, compatibility expectations, or authorization behavior change materially
    - add `test-plan.md` when behavior is materially non-trivial, integration-heavy, role-sensitive, or edge-case-heavy
    - add `adr.md` only when a meaningful cross-cutting design decision should be recorded
    - add `task-breakdown.md` only when execution sequencing should be explicit
-9. Decide the active roles for this change.
-10. Sequence the work through the minimum necessary roles.
-11. Require outputs for each phase before moving on.
-12. Do not silently skip:
+12. Decide the active roles for this change.
+13. Sequence the work through the minimum necessary roles.
+14. Require outputs for each phase before moving on.
+15. Do not silently skip:
    - auth documentation updates
    - test-plan updates
    - traceability review
    - validation updates
-13. Keep the work scoped to the existing governing feature package when the same shipped feature is still materially evolving, and create a new package only when the new work is genuinely separate in scope, ownership, or user-facing capability.
-14. Use the trivial-change exemption only for clearly low-risk work and say explicitly when you are using it.
-15. Treat small bug fixes as eligible for the lighter path unless they materially change user-visible behavior, contracts, authorization, or durable architecture.
-16. For a raw feature request, producing implementation code before the minimum governing feature package exists is a workflow failure unless the user explicitly asked to proceed with implementation now.
-17. After drafting or materially refining the feature package from a raw request, pause and produce the Required Next-Step Summary. Do not continue into implementation unless the user explicitly asks to proceed.
-18. If a request extends an existing page, module, workflow, or shipped capability, treat updating the existing governing `FEAT-...` package as the default path and require a clear reason before creating a new package.
+16. Keep the work scoped to the existing governing feature package when the same shipped feature is still materially evolving, and create a new package only when the new work is genuinely separate in scope, ownership, or user-facing capability.
+17. Use the trivial-change exemption only for clearly low-risk work and say explicitly when you are using it.
+18. Treat small bug fixes as eligible for the lighter path unless they materially change user-visible behavior, contracts, authorization, or durable architecture.
+19. For a raw feature request, producing implementation code before the minimum governing feature package exists is a workflow failure unless the user explicitly asked to proceed with implementation now.
+20. Treat short product-language requests such as "I would like...", "please add...", "show a page...", or "create a submenu..." as raw feature intake by default, not as approval to skip refinement.
+21. Even when the user clearly wants implementation in the same turn, create or update the governing feature package before writing code.
+22. After drafting or materially refining the feature package from a raw request, pause and produce the Required Next-Step Summary. Do not continue into implementation unless the user explicitly asks to proceed.
+23. If a request extends an existing page, module, workflow, or shipped capability, treat updating the existing governing `FEAT-...` package as the default path and require a clear reason before creating a new package.
 
 ## Default Sequence
 

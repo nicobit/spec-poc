@@ -161,12 +161,14 @@ function EnvRow({ env, envIndex, sortedEnvs, canEdit, msalInstance, containerRef
                   icon={<ArrowUp className="h-4 w-4" />}
                   onClick={() => void handleMove(-1)}
                   disabled={reordering}
+                  iconOnly
                 />
                 <InventoryActionButton
                   label="Move down"
                   icon={<ArrowDown className="h-4 w-4" />}
                   onClick={() => void handleMove(1)}
                   disabled={reordering}
+                  iconOnly
                 />
               </div>
             ) : null}
@@ -237,13 +239,23 @@ function InventoryActionButton({
   onClick,
   disabled = false,
   destructive = false,
+  iconOnly = false,
 }: {
   label: string;
   icon: ReactNode;
   onClick?: () => void;
   disabled?: boolean;
   destructive?: boolean;
+  iconOnly?: boolean;
 }) {
+  const base = iconOnly
+    ? 'inline-flex items-center justify-center rounded-full p-2 transition disabled:cursor-not-allowed disabled:opacity-45'
+    : 'inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm transition disabled:cursor-not-allowed disabled:opacity-45';
+
+  const tone = destructive
+    ? 'text-red-300 hover:bg-red-500/10 hover:text-red-200'
+    : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]';
+
   return (
     <button
       type="button"
@@ -251,15 +263,10 @@ function InventoryActionButton({
       title={label}
       disabled={disabled}
       onClick={onClick}
-      className={[
-        'inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm transition disabled:cursor-not-allowed disabled:opacity-45',
-        destructive
-          ? 'text-red-300 hover:bg-red-500/10 hover:text-red-200'
-          : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]',
-      ].join(' ')}
+      className={[base, tone].join(' ')}
     >
       <span className="h-4 w-4">{icon}</span>
-      <span>{label}</span>
+      {!iconOnly ? <span>{label}</span> : null}
     </button>
   );
 }

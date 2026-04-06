@@ -8,6 +8,19 @@ interface MermaidDiagramProps {
   sx?: React.CSSProperties;
 }
 
+function normalizeMermaidChart(input: string) {
+  let normalized = input.replace(/\r\n/g, "\n").replace(/\\n/g, "\n").trim();
+
+  // AI-generated diagrams often collapse `subgraph`, node, and `end` tokens onto one line.
+  normalized = normalized.replace(
+    /^(\s*subgraph\b[^\n]*?)\s+([A-Za-z][\w-]*\s*(?:\[[^\]]*\]|\([^\)]*\)|\{[^}]*\}|>"[^"]*"))/gm,
+    "$1\n$2",
+  );
+  normalized = normalized.replace(/(\[[^\]]*\]|\([^\)]*\)|\{[^}]*\}|>"[^"]*")\s+(end)\b/gm, "$1\n$2");
+
+  return normalized;
+}
+
 const MermaidDiagram = ({ chart, sx }: MermaidDiagramProps) => {
   const chartRef = useRef<HTMLDivElement | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -25,33 +38,34 @@ const MermaidDiagram = ({ chart, sx }: MermaidDiagramProps) => {
       securityLevel: "loose",
     });
 
-    const formattedChart = chart.replace(/\\n/g, "\n");
+    const formattedChart = normalizeMermaidChart(chart);
 
-    try {
-      mermaid.parse(formattedChart);
-      mermaid
-        .render(diagramId, formattedChart)
-        .then(({ svg }) => {
-          if (chartRef.current) {
-            chartRef.current.innerHTML = svg;
+    const tryRender = async (source: string) => {
+      await mermaid.parse(source);
+      const { svg } = await mermaid.render(diagramId, source);
+      if (chartRef.current) {
+        chartRef.current.innerHTML = svg;
 
-            const svgElement = chartRef.current.querySelector("svg");
-            if (svgElement && sx) {
-              Object.assign(svgElement.style, sx);
-            }
-          }
-          setError(null);
-        })
-        .catch((renderError) => {
-          console.error("Render error:", renderError);
-          setError("Failed to render diagram.");
-          if (chartRef.current) chartRef.current.innerHTML = "";
-        });
-    } catch (parseError) {
-      console.error("Parse error:", parseError);
-      setError("Invalid Mermaid syntax.");
-      if (chartRef.current) chartRef.current.innerHTML = "";
-    }
+        const svgElement = chartRef.current.querySelector("svg");
+        if (svgElement && sx) {
+          Object.assign(svgElement.style, sx);
+        }
+      }
+      setError(null);
+    };
+
+    void tryRender(formattedChart).catch(async () => {
+      try {
+        // Retry once with explicit line breaks around common flowchart delimiters.
+        const retryChart = formattedChart
+          .replace(/\s+(subgraph\b)/g, "\n$1")
+          .replace(/\s+(end)\b/g, "\n$1");
+        await tryRender(retryChart);
+      } catch {
+        setError("Invalid Mermaid syntax.");
+        if (chartRef.current) chartRef.current.innerHTML = "";
+      }
+    });
   }, [chart, sx]);
 
   return (

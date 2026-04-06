@@ -21,14 +21,22 @@ Read these first:
 - use `delivery/governance/ai-working-contract.md` as the shared minimum behavior layer across Copilot, Codex, and Claude
 - treat a short high-level request as valid input for orchestration
 - start feature-like work with `agents/feature-orchestrator.md`, not with implementation
+- use `agents/enhancement-scout.md` only when the user asks for enhancement ideas, project review, or feature-gap discovery before spec drafting
 - classify the request as feature, UI standardization, backend or platform change, bug fix, docs-only, or trivial change
 - treat UI standardization, shared component adoption, and layout harmonization as feature-like work
 - start business-originated requests with Business Analyst behavior
 - refine requests into structured specifications
 - keep assumptions explicit
 - derive tests from acceptance criteria
+- search for an existing governing `specs/features/FEAT-.../` package before creating a new one for feature-like work
+- update the existing governing package by default when the request extends an existing page, module, workflow, or shipped capability
 - do not implement feature code from a raw request when the governing feature package is missing or stale
 - create or update the governing feature package under `specs/features/...` before implementation
+- treat short requests such as "I would like...", "add a page...", "show...", or "create a submenu..." as spec-intake by default, not as approval to jump directly to code
+- even when the user wants implementation in the same turn, create or update the governing feature package first and only then implement from that spec
+- enrich the existing core artifacts with stronger actors, flows, business rules, domain/data language, and non-functional expectations when that improves clarity
+- do not introduce extra default user-facing artifacts just because another method uses terms such as requirements, use case, or entity model
+- use a lightweight embedded interaction/use-case diagram only when it clarifies a multi-actor, branching, role-sensitive, or navigation-heavy feature better than prose alone
 - treat `delivery/workflows/agent-orchestration.md` as the default role sequence instead of inventing a new flow locally
 - treat `delivery/governance/definition-of-done.md` as the closure gate before considering the work complete
 - implement only after understanding scope and constraints
@@ -47,6 +55,7 @@ For a raw feature-like request, the default Claude path is: use `agents/feature-
 ## Claude-Specific Assets
 
 **Agents** (`agents/`):
+- `enhancement-scout.md` - optional pre-spec discovery of worthwhile feature opportunities and enhancements
 - `feature-orchestrator.md` — primary entrypoint for feature work
 - `role-routing.md` — decides which role to activate
 - Full role catalog in `agents/`

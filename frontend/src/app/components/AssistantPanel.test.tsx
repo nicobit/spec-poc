@@ -6,6 +6,10 @@ import { QueryContext, type Query } from '@/features/chat/contexts/QueryContext'
 
 import AssistantPanel from './AssistantPanel';
 
+vi.mock('@/features/chat/components/MermaidDiagram', () => ({
+  default: ({ chart }: { chart: string }) => <div data-testid="mermaid-diagram">{chart}</div>,
+}));
+
 vi.mock('@/contexts/ThemeContext', () => ({
   useTheme: () => ({ themeId: 'commerce' }),
 }));
@@ -18,6 +22,13 @@ function renderPanel(overrides?: Partial<React.ContextType<typeof QueryContext>>
     selectedIndex: null,
     selectQuery: vi.fn(),
     setQueries: vi.fn(),
+    resetSession: vi.fn(),
+    sessions: [],
+    activeSessionId: undefined,
+    loadSessions: vi.fn().mockResolvedValue(undefined),
+    loadSession: vi.fn().mockResolvedValue(undefined),
+    renameSession: vi.fn().mockResolvedValue(undefined),
+    deleteSession: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 
@@ -71,6 +82,13 @@ describe('AssistantPanel', () => {
           selectedIndex: null,
           selectQuery: vi.fn(),
           setQueries: vi.fn(),
+          resetSession: vi.fn(),
+          sessions: [],
+          activeSessionId: undefined,
+          loadSessions: vi.fn().mockResolvedValue(undefined),
+          loadSession: vi.fn().mockResolvedValue(undefined),
+          renameSession: vi.fn().mockResolvedValue(undefined),
+          deleteSession: vi.fn().mockResolvedValue(undefined),
         }}
       >
         <AssistantPanel
@@ -112,5 +130,23 @@ describe('AssistantPanel', () => {
     expect(screen.getByText('ai: why did sched fail')).toBeTruthy();
     expect(screen.getByText('Thinking...')).toBeTruthy();
     expect(screen.queryByText('No answer returned.')).toBeNull();
+  });
+
+  it('renders Mermaid fenced code blocks inline inside the assistant answer', () => {
+    renderPanel({
+      queries: [
+        {
+          query: 'ai: show deployment flow',
+          result: null,
+          answer: 'Here is the flow:\n\n```mermaid\ngraph TD\nA[Start] --> B[Deploy]\n```',
+          chartType: '',
+          error: null,
+          isPending: false,
+        },
+      ],
+    });
+
+    expect(screen.getByText('ai: show deployment flow')).toBeTruthy();
+    expect(screen.getByTestId('mermaid-diagram').textContent).toContain('graph TD\nA[Start] --> B[Deploy]');
   });
 });

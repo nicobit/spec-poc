@@ -8,6 +8,17 @@ REQUIRED_RESOURCE_ACTION_PROPERTIES = {
     "sql-managed-instance": ["managedInstanceName"],
     "synapse-sql-pool": ["workspaceName", "sqlPoolName"],
     "service-bus-message": ["namespace", "entityType", "entityName", "messageTemplate"],
+    # Azure Function App — start/stop via Azure Management API
+    "function-app": ["functionAppName"],
+    "azure-function": ["functionAppName"],
+    # App Service and Container Instance are supported but require no extra
+    # property validation beyond the shared subscriptionId / resourceGroup
+    "app-service": [],
+    "web-app": [],
+    "appservice": [],
+    "container-instance": [],
+    "containerinstance": [],
+    "aci": [],
 }
 
 
@@ -18,6 +29,13 @@ LEGACY_PROPERTY_ALIASES = {
         "entityName": ["queueOrTopic"],
         "messageTemplate": ["messageType"],
     },
+    # function-app: accept siteName as alias for functionAppName
+    "function-app": {"functionAppName": ["siteName", "webAppName"]},
+    "azure-function": {"functionAppName": ["siteName", "webAppName"]},
+    # App Service: accept top-level siteName / webAppName aliases into properties
+    "app-service": {"siteName": ["siteName", "webAppName"]},
+    "web-app": {"siteName": ["siteName", "webAppName"]},
+    "appservice": {"siteName": ["siteName", "webAppName"]},
 }
 
 
@@ -73,5 +91,11 @@ def describe_resource_action(action: Dict[str, Any]) -> str:
         entity_type = properties.get("entityType")
         entity_name = properties.get("entityName")
         return "/".join([value for value in (namespace, entity_type, entity_name) if value]) or normalized.get("id") or "service-bus-message"
+    if action_type in {"function-app", "azure-function"}:
+        return properties.get("functionAppName") or properties.get("siteName") or normalized.get("id") or "function-app"
+    if action_type in {"app-service", "web-app", "appservice"}:
+        return properties.get("siteName") or properties.get("webAppName") or normalized.get("id") or "app-service"
+    if action_type in {"container-instance", "containerinstance", "aci"}:
+        return properties.get("containerGroupName") or normalized.get("id") or "container-instance"
     return normalized.get("id") or str(action_type or "resource-action")
 

@@ -113,6 +113,57 @@ def list_failed_executions(since_days: int = 7, schedule_id: str | None = None, 
     return results[:limit]
 
 
+def list_executions_needing_verification(since_minutes: int = 60, limit: int = 200) -> List[Dict[str, Any]]:
+    """
+    Return executions requested within the last `since_minutes` that have at least one
+    resourceActionResults entry where `verificationPassed` is not True.
+    Works for both the in-memory store and Cosmos-backed store.
+    """
+    from datetime import datetime, timezone, timedelta
+
+    cutoff_dt = datetime.now(timezone.utc) - timedelta(minutes=since_minutes)
+    cutoff = cutoff_dt.isoformat()
+
+    results: List[Dict[str, Any]] = []
+    if COSMOS_CONN:
+        # Use a time-bounded query to limit items then filter in Python
+        try:
+            client = CosmosClient.from_connection_string(COSMOS_CONN)
+            db = client.get_database_client(COSMOS_DB)
+            container = db.get_container_client(COSMOS_STAGE_EXECUTION_CONTAINER)
+            query = "SELECT TOP @limit * FROM c WHERE c.requestedAt >= @cutoff ORDER BY c.requestedAt DESC"
+            params = [{"name": "@cutoff", "value": cutoff}, {"name": "@limit", "value": limit}]
+            items = list(container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
+        except Exception:
+            items = []
+        for item in items:
+            ras = item.get("resourceActionResults") or []
+            if any((r.get("verificationPassed") is not True) for r in ras):
+                results.append(item)
+    else:
+        # in-memory store
+        from copy import deepcopy
+
+        items = deepcopy(STAGE_EXECUTIONS)
+        items.sort(key=lambda item: item.get("requestedAt") or "", reverse=True)
+        for item in items:
+            ts = item.get("requestedAt")
+            if ts:
+                try:
+                    dt = datetime.fromisoformat(ts)
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=timezone.utc)
+                    if dt < cutoff_dt:
+                        continue
+                except Exception:
+                    pass
+            ras = item.get("resourceActionResults") or []
+            if any((r.get("verificationPassed") is not True) for r in ras):
+                results.append(item)
+
+    return results[:limit]
+
+
 class CosmosStageExecutionStore:
     def __init__(self):
         if not COSMOS_CONN:

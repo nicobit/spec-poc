@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import type { IPublicClientApplication } from '@azure/msal-browser';
 import { Layers, Server, Sparkles } from 'lucide-react';
 
 import { themeClasses } from '@/theme/themeClasses';
@@ -17,6 +18,7 @@ type Props = {
   saving: boolean;
   error: string | null;
   validationErrors: string[];
+  msalInstance: IPublicClientApplication;
   onNameChange: (value: string) => void;
   onClientChange: (value: string) => void;
   onClientIdChange?: (value: string) => void;
@@ -58,6 +60,7 @@ export default function EnvironmentEditorForm({
   clientOptions = [],
   stages,
   saving,
+  msalInstance,
   error,
   validationErrors,
   onNameChange,
@@ -68,12 +71,66 @@ export default function EnvironmentEditorForm({
   onSubmit,
 }: Props) {
   const [showSummary, setShowSummary] = useState(false);
+  const [stageBladeOpen, setStageBladeOpen] = useState(false);
+
+  // Reference to the portal container so we can compute its position once
+  // the width transition has started and then scroll the nearest scrollable
+  // viewport so the blade becomes visible. This is more robust than a fixed
+  // pixel scroll and works inside nested scrolling layouts.
+  const bladeRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!bladeRef.current) return;
+
+    let cancelled = false;
+
+    if (stageBladeOpen) {
+      // Wait for the width transition to begin so the portal has non-zero
+      // layout. 200ms is conservative relative to the 300ms CSS duration.
+      const t = setTimeout(() => {
+        if (cancelled || !bladeRef.current) return;
+
+        // Compute the blade's right edge relative to the document.
+        const bladeRect = bladeRef.current.getBoundingClientRect();
+        const bladeRight = bladeRect.left + bladeRect.width + window.scrollX;
+        const viewportRight = window.innerWidth + window.scrollX;
+
+        // If the blade's right edge is outside the viewport, scroll so it's visible.
+        if (bladeRight > viewportRight) {
+          const delta = bladeRight - viewportRight + 16; // small padding
+          window.scrollBy({ left: delta, behavior: 'smooth' });
+        }
+      }, 120);
+
+      return () => {
+        cancelled = true;
+        clearTimeout(t);
+      };
+    }
+
+    // When closing, try to scroll back left by the blade width so the main
+    // form becomes the primary view again. Use the blade width if available.
+    const closeWidth = bladeRef.current.offsetWidth || 680;
+    window.scrollBy({ left: -closeWidth, behavior: 'smooth' });
+  }, [stageBladeOpen]);
+
   const derivedTypes = deriveEnvironmentTypes(stages);
   const resourceCount = stages.reduce((count, stage) => count + (stage.resourceActions?.length || 0), 0);
   const actionLabel = mode === 'create' ? 'Create' : 'Save';
 
   return (
-    <div className="space-y-5">
+    <div className="relative flex items-start w-full">
+    {/* When the blade (sidebar) opens we split the area 50/50. When closed the
+        sidebar width is 0 so the main area remains full width. This keeps the
+        page width constant — the main area is responsively reduced to 50%.
+    */}
+    <div
+      className={
+        stageBladeOpen
+          ? 'w-1/2 flex-none space-y-5 transition-[width] duration-300'
+          : 'w-full flex-none space-y-5 transition-[width] duration-300'
+      }
+    >
       {error ? (
         <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
           {error}
@@ -219,7 +276,7 @@ export default function EnvironmentEditorForm({
       </section>
 
       <section className={`${themeClasses.formSection} rounded-3xl p-6`}>
-        <StageEditor stages={stages} onChange={onStagesChange} />
+        <StageEditor stages={stages} onChange={onStagesChange} msalInstance={msalInstance} onBladeOpenChange={setStageBladeOpen} />
       </section>
 
       <div className={`${themeClasses.formSection} sticky bottom-4 flex items-center justify-between rounded-3xl px-6 py-4`}>
@@ -245,6 +302,11 @@ export default function EnvironmentEditorForm({
           </button>
         </div>
       </div>
+    </div>
+    <div
+      id="stage-blade-portal"
+      className={`flex-none overflow-hidden transition-[width] duration-300 ${stageBladeOpen ? 'w-1/2' : 'w-0'}`}
+    />
     </div>
   );
 }

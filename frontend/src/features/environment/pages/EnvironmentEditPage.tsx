@@ -81,6 +81,7 @@ export default function EnvironmentEditPage() {
         saving={saving}
         error={error}
         validationErrors={validationErrors}
+        msalInstance={instance}
         onNameChange={setName}
         onClientChange={setClient}
         onClientIdChange={setClientId}

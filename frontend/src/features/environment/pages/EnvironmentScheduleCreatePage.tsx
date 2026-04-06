@@ -4,13 +4,14 @@ import { useMsal } from '@azure/msal-react';
 import { CalendarClock, Clock3, Mail, ShieldAlert } from 'lucide-react';
 import { enqueueSnackbar } from 'notistack';
 
-import { type EnvInstance, createSchedule, listEnvironments } from '../api';
+import { type EnvInstance, createSchedule, listEnvironments, listSchedules, updateSchedule } from '../api';
 import EnvironmentPageLayout from '../components/EnvironmentPageLayout';
 import {
   DEFAULT_SCHEDULE_BUILDER,
   type DayOfWeek,
   cronFromBuilder,
   describeSchedule,
+  parseCronToBuilder,
 } from '../scheduleRecurrence';
 import { themeClasses } from '@/theme/themeClasses';
 
@@ -58,6 +59,8 @@ export default function EnvironmentScheduleCreatePage() {
   const [scheduleForm, setScheduleForm] = useState(emptySchedule);
   const [scheduleBuilder, setScheduleBuilder] = useState(DEFAULT_SCHEDULE_BUILDER);
   const [saving, setSaving] = useState(false);
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -208,6 +211,49 @@ export default function EnvironmentScheduleCreatePage() {
     setSearchParams(params, { replace: true });
   }, [selectedClient, selectedEnv, selectedStage, setSearchParams]);
 
+  useEffect(() => {
+    const scheduleId = searchParams.get('scheduleId');
+    if (!scheduleId) return;
+    setEditingScheduleId(scheduleId);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!editingScheduleId) return;
+    let mounted = true;
+    void (async () => {
+      try {
+        const schedules = await listSchedules(instance);
+        if (!mounted) return;
+        const match = schedules.find((s) => s.id === editingScheduleId) ?? null;
+        if (!match) {
+          enqueueSnackbar('Unable to find schedule to edit', { variant: 'warning' });
+          return;
+        }
+        setIsEditing(true);
+        setSelectedClient(match.client_id || match.client || null);
+        setSelectedEnvId(match.environment_id || null);
+        setSelectedStageId(match.stage_id || null);
+        setScheduleForm((state) => ({
+          ...state,
+          action: match.action || state.action,
+          timezone: match.timezone || state.timezone,
+          notifyBeforeMinutes: String(match.notify_before_minutes ?? state.notifyBeforeMinutes),
+          notificationGroupName: match.notification_groups?.[0]?.name || state.notificationGroupName,
+          notificationRecipients: match.notification_groups?.[0]?.recipients?.join(', ') || state.notificationRecipients,
+          postponeMinutes: String(match.postponement_policy?.maxPostponeMinutes ?? state.postponeMinutes),
+          maxPostponements: String(match.postponement_policy?.maxPostponements ?? state.maxPostponements),
+        }));
+        const parsed = parseCronToBuilder(match.cron || match.cron);
+        if (parsed) setScheduleBuilder(parsed);
+      } catch (err) {
+        enqueueSnackbar('Failed to load schedule for editing', { variant: 'error' });
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [editingScheduleId, instance]);
+
   const recipientCount = (selectedStage?.notificationGroups || []).reduce(
     (count, group) => count + (group.recipients?.length || 0),
     0,
@@ -236,7 +282,7 @@ export default function EnvironmentScheduleCreatePage() {
 
     setSaving(true);
     try {
-      await createSchedule(instance, {
+      const payload = {
         environment_id: selectedEnv.id,
         environment: selectedEnv.name,
         client: selectedEnv.client,
@@ -261,8 +307,15 @@ export default function EnvironmentScheduleCreatePage() {
           maxPostponeMinutes: Number(scheduleForm.postponeMinutes || 30),
           maxPostponements: Number(scheduleForm.maxPostponements || 1),
         },
-      });
-      enqueueSnackbar('Schedule created', { variant: 'success' });
+      } as Partial<any>;
+
+      if (isEditing && editingScheduleId) {
+        await updateSchedule(instance, editingScheduleId, payload);
+        enqueueSnackbar('Schedule updated', { variant: 'success' });
+      } else {
+        await createSchedule(instance, payload);
+        enqueueSnackbar('Schedule created', { variant: 'success' });
+      }
       handleCancel();
     } catch (error) {
       enqueueSnackbar(error instanceof Error ? error.message : 'Failed to create schedule', { variant: 'error' });
@@ -273,7 +326,7 @@ export default function EnvironmentScheduleCreatePage() {
 
   return (
     <EnvironmentPageLayout
-      title="Create schedule"
+      title={isEditing ? 'Edit schedule' : 'Create schedule'}
       description="Define timing, notifications, and postponement for a selected stage."
     >
       {loadError ? (
@@ -529,7 +582,7 @@ export default function EnvironmentScheduleCreatePage() {
               className={`${themeClasses.buttonPrimary} inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm disabled:opacity-60`}
             >
               <CalendarClock className="h-4 w-4" />
-              {saving ? 'Creating...' : 'Create schedule'}
+              {saving ? (isEditing ? 'Saving...' : 'Creating...') : isEditing ? 'Save changes' : 'Create schedule'}
             </button>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMsal } from '@azure/msal-react';
 import { createEnvironment } from '../api';
@@ -6,7 +6,6 @@ import EnvironmentEditorForm from '../components/EnvironmentEditorForm';
 import EnvironmentPageLayout from '../components/EnvironmentPageLayout';
 import type { EnvironmentStage } from '../api';
 import { listClients, type ClientRecord } from '@/features/clients/api';
-import { useEffect } from 'react';
 
 export default function EnvironmentCreatePage() {
   const { instance } = useMsal();
@@ -19,7 +18,6 @@ export default function EnvironmentCreatePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
-  
 
   useEffect(() => {
     let mounted = true;
@@ -69,6 +67,7 @@ export default function EnvironmentCreatePage() {
         saving={saving}
         error={error}
         validationErrors={validationErrors}
+        msalInstance={instance}
         onNameChange={setName}
         onClientChange={setClient}
         onClientIdChange={setClientId}
@@ -76,7 +75,6 @@ export default function EnvironmentCreatePage() {
         onCancel={() => navigate('/environment')}
         onSubmit={onSave}
       />
-      
     </EnvironmentPageLayout>
   );
 }

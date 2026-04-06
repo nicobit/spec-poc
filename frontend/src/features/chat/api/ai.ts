@@ -3,6 +3,7 @@ import { apiUrl, authFetch, getJson } from '@/shared/api/client';
 
 export interface AiChatResponse {
   answer: string;
+  mermaid?: string;
   remediation?: string[];
   references?: Array<{ type: string; id?: string; snippet?: string }>;
   session_id: string;

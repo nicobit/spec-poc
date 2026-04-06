@@ -15,6 +15,9 @@ from shared.service_bus_executor import execute_service_bus_message
 from shared.sql_managed_instance_executor import execute_sql_managed_instance_action
 from shared.sql_vm_executor import execute_sql_vm_lifecycle_action
 from shared.synapse_sql_pool_executor import execute_synapse_sql_pool_action
+from shared.app_service_executor import execute_app_service_action
+from shared.container_instance_executor import execute_container_instance_action
+from shared.azure_function_app_executor import execute_function_app_action
 
 
 ENV_API_URL = os.environ.get("ENV_API_URL", "http://localhost:7071/api/environments")
@@ -43,7 +46,15 @@ def _save_execution(record: dict, **updates):
 
 
 def _load_stage_details(environment_id: str, stage_id: str | None, stage_label: str | None):
-    resp = requests.get(f"{ENV_API_URL}/{environment_id}", timeout=10)
+    try:
+        resp = requests.get(f"{ENV_API_URL}/{environment_id}", timeout=10)
+    except requests.exceptions.ConnectionError as conn_exc:
+        raise ValueError(f"Cannot reach environment API at {ENV_API_URL}: {conn_exc}") from conn_exc
+    if resp.status_code == 404:
+        raise ValueError(
+            f"Environment '{environment_id}' not found. "
+            "It may have been deleted or the schedule references a stale ID."
+        )
     resp.raise_for_status()
     environment = resp.json()
     stages = environment.get("stages") or []
@@ -57,7 +68,11 @@ def _load_stage_details(environment_id: str, stage_id: str | None, stage_label: 
             None,
         )
     if not resolved_stage:
-        raise ValueError("Stage not found for execution")
+        stage_ref = stage_id or stage_label or "unknown"
+        raise ValueError(
+            f"Stage '{stage_ref}' not found in environment '{environment_id}'. "
+            "The stage may have been removed or renamed."
+        )
     return environment, resolved_stage
 
 
@@ -318,6 +333,96 @@ def process_item(item: dict):
                     "errorCode": "service_bus_dispatch_failed",
                 }
 
+        # App Service actions (start/stop web apps)
+        app_service_actions = [a for a in resource_actions if a.get("type") in {"app-service", "web-app", "appservice"}]
+        for action_item in app_service_actions:
+            action_result = resource_results_by_id.get(action_item.get("id")) or {}
+            started_at = _utc_now_iso_z()
+            try:
+                lifecycle = execute_app_service_action(action_item, execution)
+                resource_results_by_id[action_item.get("id")] = {
+                    **action_result,
+                    "status": "succeeded",
+                    "startedAt": started_at,
+                    "completedAt": _utc_now_iso_z(),
+                    "message": lifecycle.get("message"),
+                    "resourceIdentifier": lifecycle.get("siteName") or action_result.get("resourceIdentifier"),
+                    "verificationPassed": lifecycle.get("verificationPassed"),
+                    "verifiedState": lifecycle.get("verifiedState"),
+                    "verificationAttempts": lifecycle.get("verificationAttempts"),
+                    "verificationMessage": lifecycle.get("verificationMessage"),
+                    "errorCode": None,
+                }
+            except Exception as lifecycle_exc:
+                resource_results_by_id[action_item.get("id")] = {
+                    **action_result,
+                    "status": "failed",
+                    "startedAt": started_at,
+                    "completedAt": _utc_now_iso_z(),
+                    "message": str(lifecycle_exc),
+                    "errorCode": "app_service_execution_failed",
+                }
+
+        # Container Instance actions (start/stop container groups)
+        container_instance_actions = [a for a in resource_actions if a.get("type") in {"container-instance", "containerinstance", "aci"}]
+        for action_item in container_instance_actions:
+            action_result = resource_results_by_id.get(action_item.get("id")) or {}
+            started_at = _utc_now_iso_z()
+            try:
+                lifecycle = execute_container_instance_action(action_item, execution)
+                resource_results_by_id[action_item.get("id")] = {
+                    **action_result,
+                    "status": "succeeded",
+                    "startedAt": started_at,
+                    "completedAt": _utc_now_iso_z(),
+                    "message": lifecycle.get("message"),
+                    "resourceIdentifier": lifecycle.get("containerGroupName") or action_result.get("resourceIdentifier"),
+                    "verificationPassed": lifecycle.get("verificationPassed"),
+                    "verifiedState": lifecycle.get("verifiedState"),
+                    "verificationAttempts": lifecycle.get("verificationAttempts"),
+                    "verificationMessage": lifecycle.get("verificationMessage"),
+                    "errorCode": None,
+                }
+            except Exception as lifecycle_exc:
+                resource_results_by_id[action_item.get("id")] = {
+                    **action_result,
+                    "status": "failed",
+                    "startedAt": started_at,
+                    "completedAt": _utc_now_iso_z(),
+                    "message": str(lifecycle_exc),
+                    "errorCode": "container_instance_execution_failed",
+                }
+
+        # Azure Function App actions (start/stop function apps)
+        function_app_actions = [a for a in resource_actions if a.get("type") in {"function-app", "azure-function"}]
+        for action_item in function_app_actions:
+            action_result = resource_results_by_id.get(action_item.get("id")) or {}
+            started_at = _utc_now_iso_z()
+            try:
+                lifecycle = execute_function_app_action(action_item, execution)
+                resource_results_by_id[action_item.get("id")] = {
+                    **action_result,
+                    "status": "succeeded",
+                    "startedAt": started_at,
+                    "completedAt": _utc_now_iso_z(),
+                    "message": lifecycle.get("message"),
+                    "resourceIdentifier": lifecycle.get("functionAppName") or action_result.get("resourceIdentifier"),
+                    "verificationPassed": lifecycle.get("verificationPassed"),
+                    "verifiedState": lifecycle.get("verifiedState"),
+                    "verificationAttempts": lifecycle.get("verificationAttempts"),
+                    "verificationMessage": lifecycle.get("verificationMessage"),
+                    "errorCode": None,
+                }
+            except Exception as lifecycle_exc:
+                resource_results_by_id[action_item.get("id")] = {
+                    **action_result,
+                    "status": "failed",
+                    "startedAt": started_at,
+                    "completedAt": _utc_now_iso_z(),
+                    "message": str(lifecycle_exc),
+                    "errorCode": "function_app_execution_failed",
+                }
+
         delegated_error = None
         if delegated_actions:
             resp = requests.post(url, json=body, timeout=10)
@@ -388,6 +493,22 @@ def process_item(item: dict):
             stage_id or stage,
             final_status,
         )
+        # Only finalize stage status when the lifecycle action succeeded.
+        try:
+            if action in {"start", "stop"} and final_status == "succeeded":
+                desired = "running" if action == "start" else "stopped"
+                try:
+                    resp = requests.post(
+                        f"{ENV_API_URL}/{environment_id}/stages/{stage_id}/status",
+                        json={"status": desired},
+                        timeout=10,
+                    )
+                    resp.raise_for_status()
+                    logging.info("Set stage %s status to %s after verified execution", stage_id or stage, desired)
+                except Exception:
+                    logging.exception("Failed to set stage final status via control endpoint")
+        except Exception:
+            logging.exception("Error while attempting to finalize stage status")
     except Exception as exc:
         error_detail = str(exc)
         if "resp" in locals():

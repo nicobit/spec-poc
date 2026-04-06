@@ -6,6 +6,7 @@ import { AdminOnly } from '@/auth/useAuthZ';
 const DashboardPage = lazy(() => import('@/features/dashboard/pages/DashboardPage'));
 const LoginPage = lazy(() => import('@/pages/Login'));
 const SettingsPage = lazy(() => import('@/features/settings/pages/SettingsPage'));
+const AuditHistoryPage = lazy(() => import('@/features/admin/pages/AuditHistoryPage'));
 const EnvironmentPage = lazy(() => import('@/features/environment/pages/EnvironmentPage'));
 const ClientsPage = lazy(() => import('@/features/clients/pages/ClientsPage'));
 const ClientCreatePage = lazy(() => import('@/features/clients/pages/ClientCreatePage'));
@@ -17,6 +18,7 @@ const EnvironmentSchedulesPage = lazy(() => import('@/features/environment/pages
 const EnvironmentScheduleCreatePage = lazy(() => import('@/features/environment/pages/EnvironmentScheduleCreatePage'));
 const EnvironmentDetailsPage = lazy(() => import('@/features/environment/pages/EnvironmentDetailsPage'));
 const EnvironmentExecutionHistoryPage = lazy(() => import('@/features/environment/pages/EnvironmentExecutionHistoryPage'));
+const EnvironmentEventsPage = lazy(() => import('@/features/environment/pages/EnvironmentEventsPage'));
 const EnvironmentEditPage = lazy(() => import('@/features/environment/pages/EnvironmentEditPage'));
 const ChatPage = lazy(() => import('@/features/chat/pages/ChatPage'));
 const QuestionQueryExamplePage = lazy(() => import('@/features/examples/pages/QuestionQueryExamplePage'));
@@ -41,6 +43,7 @@ export const authenticatedRouteConfigs: AppRouteConfig[] = [
   { path: '/chat', component: ChatPage },
   { path: '/question', component: QuestionQueryExamplePage },
   { path: '/settings', component: SettingsPage, adminOnly: true },
+  { path: '/admin/audit', component: AuditHistoryPage, adminOnly: true },
   { path: '/environment', component: EnvironmentPage },
   { path: '/clients', component: ClientsPage },
   { path: '/clients/create', component: ClientCreatePage },
@@ -49,6 +52,7 @@ export const authenticatedRouteConfigs: AppRouteConfig[] = [
   { path: '/environment/manage', component: EnvironmentManagePage },
   { path: '/environment/edit/:id', component: EnvironmentEditPage },
   { path: '/environment/:id/executions', component: EnvironmentExecutionHistoryPage },
+  { path: '/environment/events', component: EnvironmentEventsPage },
   { path: '/environment/:id', component: EnvironmentDetailsPage },
   { path: '/environment/resources', component: EnvironmentResourcesPage },
   { path: '/environment/schedules', component: EnvironmentSchedulesPage },

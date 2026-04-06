@@ -76,10 +76,20 @@ class AppSettings(BaseSettings):
     dashboard_proxy_allowed_hosts: str = Field(default="", alias="DASHBOARD_PROXY_ALLOWED_HOSTS")
     dashboard_proxy_cache_ttl_seconds: int = Field(default=900, alias="DASHBOARD_PROXY_CACHE_TTL_SECONDS")
 
+    schedule_store_backend: str = Field(default="table", alias="SCHEDULE_STORE_BACKEND")
+    schedule_table_name: str = Field(default="schedules", alias="SCHEDULE_TABLE_NAME")
+    schedule_table_connection_string: Optional[str] = Field(default=None, alias="SCHEDULE_TABLE_CONNECTION_STRING")
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> AppSettings:
     settings = AppSettings()
+
+    # If AUDIENCE is not explicitly set, default to the API App ID URI
+    # derived from the configured client id. This keeps local config
+    # minimal while allowing explicit override when needed.
+    if not settings.audience and settings.azure_client_id:
+        settings.audience = f"api://{settings.azure_client_id}"
 
     if not settings.memory_search_service_endpoint_secret_name:
         settings.memory_search_service_endpoint_secret_name = settings.search_service_endpoint_secret_name

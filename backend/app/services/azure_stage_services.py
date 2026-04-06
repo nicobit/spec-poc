@@ -111,6 +111,7 @@ def _resource_action_to_service(ra: Dict[str, Any]) -> Dict[str, Any]:
         "region": ra.get("region") or ra.get("location"),
         "status": "Unknown",
         "resourceGroup": rg,
+        "subscriptionId": sub,
     }
 
 
@@ -189,28 +190,66 @@ def get_stage_services(stage_id: str, include_failures: bool = True, lookback_da
             }
 
         subscription_id = os.environ.get("AZURE_SUBSCRIPTION_ID")
+        # Fall back: extract subscription ID embedded in catalog service ARM resource IDs
+        # e.g. id = "/subscriptions/2cc2bc74-.../resourceGroups/ai-poc-rg"
+        if not subscription_id:
+            for _svc in services:
+                _sid = (_svc.get("id") or "").split("/")
+                if len(_sid) > 2 and _sid[1].lower() == "subscriptions" and _sid[2]:
+                    subscription_id = _sid[2]
+                    break
+            if not subscription_id:
+                for _svc in services:
+                    subscription_id = _svc.get("subscriptionId") or None
+                    if subscription_id:
+                        break
         if subscription_id:
             try:
-                cred = DefaultAzureCredential()
-                rm_client = ResourceManagementClient(cred, subscription_id)
+                from shared.azure_lookup import get_resource_statuses
 
-                # Try resource group lookup
-                rg_name = f"rg-{stage_id}"
-                try:
-                    for r in rm_client.resources.list_by_resource_group(rg_name):
-                        services.append({
-                            "type": r.type,
-                            "id": r.id,
-                            "name": r.name,
-                            "region": getattr(r, "location", None),
-                            "status": _safe_prop(r.properties if hasattr(r, 'properties') else {}, "provisioningState") or "Unknown",
-                        })
-                except Exception as exc:
-                    _log.debug("rg lookup failed for %s: %s", rg_name, exc)
+                # Step 1: enrich already-cataloged services with live status via
+                # type-specific SDK clients (App Service, VM, SQL MI, Synapse, etc.)
+                known_rgs = {svc.get("resourceGroup") for svc in services if svc.get("resourceGroup")}
+                for rg in known_rgs:
+                    rg_services = [s for s in services if s.get("resourceGroup") == rg]
+                    enriched = get_resource_statuses(subscription_id, rg, rg_services)
+                    # write enriched values back into the original list by index
+                    idx = 0
+                    for i, svc in enumerate(services):
+                        if svc.get("resourceGroup") == rg:
+                            services[i] = enriched[idx]
+                            idx += 1
 
-                # If no services found in rg, query subscription and match by tag or name
+                # Step 2: conventional rg-{stage_id} for undeclared resources.
+                conventional_rg = f"rg-{stage_id}"
+                if conventional_rg not in known_rgs:
+                    try:
+                        cred = DefaultAzureCredential()
+                        rm_client = ResourceManagementClient(cred, subscription_id)
+                        existing_ids = {s.get("id") for s in services if s.get("id")}
+                        discovered: List[Dict[str, Any]] = []
+                        for r in rm_client.resources.list_by_resource_group(conventional_rg):
+                            if r.id not in existing_ids:
+                                discovered.append({
+                                    "type": r.type or "",
+                                    "id": r.id,
+                                    "name": r.name or "",
+                                    "region": getattr(r, "location", None),
+                                    "status": "Unknown",
+                                    "resourceGroup": conventional_rg,
+                                })
+                        if discovered:
+                            enriched = get_resource_statuses(subscription_id, conventional_rg, discovered)
+                            services.extend(enriched)
+                    except Exception as exc:
+                        _log.debug("conventional rg scan failed for %s: %s", conventional_rg, exc)
+
+                # Step 3: subscription scan as a last resort.
                 if not services:
                     try:
+                        cred = DefaultAzureCredential()
+                        rm_client = ResourceManagementClient(cred, subscription_id)
+                        discovered_sub: List[Dict[str, Any]] = []
                         for r in rm_client.resources.list():
                             tags = getattr(r, "tags", None) or {}
                             name_matches = stage_id.lower() in (r.name or "").lower()
@@ -218,13 +257,25 @@ def get_stage_services(stage_id: str, include_failures: bool = True, lookback_da
                                 tags.get("stage") == stage_id or tags.get("stageId") == stage_id
                             )
                             if name_matches or tag_matches:
-                                services.append({
-                                    "type": r.type,
+                                rg_name = (r.id or "").split("/resourceGroups/")[-1].split("/")[0] if r.id else ""
+                                discovered_sub.append({
+                                    "type": r.type or "",
                                     "id": r.id,
-                                    "name": r.name,
+                                    "name": r.name or "",
                                     "region": getattr(r, "location", None),
-                                    "status": _safe_prop(r.properties if hasattr(r, 'properties') else {}, "provisioningState") or "Unknown",
+                                    "status": "Unknown",
+                                    "resourceGroup": rg_name,
                                 })
+                        # Enrich per-RG
+                        sub_by_rg: Dict[str, List[Dict[str, Any]]] = {}
+                        for svc in discovered_sub:
+                            sub_by_rg.setdefault(svc.get("resourceGroup", ""), []).append(svc)
+                        for rg_name, rg_svcs in sub_by_rg.items():
+                            if rg_name:
+                                enriched = get_resource_statuses(subscription_id, rg_name, rg_svcs)
+                                services.extend(enriched)
+                            else:
+                                services.extend(rg_svcs)
                     except Exception as exc:
                         _log.exception("subscription resource scan failed: %s", exc)
             except Exception as exc:

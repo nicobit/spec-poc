@@ -1,15 +1,31 @@
 import React from 'react';
-import { AlertTriangle, ChevronDown, ChevronRight, GripVertical, Info, Layers, Plus, Trash2 } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import type { IPublicClientApplication } from '@azure/msal-browser';
+import { AlertTriangle, ChevronDown, ChevronRight, GripVertical, Info, Layers, Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import { enqueueSnackbar } from 'notistack';
 
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { themeClasses } from '@/theme/themeClasses';
 
 import type { EnvironmentStage } from '../api';
+import {
+  listAzureSubscriptions,
+  listAzureResourceGroups,
+  listAzureSqlVms,
+  listAzureSqlManagedInstances,
+  listAzureSynapseWorkspaces,
+  listAzureSynapseSqlPools,
+  listAzureServiceBusNamespaces,
+  listAzureServiceBusEntities,
+  listAzureWebApps,
+  listAzureContainerGroups,
+} from '../api.azure-lookup';
 
 type Props = {
   stages: EnvironmentStage[];
   onChange: (stages: EnvironmentStage[]) => void;
+  msalInstance: IPublicClientApplication;
+  onBladeOpenChange?: (open: boolean) => void;
 };
 
 type ConfirmState = {
@@ -23,7 +39,7 @@ type ConfirmState = {
 function newStage(): EnvironmentStage {
   return {
     id: `stage-${Date.now().toString(36)}-${Math.floor(Math.random() * 1000)}`,
-    name: 'New stage',
+    name: '',
     status: 'stopped',
     resourceActions: [],
     notificationGroups: [],
@@ -80,6 +96,26 @@ function getResourceSummary(action: Record<string, any>) {
   }
 }
 
+  function getResourceActionLabel(action: Record<string, any>) {
+    if (!action) return '';
+    switch (action.type) {
+      case 'sql-vm':
+        return action.serverName || action.name || getResourceTypeLabel(action.type);
+      case 'sql-managed-instance':
+        return action.instanceName || action.name || getResourceTypeLabel(action.type);
+      case 'synapse-sql-pool':
+        return action.sqlPoolName || action.name || getResourceTypeLabel(action.type);
+      case 'service-bus-message':
+        return action.queueOrTopic || action.name || getResourceTypeLabel(action.type);
+      case 'app-service':
+        return action.siteName || action.name || getResourceTypeLabel(action.type);
+      case 'container-instance':
+        return action.containerGroupName || action.name || getResourceTypeLabel(action.type);
+      default:
+        return action.name || getResourceTypeLabel(action.type);
+    }
+  }
+
 function isResourceIncomplete(action: Record<string, any>) {
   switch (action.type) {
     case 'sql-vm':
@@ -128,29 +164,54 @@ function EmptyServicesNotice({ compact = false }: { compact?: boolean }) {
   );
 }
 
-export default function StageEditor({ stages, onChange }: Props) {
+export default function StageEditor({ stages, onChange, msalInstance, onBladeOpenChange }: Props) {
   const [openStageId, setOpenStageId] = React.useState<string | null>(null);
+  const [draft, setDraft] = React.useState<EnvironmentStage | null>(null);
   const [confirmState, setConfirmState] = React.useState<ConfirmState>({ open: false });
 
   React.useEffect(() => {
-    if (stages.length === 0) {
-      setOpenStageId(null);
-      return;
-    }
-    if (openStageId && stages.some((stage) => stage.id === openStageId)) {
-      return;
-    }
+    if (openStageId === null) return;
+    if (stages.some((s) => s.id === openStageId)) return;
     setOpenStageId(null);
+    setDraft(null);
+    onBladeOpenChange?.(false);
   }, [stages, openStageId]);
 
   const updateStage = (index: number, patch: Partial<EnvironmentStage>) => {
     onChange(stages.map((stage, stageIndex) => (stageIndex === index ? { ...stage, ...patch } : stage)));
   };
 
+  const openStage = (id: string) => {
+    const found = stages.find((s) => s.id === id);
+    if (found) {
+      setDraft({ ...found });
+      setOpenStageId(id);
+      onBladeOpenChange?.(true);
+    }
+  };
+
+  const closeBladeCancelling = () => {
+    setDraft(null);
+    setOpenStageId(null);
+    onBladeOpenChange?.(false);
+  };
+
+  const saveAndCloseBlade = () => {
+    if (draft) {
+      const idx = stages.findIndex((s) => s.id === openStageId);
+      if (idx >= 0) updateStage(idx, draft);
+    }
+    setDraft(null);
+    setOpenStageId(null);
+    onBladeOpenChange?.(false);
+  };
+
   const addStage = () => {
     const stage = newStage();
+    setDraft({ ...stage });
     setOpenStageId(stage.id);
     onChange([...stages, stage]);
+    onBladeOpenChange?.(true);
   };
 
   const removeStage = (index: number) => {
@@ -193,7 +254,19 @@ export default function StageEditor({ stages, onChange }: Props) {
     });
   };
 
+  const activeIndex = stages.findIndex((s) => s.id === openStageId);
+
+  React.useEffect(() => {
+    if (!openStageId) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setDraft(null); setOpenStageId(null); onBladeOpenChange?.(false); }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [openStageId]);
+
   return (
+    <>
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -211,132 +284,78 @@ export default function StageEditor({ stages, onChange }: Props) {
         </button>
       </div>
 
-      {stages.length === 0 ? (
-        <div className={`${themeClasses.emptyState} rounded-3xl px-5 py-10 text-center`}>
-          <div className="text-base font-medium text-[var(--text-primary)]">No stages yet</div>
-          <p className={`${themeClasses.helperText} mt-2`}>
-            Add a stage to start defining the Azure services used by this environment.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {stages.map((stage, index) => {
-            const incompleteCount = stage.resourceActions.filter((resourceAction) => isResourceIncomplete(resourceAction)).length;
+      <div className="space-y-3">
+        {stages.length === 0 ? (
+          <div className={`${themeClasses.emptyState} rounded-3xl px-5 py-10 text-center`}>
+            <div className="text-base font-medium text-[var(--text-primary)]">No stages yet</div>
+            <p className={`${themeClasses.helperText} mt-2`}>
+              Add a stage to start defining the Azure services used by this environment.
+            </p>
+          </div>
+        ) : (
+          stages.map((stage, index) => {
+            const incompleteCount = stage.resourceActions.filter((ra) => isResourceIncomplete(ra)).length;
+            const isActive = stage.id === openStageId;
 
             return (
-            <article
-              key={stage.id}
-              className={`rounded-3xl p-5 transition-all duration-200 ${
-                openStageId === stage.id
-                  ? `${themeClasses.stageCardAccent} shadow-[0_18px_36px_color-mix(in_srgb,var(--accent-primary)_10%,transparent)]`
-                  : `${themeClasses.stageCard} opacity-90`
-              }`}
-            >
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[var(--surface-subsection)] text-[var(--text-secondary)]">
-                      <GripVertical className="h-4 w-4" />
-                    </span>
-                    <div>
-                      <div className={themeClasses.sectionEyebrow}>Stage {index + 1}</div>
-                      <div className="mt-1 text-base font-semibold text-[var(--text-primary)]">
-                        {stage.name?.trim() || `Stage ${index + 1}`}
+              <article
+                key={stage.id}
+                role="button"
+                tabIndex={0}
+                aria-pressed={isActive}
+                className={`cursor-pointer rounded-3xl p-5 transition-all duration-200 ${
+                  isActive
+                    ? `${themeClasses.stageCardAccent} shadow-[0_18px_36px_color-mix(in_srgb,var(--accent-primary)_10%,transparent)]`
+                    : `${themeClasses.stageCard} opacity-90`
+                }`}
+                onClick={() => { if (stage.id === openStageId) { closeBladeCancelling(); } else { openStage(stage.id); } }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') { if (stage.id === openStageId) { closeBladeCancelling(); } else { openStage(stage.id); } }
+                }}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[var(--surface-subsection)] text-[var(--text-secondary)]">
+                        <GripVertical className="h-4 w-4" />
+                      </span>
+                      <div>
+                        <div className={themeClasses.sectionEyebrow}>Stage {index + 1}</div>
+                        <div className="mt-1 text-base font-semibold text-[var(--text-primary)]">
+                          {stage.name?.trim() || <span className="italic text-[var(--text-secondary)]">Unnamed stage</span>}
+                        </div>
                       </div>
                     </div>
+                    <StageSummary stage={stage} />
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {stage.resourceActions.length > 0 ? (
+                        <>
+                          {Array.from(new Set(stage.resourceActions.map((ra) => getResourceActionLabel(ra)))).map((label) => (
+                            <span key={label} className="rounded-full bg-[var(--surface-elevated)] px-2.5 py-1 text-xs text-[var(--text-secondary)]">
+                              {label}
+                            </span>
+                          ))}
+                          {incompleteCount > 0 ? <WarningChip>{incompleteCount} incomplete</WarningChip> : null}
+                        </>
+                      ) : (
+                        <EmptyServicesNotice compact />
+                      )}
+                    </div>
                   </div>
-                  <StageSummary stage={stage} />
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {stage.resourceActions.length > 0 ? (
-                      <>
-                        {Array.from(new Set(stage.resourceActions.map((resourceAction) => getResourceTypeLabel(resourceAction.type)))).map((type) => (
-                          <span
-                            key={type}
-                            className="rounded-full bg-[var(--surface-elevated)] px-2.5 py-1 text-xs text-[var(--text-secondary)]"
-                          >
-                            {type}
-                          </span>
-                        ))}
-                        {incompleteCount > 0 ? (
-                          <WarningChip>{incompleteCount} incomplete</WarningChip>
-                        ) : null}
-                      </>
-                    ) : (
-                      <EmptyServicesNotice compact />
-                    )}
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className={`${themeClasses.buttonSecondary} inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm`}
-                    aria-expanded={openStageId === stage.id}
-                    aria-controls={`stage-editor-details-${stage.id}`}
-                    onClick={() => setOpenStageId((current) => (current === stage.id ? null : stage.id))}
-                  >
-                    {openStageId === stage.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                    {openStageId === stage.id ? 'Hide details' : 'Edit stage details'}
-                  </button>
                   <button
                     aria-label="Remove stage"
                     className={`${themeClasses.buttonSecondary} inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm`}
-                    onClick={() => requestRemoveStage(stage, index)}
+                    onClick={(e) => { e.stopPropagation(); requestRemoveStage(stage, index); }}
                   >
                     <Trash2 className="h-4 w-4" />
                     Remove
                   </button>
                 </div>
-              </div>
-
-              {openStageId === stage.id ? (
-                <div
-                  id={`stage-editor-details-${stage.id}`}
-                  className="mt-5 rounded-2xl border border-[var(--border-stage-accent)] bg-[var(--surface-elevated)] p-5"
-                >
-                  <div className="mb-4 flex items-center justify-between gap-3">
-                    <div>
-                      <div className={themeClasses.sectionEyebrow}>Stage settings</div>
-                      <div className={`${themeClasses.helperText} mt-1`}>
-                        Update the stage name and manage the Azure services configured for this stage.
-                      </div>
-                      {incompleteCount > 0 ? (
-                        <div className="mt-3">
-                          <WarningChip>
-                            {incompleteCount} Azure service{incompleteCount === 1 ? '' : 's'} still need completion
-                          </WarningChip>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)]">
-                    <div>
-                      <FieldLabel>Stage name</FieldLabel>
-                      <input
-                        aria-label="Stage name"
-                        className={`${themeClasses.field} mt-1 w-full rounded-lg px-3 py-2 text-sm`}
-                        value={stage.name}
-                        onChange={(event) => updateStage(index, { name: event.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mt-5">
-                    <div className="mb-3 flex items-center gap-2">
-                      <Layers className="h-4 w-4 text-[var(--text-secondary)]" />
-                      <div className={themeClasses.fieldLabel}>Azure services</div>
-                    </div>
-                    <ResourceActionsEditor
-                      actions={stage.resourceActions || []}
-                      onChangeActions={(actions) => updateStage(index, { resourceActions: actions })}
-                    />
-                  </div>
-                </div>
-              ) : null}
-            </article>
+              </article>
             );
-          })}
-        </div>
-      )}
+          })
+        )}
+      </div>
 
       <ConfirmDialog
         open={confirmState.open}
@@ -351,15 +370,417 @@ export default function StageEditor({ stages, onChange }: Props) {
         onCancel={() => setConfirmState({ open: false })}
       />
     </div>
+    {draft !== null && activeIndex >= 0 ? createPortal(
+      <aside
+        className="stage-blade-enter w-full"
+        aria-label={`Edit stage ${activeIndex + 1}`}
+      >
+        <div
+          className={`${themeClasses.panel} flex flex-col overflow-hidden border-l border-[var(--border-subtle)] shadow-[-8px_0_32px_color-mix(in_srgb,var(--surface-app)_30%,transparent)]`}
+          style={{
+            position: 'sticky',
+            top: 'calc(var(--topbar-height, 80px) + 16px)',
+            height: 'calc(100vh - var(--topbar-height, 80px) - 32px)',
+          }}
+        >
+          <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-subtle)] px-6 py-4">
+            <div>
+              <div className={themeClasses.sectionEyebrow}>Stage {activeIndex + 1}</div>
+              <div className="mt-0.5 text-base font-semibold text-[var(--text-primary)]">
+                {draft.name?.trim() || <span className="italic text-[var(--text-secondary)]">Unnamed stage</span>}
+              </div>
+            </div>
+            <button
+              type="button"
+              aria-label="Close"
+              className={`${themeClasses.buttonSecondary} rounded-lg p-2`}
+              onClick={closeBladeCancelling}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto space-y-5 px-6 py-5">
+            <div>
+              <label className={`block ${themeClasses.fieldLabel}`}>Stage name</label>
+              <input
+                aria-label="Stage name"
+                autoFocus={draft.name === ''}
+                placeholder="e.g. Staging, Pre-prod, Production…"
+                className={`${themeClasses.field} mt-1 w-full rounded-lg px-3 py-2 text-sm`}
+                value={draft.name}
+                onChange={(e) => setDraft((d) => d ? { ...d, name: e.target.value } : d)}
+              />
+            </div>
+            <div>
+              <div className="mb-4 flex items-center gap-2">
+                <Layers className="h-4 w-4 text-[var(--text-secondary)]" />
+                <div className={themeClasses.sectionEyebrow}>Azure services</div>
+              </div>
+              <ResourceActionsEditor
+                actions={draft.resourceActions || []}
+                onChangeActions={(actions) => setDraft((d) => d ? { ...d, resourceActions: actions } : d)}
+                msalInstance={msalInstance}
+              />
+            </div>
+          </div>
+          <div className="shrink-0 flex items-center justify-between border-t border-[var(--border-subtle)] px-6 py-4">
+            <div className={themeClasses.helperText}>Stage {activeIndex + 1} of {stages.length}</div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className={`${themeClasses.buttonSecondary} rounded-lg px-4 py-2 text-sm`}
+                onClick={closeBladeCancelling}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={`${themeClasses.buttonPrimary} rounded-lg px-4 py-2 text-sm`}
+                onClick={saveAndCloseBlade}
+              >
+                Save stage
+              </button>
+            </div>
+          </div>
+        </div>
+      </aside>,
+      document.getElementById('stage-blade-portal') ?? document.body
+    ) : null}
+    </>
+  );
+}
+
+/**
+ * Text input + browse button. `resetKey` controls when the loaded options are
+ * discarded (e.g. pass the subscriptionId so the RG list clears when sub changes).
+ */
+function AzureLookupField({
+  label,
+  value,
+  onChange,
+  load,
+  resetKey = '',
+  placeholder,
+  ariaLabel,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  load: (() => Promise<{ value: string; label: string }[]>) | null;
+  resetKey?: string;
+  placeholder?: string;
+  ariaLabel?: string;
+}) {
+  const [options, setOptions] = React.useState<{ value: string; label: string }[] | null>(null);
+  const [browsing, setBrowsing] = React.useState(false);
+  const [browseError, setBrowseError] = React.useState<string | null>(null);
+  const [showSelect, setShowSelect] = React.useState(false);
+
+  React.useEffect(() => {
+    setOptions(null);
+    setShowSelect(false);
+    setBrowseError(null);
+  }, [resetKey]);
+
+  const browse = async () => {
+    if (!load) return;
+    setBrowsing(true);
+    setBrowseError(null);
+    try {
+      const data = await load();
+      setOptions(data);
+      setShowSelect(true);
+    } catch (err) {
+      setBrowseError(err instanceof Error ? err.message : 'Failed to load Azure resources');
+    } finally {
+      setBrowsing(false);
+    }
+  };
+
+  return (
+    <div>
+      <FieldLabel>{label}</FieldLabel>
+      <div className="mt-1 flex gap-2">
+        {showSelect && options !== null ? (
+          <select
+            aria-label={ariaLabel || label}
+            className={`${themeClasses.field} flex-1 rounded-lg px-3 py-2 text-sm`}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+          >
+            <option value="">Select…</option>
+            {options.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+            {value && !options.find((o) => o.value === value) ? (
+              <option value={value}>{value}</option>
+            ) : null}
+          </select>
+        ) : (
+          <input
+            aria-label={ariaLabel || label}
+            placeholder={placeholder}
+            className={`${themeClasses.field} flex-1 rounded-lg px-3 py-2 text-sm`}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+          />
+        )}
+        <button
+          type="button"
+          aria-label={showSelect ? `Edit ${label} manually` : `Browse ${label}`}
+          disabled={load === null || browsing}
+          title={
+            load === null
+              ? 'Fill in the fields above first'
+              : showSelect
+              ? 'Switch to manual input'
+              : 'Browse Azure resources'
+          }
+          className={`${themeClasses.buttonSecondary} inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg disabled:opacity-40`}
+          onClick={showSelect ? () => setShowSelect(false) : browse}
+        >
+          {browsing ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : showSelect ? (
+            <Pencil className="h-4 w-4" />
+          ) : (
+            <Search className="h-4 w-4" />
+          )}
+        </button>
+      </div>
+      {browseError ? (
+        <div className="mt-1 text-xs text-red-400">{browseError}</div>
+      ) : null}
+    </div>
+  );
+}
+
+function ResourceActionForm({
+  item,
+  onUpdate,
+  msalInstance,
+}: {
+  item: any;
+  onUpdate: (patch: Partial<any>) => void;
+  msalInstance: IPublicClientApplication;
+}) {
+  const sub: string = item.subscriptionId || '';
+  const rg: string = item.resourceGroup || '';
+  const ws: string = item.workspaceName || '';
+  const ns: string = item.namespace || '';
+
+  return (
+    <div className="mt-4 grid gap-4 lg:grid-cols-2">
+      <div className="lg:col-span-2">
+        <FieldLabel>Azure service type</FieldLabel>
+        <select
+          aria-label="Azure service type"
+          className={`${themeClasses.field} mt-1 w-full rounded-lg px-3 py-2 text-sm`}
+          value={item.type}
+          onChange={(e) => onUpdate({ type: e.target.value })}
+        >
+          <option value="sql-vm">SQL VM</option>
+          <option value="sql-managed-instance">SQL Managed Instance</option>
+          <option value="synapse-sql-pool">Synapse SQL Pool</option>
+          <option value="service-bus-message">Service Bus message</option>
+          <option value="app-service">App Service (Web App)</option>
+          <option value="container-instance">Container Instance (ACI)</option>
+        </select>
+      </div>
+
+      <div className="lg:col-span-2">
+        <AzureLookupField
+          label="Subscription ID"
+          value={sub}
+          onChange={(v) =>
+            onUpdate({ subscriptionId: v, resourceGroup: '', serverName: '', instanceName: '', workspaceName: '', sqlPoolName: '', namespace: '', queueOrTopic: '' })
+          }
+          load={() =>
+            listAzureSubscriptions(msalInstance).then((subs) =>
+              subs.map((s) => ({ value: s.subscriptionId, label: `${s.displayName} (${s.subscriptionId})` })),
+            )
+          }
+        />
+      </div>
+      <div className="lg:col-span-2">
+        <AzureLookupField
+          label="Resource group"
+          value={rg}
+          resetKey={sub}
+          onChange={(v) =>
+            onUpdate({ resourceGroup: v, serverName: '', instanceName: '', workspaceName: '', sqlPoolName: '', namespace: '', queueOrTopic: '' })
+          }
+          load={
+            sub
+              ? () => listAzureResourceGroups(msalInstance, sub).then((rgs) => rgs.map((r) => ({ value: r.name, label: r.name })))
+              : null
+          }
+        />
+      </div>
+
+      {item.type === 'sql-vm' ? (
+        <div className="lg:col-span-2">
+          <AzureLookupField
+            label="Server name"
+            value={item.serverName || ''}
+            resetKey={`${sub}|${rg}`}
+            onChange={(v) => onUpdate({ serverName: v })}
+            load={
+              sub && rg
+                ? () => listAzureSqlVms(msalInstance, sub, rg).then((vms) => vms.map((vm) => ({ value: vm.name, label: vm.name })))
+                : null
+            }
+          />
+        </div>
+      ) : null}
+
+      {item.type === 'sql-managed-instance' ? (
+        <div className="lg:col-span-2">
+          <AzureLookupField
+            label="Instance name"
+            value={item.instanceName || ''}
+            resetKey={`${sub}|${rg}`}
+            onChange={(v) => onUpdate({ instanceName: v })}
+            load={
+              sub && rg
+                ? () =>
+                    listAzureSqlManagedInstances(msalInstance, sub, rg).then((mis) =>
+                      mis.map((mi) => ({ value: mi.name, label: mi.name })),
+                    )
+                : null
+            }
+          />
+        </div>
+      ) : null}
+
+      {item.type === 'synapse-sql-pool' ? (
+        <>
+          <AzureLookupField
+            label="Workspace name"
+            value={ws}
+            resetKey={`${sub}|${rg}`}
+            onChange={(v) => onUpdate({ workspaceName: v, sqlPoolName: '' })}
+            load={
+              sub && rg
+                ? () =>
+                    listAzureSynapseWorkspaces(msalInstance, sub, rg).then((wss) =>
+                      wss.map((w) => ({ value: w.name, label: w.name })),
+                    )
+                : null
+            }
+          />
+          <AzureLookupField
+            label="SQL pool name"
+            value={item.sqlPoolName || ''}
+            resetKey={`${sub}|${rg}|${ws}`}
+            onChange={(v) => onUpdate({ sqlPoolName: v })}
+            load={
+              sub && rg && ws
+                ? () =>
+                    listAzureSynapseSqlPools(msalInstance, sub, rg, ws).then((pools) =>
+                      pools.map((p) => ({ value: p.name, label: p.name })),
+                    )
+                : null
+            }
+          />
+        </>
+      ) : null}
+
+      {item.type === 'service-bus-message' ? (
+        <>
+          <AzureLookupField
+            label="Service Bus namespace"
+            ariaLabel="Service Bus namespace"
+            value={ns}
+            resetKey={`${sub}|${rg}`}
+            onChange={(v) => onUpdate({ namespace: v, queueOrTopic: '' })}
+            load={
+              sub && rg
+                ? () =>
+                    listAzureServiceBusNamespaces(msalInstance, sub, rg).then((nss) =>
+                      nss.map((n) => ({ value: n.shortName, label: n.name })),
+                    )
+                : null
+            }
+          />
+          <div>
+            <FieldLabel>Message type</FieldLabel>
+            <select
+              aria-label="Message type"
+              className={`${themeClasses.field} mt-1 w-full rounded-lg px-3 py-2 text-sm`}
+              value={item.messageType || ''}
+              onChange={(e) => onUpdate({ messageType: e.target.value })}
+            >
+              <option value="">Any</option>
+              <option value="queue">Queue</option>
+              <option value="topic">Topic</option>
+            </select>
+          </div>
+          <div className="lg:col-span-2">
+            <AzureLookupField
+              label="Service Bus entity name"
+              ariaLabel="Service Bus entity name"
+              value={item.queueOrTopic || ''}
+              resetKey={`${sub}|${rg}|${ns}`}
+              onChange={(v) => onUpdate({ queueOrTopic: v })}
+              load={
+                sub && rg && ns
+                  ? () =>
+                      listAzureServiceBusEntities(msalInstance, sub, rg, ns).then((entities) =>
+                        entities
+                          .filter((e) => !item.messageType || e.entityType === item.messageType)
+                          .map((e) => ({ value: e.name, label: `${e.entityType}: ${e.name}` })),
+                      )
+                  : null
+              }
+            />
+          </div>
+        </>
+      ) : null}
+
+      {item.type === 'app-service' ? (
+        <div className="lg:col-span-2">
+          <AzureLookupField
+            label="Site name"
+            value={item.siteName || ''}
+            resetKey={`${sub}|${rg}`}
+            onChange={(v) => onUpdate({ siteName: v })}
+            load={
+              sub && rg
+                ? () => listAzureWebApps(msalInstance, sub, rg).then((apps) => apps.map((a) => ({ value: a.name, label: a.name })))
+                : null
+            }
+          />
+        </div>
+      ) : null}
+
+      {item.type === 'container-instance' ? (
+        <div className="lg:col-span-2">
+          <AzureLookupField
+            label="Container group name"
+            value={item.containerGroupName || ''}
+            resetKey={`${sub}|${rg}`}
+            onChange={(v) => onUpdate({ containerGroupName: v })}
+            load={
+              sub && rg
+                ? () => listAzureContainerGroups(msalInstance, sub, rg).then((g) => g.map((cg) => ({ value: cg.name, label: cg.name })))
+                : null
+            }
+          />
+        </div>
+      ) : null}
+    </div>
   );
 }
 
 function ResourceActionsEditor({
   actions,
   onChangeActions,
+  msalInstance,
 }: {
   actions: any[];
   onChangeActions: (actions: any[]) => void;
+  msalInstance: IPublicClientApplication;
 }) {
   const [local, setLocal] = React.useState(actions && actions.length ? actions : []);
   const [expanded, setExpanded] = React.useState<boolean[]>(() => (actions && actions.length ? actions.map(() => false) : []));
@@ -456,75 +877,12 @@ function ResourceActionsEditor({
           </div>
 
           {expanded[index] ? (
-            <div id={`azure-service-editor-${index}`} className="mt-4 grid gap-4 lg:grid-cols-2">
-              <div className="lg:col-span-2">
-                <FieldLabel>Azure service type</FieldLabel>
-                <select
-                  aria-label="Azure service type"
-                  className={`${themeClasses.field} mt-1 w-full rounded-lg px-3 py-2 text-sm`}
-                  value={item.type}
-                  onChange={(event) => update(index, { type: event.target.value })}
-                >
-                  <option value="sql-vm">SQL VM</option>
-                  <option value="sql-managed-instance">SQL Managed Instance</option>
-                  <option value="synapse-sql-pool">Synapse SQL Pool</option>
-                  <option value="service-bus-message">Service Bus message</option>
-                </select>
-              </div>
-
-              {item.type === 'sql-vm' ? (
-                <>
-                  <FormField label="Subscription ID" value={item.subscriptionId || ''} onChange={(value) => update(index, { subscriptionId: value })} />
-                  <FormField label="Resource group" value={item.resourceGroup || ''} onChange={(value) => update(index, { resourceGroup: value })} />
-                  <div className="lg:col-span-2">
-                    <FormField label="Server name" value={item.serverName || ''} onChange={(value) => update(index, { serverName: value })} />
-                  </div>
-                </>
-              ) : null}
-
-              {item.type === 'sql-managed-instance' ? (
-                <>
-                  <FormField label="Subscription ID" value={item.subscriptionId || ''} onChange={(value) => update(index, { subscriptionId: value })} />
-                  <FormField label="Resource group" value={item.resourceGroup || ''} onChange={(value) => update(index, { resourceGroup: value })} />
-                  <div className="lg:col-span-2">
-                    <FormField label="Instance name" value={item.instanceName || ''} onChange={(value) => update(index, { instanceName: value })} />
-                  </div>
-                </>
-              ) : null}
-
-              {item.type === 'synapse-sql-pool' ? (
-                <>
-                  <FormField label="Subscription ID" value={item.subscriptionId || ''} onChange={(value) => update(index, { subscriptionId: value })} />
-                  <FormField label="Workspace name" value={item.workspaceName || ''} onChange={(value) => update(index, { workspaceName: value })} />
-                  <div className="lg:col-span-2">
-                    <FormField label="SQL pool name" value={item.sqlPoolName || ''} onChange={(value) => update(index, { sqlPoolName: value })} />
-                  </div>
-                </>
-              ) : null}
-
-              {item.type === 'service-bus-message' ? (
-                <>
-                  <FormField
-                    label="Service Bus namespace"
-                    ariaLabel="Service Bus namespace"
-                    value={item.namespace || ''}
-                    onChange={(value) => update(index, { namespace: value })}
-                  />
-                  <FormField
-                    label="Message type"
-                    value={item.messageType || ''}
-                    onChange={(value) => update(index, { messageType: value })}
-                  />
-                  <div className="lg:col-span-2">
-                    <FormField
-                      label="Service Bus entity name"
-                      ariaLabel="Service Bus entity name"
-                      value={item.queueOrTopic || ''}
-                      onChange={(value) => update(index, { queueOrTopic: value })}
-                    />
-                  </div>
-                </>
-              ) : null}
+            <div id={`azure-service-editor-${index}`}>
+              <ResourceActionForm
+                item={item}
+                onUpdate={(patch) => update(index, patch)}
+                msalInstance={msalInstance}
+              />
             </div>
           ) : null}
         </section>

@@ -41,9 +41,10 @@ export function useAuthZ(instance: IPublicClientApplication) {
   }, [instance]);
 
   const roles = claims?.roles ?? [];
-  const isAdmin = roles.includes("Admin");
+  const normalizedRoles = Array.isArray(roles) ? roles.map(r => String(r).toLowerCase()) : [];
+  const isAdmin = normalizedRoles.includes("admin");
 
-  return { ready, token, claims, roles, isAdmin };
+  return { ready, token, claims, roles, normalizedRoles, isAdmin };
 }
 
 // Use this hook inside a React component instead of a standalone function

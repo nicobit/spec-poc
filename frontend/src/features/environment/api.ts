@@ -213,12 +213,12 @@ export async function startStage(
   msalInstance: IPublicClientApplication,
   envId: string,
   stageId: string,
+  force?: boolean,
 ): Promise<void> {
-  const res = await authFetch(
-    msalInstance,
-    apiUrl(`/environments/${encodeURIComponent(envId)}/stages/${encodeURIComponent(stageId)}/start`),
-    { method: 'POST' },
+  const url = apiUrl(
+    `/environments/${encodeURIComponent(envId)}/stages/${encodeURIComponent(stageId)}/start${force ? '?force=true' : ''}`,
   );
+  const res = await authFetch(msalInstance, url, { method: 'POST' });
   await ensureOk(res);
 }
 
@@ -226,12 +226,12 @@ export async function stopStage(
   msalInstance: IPublicClientApplication,
   envId: string,
   stageId: string,
+  force?: boolean,
 ): Promise<void> {
-  const res = await authFetch(
-    msalInstance,
-    apiUrl(`/environments/${encodeURIComponent(envId)}/stages/${encodeURIComponent(stageId)}/stop`),
-    { method: 'POST' },
+  const url = apiUrl(
+    `/environments/${encodeURIComponent(envId)}/stages/${encodeURIComponent(stageId)}/stop${force ? '?force=true' : ''}`,
   );
+  const res = await authFetch(msalInstance, url, { method: 'POST' });
   await ensureOk(res);
 }
 
@@ -370,4 +370,17 @@ export async function postponeSchedule(
 export async function deleteSchedule(msalInstance: IPublicClientApplication, id: string): Promise<void> {
   const res = await authFetch(msalInstance, apiUrl(`/environments/schedules/${encodeURIComponent(id)}`), { method: 'DELETE' });
   await ensureOk(res);
+}
+
+export async function updateSchedule(
+  msalInstance: IPublicClientApplication,
+  id: string,
+  payload: Partial<Schedule>,
+): Promise<Schedule> {
+  const res = await authFetch(msalInstance, apiUrl(`/environments/schedules/${encodeURIComponent(id)}`), {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+  const body = await getJson<{ updated: Schedule }>(res);
+  return body.updated;
 }

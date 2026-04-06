@@ -60,6 +60,13 @@ This catalog defines the main roles that may collaborate on spec-driven delivery
 
 ## Supporting Governance Roles
 
+### Enhancement Scout
+
+- optionally reviews the project for worthwhile feature opportunities, UX gaps, and enhancement candidates before formal spec drafting begins
+- produces lightweight, ranked recommendations grounded in repository context
+- identifies whether a recommendation likely extends an existing `FEAT-...` package
+- does not replace the normal spec-driven delivery flow once an opportunity is chosen
+
 ### Security Reviewer
 
 - reviews authentication, authorization, secrets handling, data exposure, and threat surfaces

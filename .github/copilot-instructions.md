@@ -33,6 +33,7 @@ This repository uses the following GitHub Copilot customization layers:
 
 Copilot custom agents live in:
 
+- `.github/agents/enhancement-scout.agent.md`
 - `.github/agents/feature-orchestrator.agent.md`
 - `.github/agents/business-analyst.agent.md`
 - `.github/agents/architect.agent.md`
@@ -81,17 +82,24 @@ The shared contract in [AI Working Contract](../delivery/governance/ai-working-c
 
 - Follow [AI Working Contract](../delivery/governance/ai-working-contract.md) for the minimum feature package, implementation-transition checkpoint, clarifying-question threshold, and trivial-change exemption.
 - Treat a short high-level request as valid input for orchestration.
+- Use `Enhancement Scout` only when the user asks for enhancement ideas, project review, or feature-gap discovery before formal spec drafting.
 - Start feature-like work with `Feature Orchestrator` or the feature-orchestration prompt, not with implementation.
 - Classify the request as feature, UI standardization, backend or platform change, bug fix, docs-only, or trivial change.
 - Treat UI standardization, shared component adoption, and layout harmonization as feature-like work.
 - If the request comes from a business user, start by refining it with the business request and spec refinement templates.
 - Do not jump directly from a raw request to code when a governing feature package is missing or stale.
 - For feature-like work, stop and create or update the feature package under `specs/features/FEAT-<area>-<id>-<short-name>/` before writing code.
+- Search for an existing governing `FEAT-...` package first and update it by default when the same shipped capability is still evolving.
 - If the user says "create a feature" or uses similar language without explicitly asking for implementation now, treat that as a spec-first request, not a coding request.
 - If the user says "add a feature" or "add a new feature" without explicitly asking for implementation now, treat that as a spec-first request, not a coding request.
+- If the user says "I would like...", "add a page...", "show...", or "create a submenu..." without clearly asking to implement now, treat that as spec-intake, not as approval to jump directly into coding.
 - When a raw feature request creates tension between "implement immediately" and "create or update the governing feature package first", the spec-first workflow wins.
 - If the request extends an existing page, module, workflow, or shipped capability, update the existing governing `FEAT-...` package by default unless the new work is clearly separate.
 - After creating or materially refining a new feature package, pause unless the user has asked to proceed or the request clearly implies implementation now.
+- Even when the user clearly wants implementation in the same turn, create or update the governing feature package first and only then implement from that spec.
+- Enrich the existing artifacts with stronger actors, flows, business rules, domain/data language, and non-functional expectations when that improves clarity.
+- Do not create extra default user-facing artifacts just because another method uses labels such as requirements, use case, or entity model.
+- Use a lightweight embedded interaction or use-case diagram only when it clarifies a multi-actor, branching, role-sensitive, or navigation-heavy feature better than prose alone.
 - Any implementation response should name the exact `feature-spec.md` and `test-plan.md` it is following.
 - Preserve links between requirements, acceptance criteria, tests, and implementation.
 - Update automated tests when behavior changes.

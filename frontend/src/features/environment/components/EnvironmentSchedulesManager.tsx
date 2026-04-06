@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { IPublicClientApplication } from '@azure/msal-browser';
-import { AlertTriangle, CalendarClock, CheckCircle2, Loader2, Plus, XCircle } from 'lucide-react';
+import { AlertTriangle, CalendarClock, CheckCircle2, Loader2, Plus, XCircle, Edit3, Trash2 } from 'lucide-react';
 import { enqueueSnackbar } from 'notistack';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
-import { type EnvInstance, type Schedule, type StageExecution, getEnvironment, listEnvironments, listSchedules, postponeSchedule } from '../api';
+import { type EnvInstance, type Schedule, type StageExecution, getEnvironment, listEnvironments, listSchedules, postponeSchedule, deleteSchedule } from '../api';
 import { themeClasses } from '@/theme/themeClasses';
 import { describeSchedule } from '../scheduleRecurrence';
 
@@ -30,6 +30,8 @@ export default function EnvironmentSchedulesManager({ instance: msalInstance, re
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
   const [selectedEnvId, setSelectedEnvId] = useState<string | null>(null);
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -463,23 +465,52 @@ export default function EnvironmentSchedulesManager({ instance: msalInstance, re
                       ) : null}
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void postponeSchedule(msalInstance, schedule.id, {
-                          postponeByMinutes: defaultPostponeMinutes,
-                          reason: 'Postponed from environment schedules UI',
-                        })
-                          .then((updated) =>
-                            setSchedules((current) => current.map((item) => (item.id === updated.id ? updated : item))),
+                    <div className="flex items-center gap-2 justify-end">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void postponeSchedule(msalInstance, schedule.id, {
+                            postponeByMinutes: defaultPostponeMinutes,
+                            reason: 'Postponed from environment schedules UI',
+                          })
+                            .then((updated) =>
+                              setSchedules((current) => current.map((item) => (item.id === updated.id ? updated : item))),
+                            )
+                            .then(() => enqueueSnackbar('Schedule postponed', { variant: 'success' }))
+                            .catch(() => enqueueSnackbar('Failed to postpone schedule', { variant: 'error' }))
+                        }
+                        className={`${themeClasses.buttonSecondary} inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm`}
+                      >
+                        <CalendarClock className="h-4 w-4" />
+                        Postpone {defaultPostponeMinutes}m
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          navigate(
+                            `/environment/schedules/create?clientId=${encodeURIComponent(
+                              selectedClient || '',
+                            )}&environmentId=${encodeURIComponent(selectedEnv?.id || '')}&stageId=${encodeURIComponent(
+                              selectedStage?.id || '',
+                            )}&scheduleId=${encodeURIComponent(schedule.id)}`,
                           )
-                          .then(() => enqueueSnackbar('Schedule postponed', { variant: 'success' }))
-                          .catch(() => enqueueSnackbar('Failed to postpone schedule', { variant: 'error' }))
-                      }
-                      className={`${themeClasses.buttonSecondary} rounded-lg px-3 py-1.5 text-sm`}
-                    >
-                      Postpone {defaultPostponeMinutes}m
-                    </button>
+                        }
+                        className={`${themeClasses.buttonSecondary} inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm`}
+                      >
+                        <Edit3 className="h-4 w-4" />
+                        Edit
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setDeleteConfirmId(schedule.id)}
+                        className={`${themeClasses.buttonDanger} inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -487,6 +518,46 @@ export default function EnvironmentSchedulesManager({ instance: msalInstance, re
           ) : null}
         </div>
       </section>
+
+        {deleteConfirmId ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setDeleteConfirmId(null)} />
+            <div className="relative z-10 w-full max-w-md rounded-2xl bg-[var(--surface-panel)] p-6">
+              <div className="text-lg font-semibold">Delete schedule?</div>
+              <div className="mt-2 text-sm text-[var(--text-secondary)]">This will permanently delete the schedule. Are you sure?</div>
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirmId(null)}
+                  className={`${themeClasses.buttonSecondary} rounded-lg px-3 py-1.5 text-sm`}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!deleteConfirmId) return;
+                    try {
+                      setDeleting(true);
+                      await deleteSchedule(msalInstance, deleteConfirmId);
+                      setSchedules((current) => current.filter((s) => s.id !== deleteConfirmId));
+                      enqueueSnackbar('Schedule deleted', { variant: 'success' });
+                    } catch (err) {
+                      enqueueSnackbar('Failed to delete schedule', { variant: 'error' });
+                    } finally {
+                      setDeleting(false);
+                      setDeleteConfirmId(null);
+                    }
+                  }}
+                  disabled={deleting}
+                  className={`${themeClasses.buttonDanger} rounded-lg px-3 py-1.5 text-sm`}
+                >
+                  {deleting ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
     </div>
   );
 }

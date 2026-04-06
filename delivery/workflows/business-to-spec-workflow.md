@@ -6,6 +6,8 @@ This workflow is for requests that start from a business user, product stakehold
 
 Turn a plain-language request into an implementation-ready specification without expecting the requester to describe technical design, APIs, architecture, or tests.
 
+An optional discovery-oriented step may happen before this workflow when the user asks for enhancement ideas, project improvement opportunities, or feature gap analysis. That discovery step is advisory only and does not replace the normal specification flow once an opportunity is selected.
+
 ## Core Principle
 
 Business users describe the problem and the desired outcome. The repository process translates that into delivery artifacts.
@@ -24,10 +26,13 @@ High-level requests are sufficient input to start this process. The business req
    - The refined request is transformed into the minimum governing artifact set.
    - Start with `business-request.md`, `spec-refinement.md`, and `feature-spec.md`.
    - Add `test-plan.md`, `api-spec.md`, `adr.md`, or `task-breakdown.md` only when they are needed.
+   - Enrich those artifacts with stronger actors, outcomes, flows, business rules, domain/data notes, and non-functional expectations when that improves clarity.
+   - Do not create extra default user-facing artifacts just because a supporting method uses labels such as requirements, use case, or entity model.
    - Initial acceptance criteria are produced.
 4. Business Review
    - The requester reviews the refined scope, expected behavior, and acceptance criteria.
    - Implementation does not begin until the business intent is confirmed.
+   - Treat short requests such as "I would like...", "add a page...", or "show all events..." as business intent input, not as implicit approval to skip refinement and start coding.
 5. Solution Design
    - Architect, UX, Test, Engineering, and DevOps roles derive their artifacts from the approved specification.
 6. Implementation And Validation
@@ -89,7 +94,22 @@ The Business Analyst should:
 
 1. restate the request in structured terms
 2. identify ambiguities and assumptions
-3. produce the first minimum artifact draft
+3. produce the first minimum artifact draft with enough structure to capture actors, outcomes, constraints, and main flows
 4. prepare the approval summary for the business requester
 
 Only after that should implementation roles begin work.
+
+Signals that do not, by themselves, authorize implementation:
+
+- "I would like..."
+- "Add a page for..."
+- "Show ..."
+- "Create a submenu ..."
+
+These phrases describe desired outcomes. They should trigger refinement first unless the requester also explicitly asks to implement now.
+
+## Optional Diagram Use
+
+When the request involves multiple actors, branching workflows, role-sensitive behavior, or navigation-heavy interaction, a lightweight embedded diagram may be added to the refinement or feature-spec artifact to improve understanding.
+
+Do not require diagrams for every request, and do not create a separate diagram artifact by default.

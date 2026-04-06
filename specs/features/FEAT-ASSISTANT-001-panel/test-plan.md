@@ -24,6 +24,8 @@ This plan covers the new shell-level assistant panel, its launch behavior, resiz
 - existing chat messages render inside the docked panel
 - loading state renders while a query is in progress
 - empty state renders appropriately before any conversation
+- assistant answers with fenced `mermaid` blocks render diagrams inline inside the panel
+- invalid Mermaid blocks show a graceful fallback instead of breaking the panel
 
 ### Composer
 

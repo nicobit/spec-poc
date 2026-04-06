@@ -26,6 +26,12 @@
 - Primary users:
 - Secondary users:
 
+## Domain Terms And Entities
+
+- Domain term 1:
+- Entity 1:
+- Relationship notes:
+
 ## User Journeys
 
 ### Journey 1
@@ -33,18 +39,34 @@
 - Trigger:
 - Main flow:
 - Alternate flows:
+- Failure flows:
+
+## Preconditions
+
+- Preconditions:
+
+## Postconditions
+
+- Success postconditions:
+- Failure postconditions:
 
 ## Functional Requirements
 
-| ID | Requirement |
-| --- | --- |
-| `REQ-...` | |
+| ID | Requirement | Priority |
+| --- | --- | --- |
+| `REQ-...` | | Must / Should / Could / Won't |
 
 ## Non-Functional Requirements
 
-| ID | Requirement |
+| ID | Category | Requirement |
+| --- | --- | --- |
+| `NFR-...` | | |
+
+## Business Rules And Invariants
+
+| ID | Rule |
 | --- | --- |
-| `NFR-...` | |
+| `BR-...` | |
 
 ## UX And Accessibility Notes
 
@@ -65,16 +87,33 @@
 - New or changed endpoints:
 - Contract compatibility notes:
 
+## Data Requirements
+
+| Entity | Operation | Fields / Notes |
+| --- | --- | --- |
+| | | |
+
+## State And Lifecycle Notes
+
+- State transition 1:
+- Lifecycle constraint 1:
+
 ## Edge Cases
 
 - Edge case 1:
 - Edge case 2:
 
+## Error, Empty, And Degraded States
+
+- Error state:
+- Empty state:
+- Degraded state:
+
 ## Acceptance Criteria
 
-| ID | Acceptance Criterion |
-| --- | --- |
-| `AC-...` | |
+| ID | Acceptance Criterion | Related Requirement | Postcondition |
+| --- | --- | --- | --- |
+| `AC-...` | | `REQ-...` | |
 
 ## Traceability Matrix
 

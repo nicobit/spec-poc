@@ -4,6 +4,15 @@ This document defines the recommended role sequence for turning a request into a
 
 ## Business-Originated Request Flow
 
+An optional pre-spec discovery step may happen before this flow:
+
+0. Enhancement Scout
+   - identifies worthwhile improvements, gaps, or enhancement candidates when the user asks for ideation or project review
+   - stays advisory only
+   - hands the selected opportunity into the normal Business Analyst -> specification flow
+
+This optional step is not part of the default mandatory delivery sequence.
+
 1. Business Analyst
    - refines the request
    - drafts the feature specification

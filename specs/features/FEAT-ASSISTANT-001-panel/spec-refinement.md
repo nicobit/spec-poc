@@ -24,6 +24,7 @@
 - Horizontal resize handle with drag interaction
 - Shell-aware content layout behavior while the panel is open
 - Embedded AI chat view inside the panel
+- Markdown answers that can render Mermaid diagram blocks inline inside the panel
 - Rounded chat composer with embedded action icon
 - Auto-growing textarea inside the composer
 - Theme-safe and keyboard-accessible behavior
@@ -36,6 +37,12 @@
 - Per-user saved panel presets beyond the basic remembered width/open state if implemented
 - Replacing the existing chat data model
 - Production push notifications or real-time collaborative chat
+
+## Content Rendering Direction
+
+- The docked assistant panel should render Markdown answers, including fenced ```mermaid code blocks, as part of the in-panel reading experience.
+- Mermaid support should not require a separate modal or route to view the first diagram in an answer.
+- If a Mermaid block is invalid, the panel should fail gracefully and continue rendering the rest of the assistant response.
 
 ## UX Decisions
 
@@ -82,3 +89,4 @@
 - Reuse the current chat feature UI/logic where practical, but reshape it to fit the new docked panel.
 - Keep the dedicated `/chat` route temporarily.
 - Treat this as a product-wide assistant surface, not a page-local widget.
+- Prefer inline Mermaid rendering from Markdown fenced blocks over introducing a new response contract field for the first panel release.

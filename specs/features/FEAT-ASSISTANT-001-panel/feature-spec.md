@@ -39,6 +39,8 @@ Introduce a shell-level AI assistant panel that is launched from the topbar and 
 - The panel must show message history and loading states.
 - The panel must support submitting new prompts from the composer.
 - The panel must support the same first-release chat capability as the existing dedicated chat route.
+- The panel must render Mermaid diagrams inline when an assistant answer includes fenced `mermaid` code blocks in Markdown.
+- Invalid Mermaid blocks must degrade gracefully without breaking the rest of the answer rendering.
 
 ### FR-5 Composer
 
@@ -83,3 +85,5 @@ Introduce a shell-level AI assistant panel that is launched from the topbar and 
 6. Message history and current prompt entry remain usable while the panel is open.
 7. The panel behaves consistently across route navigation inside the authenticated shell.
 8. The panel respects theme styling and accessible interaction basics.
+9. Assistant answers that include fenced `mermaid` code blocks render those diagrams inline inside the docked panel.
+10. Invalid Mermaid content does not crash the panel and leaves the surrounding answer readable.

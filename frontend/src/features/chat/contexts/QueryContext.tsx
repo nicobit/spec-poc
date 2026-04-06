@@ -254,7 +254,7 @@ export function QueryProvider({ children }: QueryProviderProps) {
           isPending: false,
           sql_query: undefined,
           execution_history: [],
-          mermaid: undefined,
+          mermaid: aiResp.mermaid,
           reasoning: aiResp.references ? JSON.stringify(aiResp.references, null, 2) : '',
         } as Query;
         replaceQueryEntry(queryId, entry);

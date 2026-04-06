@@ -1,23 +1,33 @@
 import React, { Suspense } from 'react';
-import { X } from 'lucide-react';
+import { X, Edit3 } from 'lucide-react';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 import { themeClasses } from '@/theme/themeClasses';
 import { getWidgetDefinition } from './registry';
 
 interface Props {
-  widget: { id: string; type: string };
+  widget: { id: string; type: string; config?: any };
   editMode: boolean;
   onRemove: () => void;
   layout: { i: string; x: number; y: number; w: number; h: number };
   onLayoutChange: (layout: { i: string; x: number; y: number; w: number; h: number }) => void;
+  onConfigChange?: (config: any) => void;
 }
 
-const WidgetWrapper: React.FC<Props> = ({ widget, editMode, onRemove, layout }) => {
+const WidgetWrapper: React.FC<Props> = ({ widget, editMode, onRemove, layout, onConfigChange }) => {
   const definition = getWidgetDefinition(widget.type);
   const Component = definition?.component;
   const title = definition?.title ?? widget.type;
   const icon = definition?.icon ?? null;
+  const editorOpenerRef = React.useRef<(() => void) | null>(null);
+  const [headerAction, setHeaderAction] = React.useState<(() => React.ReactNode) | null>(null);
+  const registerEditorOpener = React.useCallback((fn: () => void) => {
+    editorOpenerRef.current = fn;
+  }, []);
+
+  const registerHeaderAction = React.useCallback((fn: () => React.ReactNode) => {
+    setHeaderAction(() => fn);
+  }, []);
 
   return (
     <div
@@ -33,22 +43,41 @@ const WidgetWrapper: React.FC<Props> = ({ widget, editMode, onRemove, layout }) 
       >
         <div className="flex items-center justify-between px-4 py-2">
           <h3 className="text-lg font-semibold text-[var(--text-primary)]">{title}</h3>
-          {icon && <span className="mr-3 h-5 w-5">{icon}</span>}
-
-          {editMode && (
-            <button
-              onClick={onRemove}
-              className={`no-drag ${themeClasses.iconButton} rounded p-1 focus:outline-none`}
-              aria-label="Remove widget"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
+          <div className="flex items-center space-x-2">
+            {headerAction ? headerAction() : null}
+            {editMode && (
+              <button
+                onClick={() => editorOpenerRef.current?.()}
+                className={`no-drag ${themeClasses.iconButton} rounded p-1 focus:outline-none`}
+                aria-label="Edit widget"
+                title="Edit widget"
+              >
+                <Edit3 className="h-4 w-4" />
+              </button>
+            )}
+            {icon && <span className="h-5 w-5">{icon}</span>}
+            {editMode && (
+              <button
+                onClick={onRemove}
+                className={`no-drag ${themeClasses.iconButton} rounded p-1 focus:outline-none`}
+                aria-label="Remove widget"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
         <div className="flex-1 overflow-auto p-4">
           {Component ? (
             <Suspense fallback={<div className="text-sm ui-text-muted">Loading widget...</div>}>
-              <Component />
+              <Component
+                widget={widget}
+                config={widget.config}
+                onConfigChange={onConfigChange}
+                editMode={editMode}
+                registerEditorOpener={registerEditorOpener}
+                registerHeaderAction={registerHeaderAction}
+              />
             </Suspense>
           ) : (
             <div className="text-sm ui-text-muted">Component not found</div>

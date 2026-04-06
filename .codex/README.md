@@ -19,12 +19,20 @@ Codex should use this repository as a spec-driven delivery workspace rather than
 - use `delivery/governance/ai-working-contract.md` as the shared minimum behavior layer across Copilot, Codex, and Claude
 - treat a short high-level request as valid input for orchestration
 - start feature-like work with `agents/feature-orchestrator.md`, not with implementation
+- use `agents/enhancement-scout.md` only when the user asks for enhancement ideas, project review, or feature-gap discovery before spec drafting
 - classify the request as feature, UI standardization, backend or platform change, bug fix, docs-only, or trivial change
 - treat UI standardization, shared component adoption, and layout harmonization as feature-like work
 - begin business-originated requests with Business Analyst style refinement
 - understand the feature intent before changing code
+- search for an existing governing `specs/features/FEAT-.../` package before creating a new one for feature-like work
+- update the existing governing package by default when the request extends an existing page, module, workflow, or shipped capability
 - do not implement feature code from a raw request when the governing feature package is missing or stale
 - create or update the governing feature package under `specs/features/...` before implementation
+- treat short requests such as "I would like...", "add a page...", "show...", or "create a submenu..." as spec-intake by default, not as approval to jump directly to code
+- even when the user wants implementation in the same turn, create or update the governing feature package first and only then implement from that spec
+- enrich the existing core artifacts with stronger actors, flows, business rules, domain/data language, and non-functional expectations when that improves clarity
+- do not introduce extra default user-facing artifacts just because another method uses terms such as requirements, use case, or entity model
+- use a lightweight embedded interaction/use-case diagram only when it clarifies a multi-actor, branching, role-sensitive, or navigation-heavy feature better than prose alone
 - align implementation to explicit requirements and acceptance criteria
 - keep frontend and backend changes traceable to specs
 - include tests and docs in the same delivery flow
@@ -45,6 +53,7 @@ For a raw feature-like request, the default Codex path is: use `agents/feature-o
 ## Codex-Specific Assets
 
 **Agents** (`agents/`):
+- `enhancement-scout.md` - optional pre-spec discovery of worthwhile feature opportunities and enhancements
 - `feature-orchestrator.md` — primary entrypoint for feature work
 - `role-routing.md` — decides which role to activate
 - `business-analyst.md`, `architect.md`, `python-engineer.md`, `reactjs-expert.md`
