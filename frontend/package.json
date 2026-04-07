@@ -25,7 +25,7 @@
         "i18next": "^23.0.0",
         "lucide-react": "^0.268.0",
         "marked": "^8.0.1",
-        "mermaid": "^11.6.0",
+        "mermaid": "^11.14.0",
         "notistack": "^3.0.2",
         "react": "^18.3.0",
         "react-dom": "^18.3.0",
@@ -36,7 +36,7 @@
         "react-router-dom": "^6.15.0",
         "react-svg-worldmap": "^2.0.0-alpha.16",
         "reactflow": "^11.11.4",
-        "recharts": "^2.15.3",
+        "recharts": "^2.15.4",
         "remark-gfm": "^4.0.1",
         "tailwind-merge": "^3.2.0",
         "uuid": "^11.1.0"
@@ -55,13 +55,24 @@
         "eslint-plugin-react-hooks": "^5.2.0",
         "globals": "^15.15.0",
         "jsdom": "^26.1.0",
-        "playwright": "^1.45.0",
+        "playwright": "^1.59.1",
         "postcss": "^8.4.30",
         "postcss-nesting": "^13.0.1",
-        "tailwindcss": "^3.4.0",
+        "tailwindcss": "^3.4.19",
         "typescript": "^5.3.0",
         "typescript-eslint": "^8.26.1",
-        "vite": "^8.0.1",
+        "vite": "^8.0.5",
         "vitest": "^3.2.4"
+    },
+    "overrides": {
+        "anymatch": {
+            "picomatch": "^2.3.2"
+        },
+        "readdirp": {
+            "picomatch": "^2.3.2"
+        },
+        "micromatch": {
+            "picomatch": "^2.3.2"
+        }
     }
 }
