@@ -2,6 +2,7 @@ import { useContext, useEffect, useMemo, useRef, useState, type FormEvent } from
 import { ArrowUp, Database, Loader2, Maximize2, MessageSquare, Minimize2, Sparkles, X, ChevronDown } from 'lucide-react';
 
 import { QueryContext } from '@/features/chat/contexts/QueryContext';
+import "@/styles/LoadingIndicator.css";
 import MarkdownAnswer from '@/features/chat/components/MarkdownAnswer';
 import StageServicesPanel from './StageServicesPanel';
 import { themeClasses } from '@/theme/themeClasses';
@@ -241,7 +242,7 @@ export default function AssistantPanel({
                     ) : entry.isPending ? (
                       <div className="flex items-center gap-2 text-[var(--text-muted)]">
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Thinking...
+                        <span className="revealing-light">Thinking<span className="dots" /></span>
                       </div>
                     ) : entry.answer ? (
                       <MarkdownAnswer content={entry.answer || ''} />
@@ -254,7 +255,7 @@ export default function AssistantPanel({
               {loading && !hasPendingEntry ? (
                 <div className="flex items-center gap-2 rounded-3xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-4 py-3 text-sm text-[var(--text-muted)] shadow-sm">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Thinking...
+                  <span className="revealing-light">Thinking<span className="dots" /></span>
                 </div>
               ) : null}
               <div ref={listEndRef} />
