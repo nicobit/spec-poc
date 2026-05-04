@@ -1,0 +1,239 @@
+{
+  "name": "C4 PlantUML",
+  "description": "Faithful port of the official C4_blue PlantUML theme (plantuml-stdlib/C4-PlantUML). Classic C4 color palette: dark-blue persons, bright-blue systems, medium-blue containers, light-blue components, and grey externals.",
+  "elements": [
+    {
+      "tag": "Person",
+      "shape": "Person",
+      "background": "#08427B",
+      "color": "#FFFFFF",
+      "stroke": "#073B6F",
+      "strokeWidth": 2,
+      "border": "Solid"
+    },
+    {
+      "tag": "External Person",
+      "shape": "Person",
+      "background": "#686868",
+      "color": "#FFFFFF",
+      "stroke": "#8A8A8A",
+      "strokeWidth": 2,
+      "border": "Dashed",
+      "opacity": 70
+    },
+
+    {
+      "tag": "Software System",
+      "shape": "Box",
+      "background": "#1168BD",
+      "color": "#FFFFFF",
+      "stroke": "#3C7FC0",
+      "strokeWidth": 2,
+      "border": "Solid"
+    },
+    {
+      "tag": "External",
+      "background": "#999999",
+      "color": "#FFFFFF",
+      "stroke": "#8A8A8A",
+      "strokeWidth": 2,
+      "border": "Dashed",
+      "opacity": 70
+    },
+
+    {
+      "tag": "Container",
+      "shape": "RoundedBox",
+      "background": "#438DD5",
+      "color": "#FFFFFF",
+      "stroke": "#3C7FC0",
+      "strokeWidth": 2,
+      "border": "Solid"
+    },
+    {
+      "tag": "Application",
+      "shape": "RoundedBox",
+      "background": "#438DD5",
+      "color": "#FFFFFF",
+      "stroke": "#3C7FC0",
+      "strokeWidth": 2,
+      "border": "Solid"
+    },
+    {
+      "tag": "WebApp",
+      "shape": "WebBrowser",
+      "background": "#438DD5",
+      "color": "#FFFFFF",
+      "stroke": "#3C7FC0",
+      "strokeWidth": 2
+    },
+    {
+      "tag": "MobileApp",
+      "shape": "MobileDevicePortrait",
+      "background": "#438DD5",
+      "color": "#FFFFFF",
+      "stroke": "#3C7FC0",
+      "strokeWidth": 2
+    },
+    {
+      "tag": "Api",
+      "shape": "Hexagon",
+      "background": "#438DD5",
+      "color": "#FFFFFF",
+      "stroke": "#3C7FC0",
+      "strokeWidth": 2
+    },
+    {
+      "tag": "Worker",
+      "shape": "RoundedBox",
+      "background": "#438DD5",
+      "color": "#FFFFFF",
+      "stroke": "#3C7FC0",
+      "strokeWidth": 2
+    },
+    {
+      "tag": "Database",
+      "shape": "Cylinder",
+      "background": "#438DD5",
+      "color": "#FFFFFF",
+      "stroke": "#3C7FC0",
+      "strokeWidth": 2
+    },
+    {
+      "tag": "Cache",
+      "shape": "RoundedBox",
+      "background": "#B3B3B3",
+      "color": "#000000",
+      "stroke": "#A6A6A6",
+      "strokeWidth": 2
+    },
+    {
+      "tag": "MessageBroker",
+      "shape": "Pipe",
+      "background": "#438DD5",
+      "color": "#FFFFFF",
+      "stroke": "#3C7FC0",
+      "strokeWidth": 2
+    },
+    {
+      "tag": "Storage",
+      "shape": "Folder",
+      "background": "#438DD5",
+      "color": "#FFFFFF",
+      "stroke": "#3C7FC0",
+      "strokeWidth": 2
+    },
+    {
+      "tag": "Web Browser",
+      "shape": "WebBrowser",
+      "background": "#438DD5",
+      "color": "#FFFFFF",
+      "stroke": "#3C7FC0",
+      "strokeWidth": 2
+    },
+    {
+      "tag": "Mobile App",
+      "shape": "MobileDeviceLandscape",
+      "background": "#438DD5",
+      "color": "#FFFFFF",
+      "stroke": "#3C7FC0",
+      "strokeWidth": 2
+    },
+
+    {
+      "tag": "Component",
+      "shape": "RoundedBox",
+      "background": "#85BBF0",
+      "color": "#000000",
+      "stroke": "#78A8D8",
+      "strokeWidth": 2,
+      "border": "Solid"
+    },
+    {
+      "tag": "Code",
+      "shape": "RoundedBox",
+      "background": "#85BBF0",
+      "color": "#000000",
+      "stroke": "#78A8D8",
+      "strokeWidth": 2
+    },
+
+    {
+      "tag": "Deployment Environment",
+      "shape": "RoundedBox",
+      "background": "#FFFFFF",
+      "color": "#000000",
+      "stroke": "#A2A2A2",
+      "strokeWidth": 1,
+      "border": "Dashed"
+    },
+    {
+      "tag": "Deployment Node",
+      "shape": "RoundedBox",
+      "background": "#FFFFFF",
+      "color": "#000000",
+      "stroke": "#A2A2A2",
+      "strokeWidth": 1,
+      "border": "Dashed"
+    },
+    {
+      "tag": "Infrastructure Node",
+      "shape": "RoundedBox",
+      "background": "#FFFFFF",
+      "color": "#000000",
+      "stroke": "#A2A2A2",
+      "strokeWidth": 1
+    },
+
+    {
+      "tag": "Software System Instance",
+      "shape": "Box",
+      "background": "#1168BD",
+      "color": "#FFFFFF",
+      "stroke": "#3C7FC0",
+      "strokeWidth": 2
+    },
+    {
+      "tag": "Container Instance",
+      "shape": "RoundedBox",
+      "background": "#438DD5",
+      "color": "#FFFFFF",
+      "stroke": "#3C7FC0",
+      "strokeWidth": 2
+    },
+
+    {
+      "tag": "Robot",
+      "shape": "Robot",
+      "background": "#08427B",
+      "color": "#FFFFFF",
+      "stroke": "#073B6F",
+      "strokeWidth": 2
+    },
+    {
+      "tag": "Circle",
+      "shape": "Circle",
+      "background": "#1168BD",
+      "color": "#FFFFFF",
+      "stroke": "#3C7FC0",
+      "strokeWidth": 2
+    },
+    {
+      "tag": "Ellipse",
+      "shape": "Ellipse",
+      "background": "#1168BD",
+      "color": "#FFFFFF",
+      "stroke": "#3C7FC0",
+      "strokeWidth": 2
+    }
+  ],
+  "relationships": [
+    {
+      "tag": "Relationship",
+      "color": "#666666",
+      "thickness": 2,
+      "fontSize": 12,
+      "opacity": 100
+    }
+  ]
+}
